@@ -10,7 +10,7 @@ export default async function FloorPlanPage() {
       <PageHeader
         eyebrow="Ballroom view"
         title="Floor plan"
-        description="Drag tables into position, save coordinates, and preview each table's checked-in guests."
+        description="Scroll and zoom the ballroom on mobile, tap tables for guests, or switch to the list view. Enable Move tables only when editing layout."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
       <FloorPlanCanvas tables={data.tables} guests={data.guests} />
