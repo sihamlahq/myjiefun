@@ -62,8 +62,14 @@ h3,
 }
 
 .checkin-search {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   height: 3.5rem;
+}
+
+@media (max-width: 640px) {
+  .checkin-search {
+    font-size: 1rem;
+  }
 }
 
 .reception-orb {
