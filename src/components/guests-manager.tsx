@@ -1,0 +1,513 @@
+"use client";
+
+import Fuse from "fuse.js";
+import { Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
+import { deleteGuest, upsertGuest } from "@/lib/actions/wedding";
+import { csvToObjects, guestsToCsv } from "@/lib/csv";
+import { cn } from "@/lib/utils";
+import type {
+  AttendanceStatus,
+  Guest,
+  GuestGroup,
+  GuestWithRelations,
+  ReceptionTable,
+  RsvpStatus,
+} from "@/types/wedding";
+import { Button } from "@/components/ui/button";
+import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input, Label, Textarea } from "@/components/ui/input";
+import { EmptyState } from "@/components/page-chrome";
+
+type GuestDraft = Pick<
+  Guest,
+  | "name_en"
+  | "name_zh"
+  | "nickname"
+  | "phone"
+  | "email"
+  | "guest_code"
+  | "rsvp_status"
+  | "attendance_status"
+  | "expected_count"
+  | "group_id"
+  | "table_id"
+  | "is_vip"
+  | "is_walk_in"
+  | "dietary"
+  | "relationship"
+  | "category"
+  | "notes"
+  | "custom_fields"
+> & { id?: string };
+
+const rsvpOptions: RsvpStatus[] = ["pending", "confirmed", "maybe", "declined"];
+const attendanceOptions: AttendanceStatus[] = ["not_arrived", "checked_in", "no_show", "walk_in"];
+
+const emptyDraft: GuestDraft = {
+  name_en: "",
+  name_zh: "",
+  nickname: "",
+  phone: "",
+  email: "",
+  guest_code: "",
+  rsvp_status: "pending",
+  attendance_status: "not_arrived",
+  expected_count: 1,
+  group_id: null,
+  table_id: null,
+  is_vip: false,
+  is_walk_in: false,
+  dietary: "",
+  relationship: "",
+  category: "",
+  notes: "",
+  custom_fields: {},
+};
+
+function download(filename: string, content: string, type = "text/csv;charset=utf-8") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function toBoolean(value: string) {
+  return ["1", "true", "yes", "y"].includes(value.trim().toLowerCase());
+}
+
+export function GuestsManager({
+  guests,
+  tables,
+  groups,
+}: {
+  guests: GuestWithRelations[];
+  tables: ReceptionTable[];
+  groups: GuestGroup[];
+}) {
+  const [query, setQuery] = useState("");
+  const [rsvp, setRsvp] = useState("all");
+  const [attendance, setAttendance] = useState("all");
+  const [vip, setVip] = useState("all");
+  const [table, setTable] = useState("all");
+  const [group, setGroup] = useState("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [draft, setDraft] = useState<GuestDraft | null>(null);
+  const [customFieldsText, setCustomFieldsText] = useState("{}");
+  const [isPending, startTransition] = useTransition();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const fuse = useMemo(
+    () =>
+      new Fuse(guests, {
+        keys: [
+          "name_en",
+          "name_zh",
+          "nickname",
+          "phone",
+          "email",
+          "guest_code",
+          "guest_groups.name",
+          "reception_tables.table_number",
+        ],
+        threshold: 0.32,
+        ignoreLocation: true,
+      }),
+    [guests],
+  );
+
+  const filtered = useMemo(() => {
+    const searched = query.trim() ? fuse.search(query.trim()).map((result) => result.item) : guests;
+    return searched.filter((guest) => {
+      if (rsvp !== "all" && guest.rsvp_status !== rsvp) return false;
+      if (attendance !== "all" && guest.attendance_status !== attendance) return false;
+      if (vip !== "all" && guest.is_vip !== (vip === "yes")) return false;
+      if (table === "unassigned" && guest.table_id) return false;
+      if (table !== "all" && table !== "unassigned" && guest.table_id !== table) return false;
+      if (group === "ungrouped" && guest.group_id) return false;
+      if (group !== "all" && group !== "ungrouped" && guest.group_id !== group) return false;
+      return true;
+    });
+  }, [attendance, fuse, group, guests, query, rsvp, table, vip]);
+
+  const selectedGuests = filtered.filter((guest) => selected.has(guest.id));
+
+  function openGuest(guest?: GuestWithRelations) {
+    if (!guest) {
+      setDraft(emptyDraft);
+      setCustomFieldsText("{}");
+      return;
+    }
+    const nextDraft: GuestDraft = {
+      id: guest.id,
+      name_en: guest.name_en,
+      name_zh: guest.name_zh,
+      nickname: guest.nickname,
+      phone: guest.phone,
+      email: guest.email,
+      guest_code: guest.guest_code,
+      rsvp_status: guest.rsvp_status,
+      attendance_status: guest.attendance_status,
+      expected_count: guest.expected_count,
+      group_id: guest.group_id,
+      table_id: guest.table_id,
+      is_vip: guest.is_vip,
+      is_walk_in: guest.is_walk_in,
+      dietary: guest.dietary,
+      relationship: guest.relationship,
+      category: guest.category,
+      notes: guest.notes,
+      custom_fields: guest.custom_fields,
+    };
+    setDraft(nextDraft);
+    setCustomFieldsText(JSON.stringify(guest.custom_fields ?? {}, null, 2));
+  }
+
+  function updateDraft<K extends keyof GuestDraft>(key: K, value: GuestDraft[K]) {
+    setDraft((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  function saveGuest(event: FormEvent) {
+    event.preventDefault();
+    if (!draft) return;
+
+    let customFields: Record<string, unknown>;
+    try {
+      customFields = JSON.parse(customFieldsText) as Record<string, unknown>;
+    } catch {
+      toast.error("Custom fields must be valid JSON.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        await upsertGuest({
+          ...draft,
+          guest_code: draft.guest_code.trim() || undefined,
+          group_id: draft.group_id || null,
+          table_id: draft.table_id || null,
+          custom_fields: customFields,
+          expected_count: Number(draft.expected_count) || 1,
+        });
+        setDraft(null);
+        toast.success("Guest saved.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to save guest.");
+      }
+    });
+  }
+
+  function removeGuest(guest: GuestWithRelations) {
+    if (!confirm(`Delete ${guest.name_en}? This cannot be undone.`)) return;
+    startTransition(async () => {
+      try {
+        await deleteGuest(guest.id);
+        toast.success("Guest deleted.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to delete guest.");
+      }
+    });
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exportCsv() {
+    const rows = selectedGuests.length ? selectedGuests : filtered;
+    download(`myjiefun-guests-${new Date().toISOString().slice(0, 10)}.csv`, guestsToCsv(rows));
+  }
+
+  async function importCsv(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const rows = csvToObjects(text);
+    const tableByNumber = new Map(tables.map((item) => [item.table_number.toLowerCase(), item.id]));
+    const groupByName = new Map(groups.map((item) => [item.name.toLowerCase(), item.id]));
+
+    startTransition(async () => {
+      try {
+        for (const row of rows) {
+          const name = row.name_en || row.name || row.guest_name;
+          if (!name) continue;
+          await upsertGuest({
+            name_en: name,
+            name_zh: row.name_zh ?? "",
+            nickname: row.nickname ?? "",
+            phone: row.phone ?? "",
+            email: row.email ?? "",
+            guest_code: row.guest_code || undefined,
+            rsvp_status: (row.rsvp_status as RsvpStatus) || "pending",
+            attendance_status: (row.attendance_status as AttendanceStatus) || "not_arrived",
+            expected_count: Number(row.expected_count || 1),
+            group_id: row.group_id || groupByName.get((row.group || "").toLowerCase()) || null,
+            table_id: row.table_id || tableByNumber.get((row.table || "").toLowerCase()) || null,
+            is_vip: toBoolean(row.is_vip || ""),
+            is_walk_in: toBoolean(row.is_walk_in || ""),
+            dietary: row.dietary ?? "",
+            relationship: row.relationship ?? "",
+            category: row.category ?? "",
+            notes: row.notes ?? "",
+          });
+        }
+        toast.success(`Imported ${rows.length} CSV rows.`);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "CSV import failed.");
+      } finally {
+        if (fileRef.current) fileRef.current.value = "";
+      }
+    });
+  }
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every((guest) => selected.has(guest.id));
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(120px,auto))]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search names, phone, code, group, table..."
+              className="pl-9"
+            />
+          </div>
+          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={rsvp} onChange={(event) => setRsvp(event.target.value)}>
+            <option value="all">All RSVP</option>
+            {rsvpOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={attendance} onChange={(event) => setAttendance(event.target.value)}>
+            <option value="all">All attendance</option>
+            {attendanceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={vip} onChange={(event) => setVip(event.target.value)}>
+            <option value="all">VIP all</option>
+            <option value="yes">VIP only</option>
+            <option value="no">Non-VIP</option>
+          </select>
+          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={table} onChange={(event) => setTable(event.target.value)}>
+            <option value="all">All tables</option>
+            <option value="unassigned">Unassigned</option>
+            {tables.map((item) => <option key={item.id} value={item.id}>{item.table_number}</option>)}
+          </select>
+          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={group} onChange={(event) => setGroup(event.target.value)}>
+            <option value="all">All groups</option>
+            <option value="ungrouped">Ungrouped</option>
+            {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-[var(--foreground)]/65">
+          Showing {filtered.length} of {guests.length}. {selected.size} selected.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
+          <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={isPending}>
+            <Upload className="h-4 w-4" /> Import CSV
+          </Button>
+          <Button variant="outline" onClick={exportCsv}>
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+          <Button onClick={() => openGuest()}>
+            <Plus className="h-4 w-4" /> Add guest
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Guest list</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filtered.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1500px] text-left text-sm">
+                <thead className="text-xs uppercase tracking-[0.14em] text-[var(--foreground)]/50">
+                  <tr className="border-b border-black/10">
+                    <th className="py-3 pr-3">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={() =>
+                          setSelected((current) => {
+                            const next = new Set(current);
+                            if (allVisibleSelected) filtered.forEach((guest) => next.delete(guest.id));
+                            else filtered.forEach((guest) => next.add(guest.id));
+                            return next;
+                          })
+                        }
+                      />
+                    </th>
+                    {[
+                      "Code",
+                      "Name",
+                      "Chinese",
+                      "Nickname",
+                      "Phone",
+                      "Email",
+                      "Group",
+                      "RSVP",
+                      "Count",
+                      "Attendance",
+                      "Table",
+                      "Seat",
+                      "VIP",
+                      "Walk-in",
+                      "Dietary",
+                      "Relationship",
+                      "Category",
+                      "Notes",
+                      "Checked in",
+                      "Actions",
+                    ].map((header) => (
+                      <th key={header} className="py-3 pr-3">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((guest) => (
+                    <tr key={guest.id} className="border-b border-black/5 align-top hover:bg-white/55">
+                      <td className="py-3 pr-3">
+                        <input type="checkbox" checked={selected.has(guest.id)} onChange={() => toggleSelected(guest.id)} />
+                      </td>
+                      <td className="py-3 pr-3 font-mono text-xs">{guest.guest_code}</td>
+                      <td className="py-3 pr-3 font-semibold">{guest.name_en}</td>
+                      <td className="py-3 pr-3">{guest.name_zh}</td>
+                      <td className="py-3 pr-3">{guest.nickname}</td>
+                      <td className="py-3 pr-3">{guest.phone}</td>
+                      <td className="py-3 pr-3">{guest.email}</td>
+                      <td className="py-3 pr-3">{guest.guest_groups?.name ?? "—"}</td>
+                      <td className="py-3 pr-3"><Badge className="capitalize">{guest.rsvp_status}</Badge></td>
+                      <td className="py-3 pr-3">{guest.expected_count}</td>
+                      <td className="py-3 pr-3">{guest.attendance_status}</td>
+                      <td className="py-3 pr-3">{guest.reception_tables?.table_number ?? "Unassigned"}</td>
+                      <td className="py-3 pr-3">{guest.seats?.seat_number ?? "—"}</td>
+                      <td className="py-3 pr-3">{guest.is_vip ? "Yes" : "No"}</td>
+                      <td className="py-3 pr-3">{guest.is_walk_in ? "Yes" : "No"}</td>
+                      <td className="py-3 pr-3">{guest.dietary}</td>
+                      <td className="py-3 pr-3">{guest.relationship}</td>
+                      <td className="py-3 pr-3">{guest.category}</td>
+                      <td className="max-w-[220px] py-3 pr-3">{guest.notes}</td>
+                      <td className="py-3 pr-3">{guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleString() : "—"}</td>
+                      <td className="py-3 pr-3">
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => openGuest(guest)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => removeGuest(guest)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No guests found" description="Adjust filters, import a CSV, or add the first guest manually." />
+          )}
+        </CardContent>
+      </Card>
+
+      {draft ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4 backdrop-blur-sm">
+          <form onSubmit={saveGuest} className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/50 bg-[var(--background)] p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">Guest details</p>
+                <h2 className="font-heading text-3xl font-semibold">{draft.id ? "Edit guest" : "Add guest"}</h2>
+              </div>
+              <Button type="button" variant="ghost" onClick={() => setDraft(null)}>Close</Button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="English name"><Input required value={draft.name_en} onChange={(event) => updateDraft("name_en", event.target.value)} /></Field>
+              <Field label="Chinese name"><Input value={draft.name_zh} onChange={(event) => updateDraft("name_zh", event.target.value)} /></Field>
+              <Field label="Nickname"><Input value={draft.nickname} onChange={(event) => updateDraft("nickname", event.target.value)} /></Field>
+              <Field label="Guest code"><Input value={draft.guest_code} onChange={(event) => updateDraft("guest_code", event.target.value)} /></Field>
+              <Field label="Phone"><Input value={draft.phone} onChange={(event) => updateDraft("phone", event.target.value)} /></Field>
+              <Field label="Email"><Input type="email" value={draft.email} onChange={(event) => updateDraft("email", event.target.value)} /></Field>
+              <Field label="Expected count"><Input type="number" min={0} value={draft.expected_count} onChange={(event) => updateDraft("expected_count", Number(event.target.value))} /></Field>
+              <Field label="RSVP"><Select value={draft.rsvp_status} onChange={(value) => updateDraft("rsvp_status", value as RsvpStatus)} options={rsvpOptions} /></Field>
+              <Field label="Attendance"><Select value={draft.attendance_status} onChange={(value) => updateDraft("attendance_status", value as AttendanceStatus)} options={attendanceOptions} /></Field>
+              <Field label="Group">
+                <select className="h-10 rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={draft.group_id ?? ""} onChange={(event) => updateDraft("group_id", event.target.value || null)}>
+                  <option value="">No group</option>
+                  {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Table">
+                <select className="h-10 rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={draft.table_id ?? ""} onChange={(event) => updateDraft("table_id", event.target.value || null)}>
+                  <option value="">Unassigned</option>
+                  {tables.map((item) => <option key={item.id} value={item.id}>{item.table_number} · {item.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Dietary"><Input value={draft.dietary} onChange={(event) => updateDraft("dietary", event.target.value)} /></Field>
+              <Field label="Relationship"><Input value={draft.relationship} onChange={(event) => updateDraft("relationship", event.target.value)} /></Field>
+              <Field label="Category"><Input value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} /></Field>
+              <label className="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2 text-sm font-semibold">
+                <input type="checkbox" checked={draft.is_vip} onChange={(event) => updateDraft("is_vip", event.target.checked)} /> VIP guest
+              </label>
+              <label className="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2 text-sm font-semibold">
+                <input type="checkbox" checked={draft.is_walk_in} onChange={(event) => updateDraft("is_walk_in", event.target.checked)} /> Walk-in
+              </label>
+              <Field label="Notes" className="md:col-span-2"><Textarea value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} /></Field>
+              <Field label="Custom fields JSON" className="md:col-span-2"><Textarea className="font-mono" value={customFieldsText} onChange={(event) => setCustomFieldsText(event.target.value)} /></Field>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDraft(null)}>Cancel</Button>
+              <Button type="submit" disabled={isPending}>{isPending ? "Saving..." : "Save guest"}</Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function Select({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+}) {
+  return (
+    <select className="h-10 rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)}>
+      {options.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select>
+  );
+}
