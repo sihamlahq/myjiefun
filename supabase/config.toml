@@ -6,8 +6,9 @@
 #   - Venus Makeup Artist (venusmakeupartist)
 #
 # Use its OWN Supabase project and OWN Vercel project, both named: myjiefun
+# Connected project: https://rnjsqobnzzgnjmdejeui.supabase.co
 
-project_id = "myjiefun"
+project_id = "rnjsqobnzzgnjmdejeui"
 
 [api]
 enabled = true
