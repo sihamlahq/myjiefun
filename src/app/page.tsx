@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { EnquiryForm } from "@/components/enquiry-form";
 
 const menu = [
   {
@@ -172,12 +173,7 @@ export default function Home() {
               </p>
               <p className="mt-2 text-lg">Coming soon — stay tuned</p>
             </div>
-            <a
-              href="mailto:hello@myjiefun.com"
-              className="inline-flex rounded-full bg-mango px-6 py-3 text-sm font-semibold text-ink transition hover:bg-mango-deep"
-            >
-              Say hello
-            </a>
+            <EnquiryForm />
           </div>
         </div>
       </section>

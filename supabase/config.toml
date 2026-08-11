@@ -1,0 +1,30 @@
+# Myjiefun — independent website
+#
+# This project is SEPARATE from:
+#   - Sihamla (v0-sihamla)
+#   - The Agarwood (theagarwood.com)
+#   - Venus Makeup Artist (venusmakeupartist)
+#
+# Use its OWN Supabase project and OWN Vercel project, both named: myjiefun
+
+project_id = "myjiefun"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://myjiefun.com", "https://www.myjiefun.com"]
