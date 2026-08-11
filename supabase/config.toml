@@ -28,4 +28,4 @@ port = 54323
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://myjiefun.com", "https://www.myjiefun.com"]
+additional_redirect_urls = ["https://tablewedding.com", "https://www.tablewedding.com", "http://localhost:3000", "http://localhost:3001"]

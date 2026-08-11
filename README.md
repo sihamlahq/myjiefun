@@ -62,11 +62,12 @@ cp .env.example .env.local
 Fill in values from the **myjiefun** Supabase project:
 
 ```env
-NEXT_PUBLIC_SITE_URL=https://myjiefun.com
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SITE_URL=https://tablewedding.com
+NEXT_PUBLIC_SUPABASE_URL=https://rnjsqobnzzgnjmdejeui.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_PROJECT_ID=myjiefun
+SUPABASE_PROJECT_ID=rnjsqobnzzgnjmdejeui
+VERCEL_PROJECT_ID=prj_0v0fe1nhjA8Eqf6hIB6ospcoLQWK
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is only required for the seed script and trusted
@@ -119,14 +120,29 @@ npm run lint
 
 ## Deployment
 
-Vercel project ID: **`prj_0v0fe1nhjA8Eqf6hIB6ospcoLQWK`**
+**Domain:** [https://tablewedding.com](https://tablewedding.com)  
+**Vercel project:** `prj_0v0fe1nhjA8Eqf6hIB6ospcoLQWK`
 
-1. In that Vercel project, set Root Directory to `myjiefun-website` if the repo is still `v0-sihamla`, or `/` once hosted in `sihamlahq/myjiefun`.
-2. Add environment variables:
-   - `NEXT_PUBLIC_SITE_URL=https://myjiefun.com`
-   - `NEXT_PUBLIC_SUPABASE_URL=https://rnjsqobnzzgnjmdejeui.supabase.co`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY=...`
-   - `SUPABASE_SERVICE_ROLE_KEY=...` (optional on Vercel; required for seed)
-3. Deploy.
-4. Attach `myjiefun.com` and `www.myjiefun.com` in Vercel Domains.
-5. In Supabase Auth → URL config, allow your Vercel and custom domain callbacks.
+1. In Vercel project settings:
+   - Root Directory: `myjiefun-website` (while repo is still `v0-sihamla`)
+   - Env vars:
+     - `NEXT_PUBLIC_SITE_URL=https://tablewedding.com`
+     - `NEXT_PUBLIC_SUPABASE_URL=https://rnjsqobnzzgnjmdejeui.supabase.co`
+     - `NEXT_PUBLIC_SUPABASE_ANON_KEY=...`
+     - `SUPABASE_SERVICE_ROLE_KEY=...` (optional on Vercel; required for seed)
+2. Deploy the project.
+3. Vercel → **Domains** → add:
+   - `tablewedding.com`
+   - `www.tablewedding.com`
+4. At **Namecheap** (domain is currently on parking), replace parking DNS with Vercel records:
+
+   | Type | Host | Value |
+   | --- | --- | --- |
+   | A | `@` | `76.76.21.21` |
+   | CNAME | `www` | `cname.vercel-dns.com` |
+
+   (If Vercel shows different values in the Domains panel, use those.)
+
+5. Supabase → **Authentication → URL configuration**:
+   - Site URL: `https://tablewedding.com`
+   - Redirect URLs: `https://tablewedding.com/**`, `https://www.tablewedding.com/**`

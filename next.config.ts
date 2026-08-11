@@ -5,7 +5,7 @@ const nextConfig = {
     root: __dirname,
   },
   env: {
-    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || "https://myjiefun.com",
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || "https://tablewedding.com",
   },
 };
 
