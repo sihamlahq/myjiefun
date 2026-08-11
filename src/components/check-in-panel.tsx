@@ -59,7 +59,7 @@ export function CheckInPanel({
     if (!selectedId && results[0]) setSelectedId(results[0].id);
   }, [results, selectedId]);
 
-  function runAction(label: string, action: () => Promise<void>) {
+  function runAction(label: string, action: () => Promise<unknown>) {
     startTransition(async () => {
       try {
         await action();
