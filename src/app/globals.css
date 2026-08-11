@@ -1,123 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #10241f;
-  --forest: #1a3c34;
-  --jade: #2f6b5c;
-  --mist: #dceee8;
-  --foam: #f3faf7;
-  --mango: #f0a429;
-  --mango-deep: #d88912;
-  --coral: #e85d4c;
-  --background: var(--foam);
-  --foreground: var(--ink);
+  --background: #f7f3ec;
+  --foreground: #2c2a26;
+  --primary: #8b7355;
+  --secondary: #c9a66b;
+  --accent: #d4af37;
+  --card: rgba(255, 255, 255, 0.78);
+  --muted: #efe8dc;
+  --danger: #9b2c2c;
+  --radius: 0.75rem;
+  --font-heading: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Source Sans 3", system-ui, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-ink: var(--ink);
-  --color-forest: var(--forest);
-  --color-jade: var(--jade);
-  --color-mist: var(--mist);
-  --color-foam: var(--foam);
-  --color-mango: var(--mango);
-  --color-mango-deep: var(--mango-deep);
-  --color-coral: var(--coral);
-  --font-display: var(--font-display);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-body);
 }
 
 * {
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
+html,
+body {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
-  background: var(--background);
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(212, 175, 55, 0.14), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(139, 115, 85, 0.1), transparent 50%),
+    var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3,
+.font-heading {
+  font-family: var(--font-heading);
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--mango) 55%, white);
-  color: var(--ink);
+  background: color-mix(in oklab, var(--accent) 45%, white);
 }
 
-@keyframes rise {
+.floral-rail {
+  background-image: radial-gradient(circle at 20% 20%, rgba(201, 166, 107, 0.18), transparent 28%),
+    radial-gradient(circle at 80% 0%, rgba(139, 115, 85, 0.12), transparent 24%);
+}
+
+.stat-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.checkin-search {
+  font-size: 1.25rem;
+  height: 3.5rem;
+}
+
+.reception-orb {
+  animation: reception-float 9s ease-in-out infinite alternate;
+}
+
+.reception-orb-delay {
+  animation-delay: -3s;
+}
+
+@keyframes reception-float {
   from {
-    opacity: 0;
-    transform: translateY(28px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes drift {
-  0%,
-  100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
-  50% {
-    transform: translate3d(0, -12px, 0) scale(1.02);
+
+  to {
+    transform: translate3d(2rem, -1.5rem, 0) scale(1.08);
   }
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: 0% 50%;
+@media (max-width: 768px) {
+  .app-shell {
+    padding-bottom: 5rem;
   }
-  100% {
-    background-position: 100% 50%;
-  }
-}
-
-.anim-rise {
-  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.anim-rise-delay-1 {
-  animation-delay: 0.12s;
-}
-
-.anim-rise-delay-2 {
-  animation-delay: 0.24s;
-}
-
-.anim-rise-delay-3 {
-  animation-delay: 0.36s;
-}
-
-.anim-drift {
-  animation: drift 9s ease-in-out infinite;
-}
-
-.hero-wash {
-  background:
-    radial-gradient(ellipse 80% 60% at 70% 40%, rgba(240, 164, 41, 0.28), transparent 55%),
-    radial-gradient(ellipse 60% 50% at 15% 80%, rgba(47, 107, 92, 0.45), transparent 50%),
-    linear-gradient(135deg, #0d2a24 0%, #1a3c34 45%, #24574a 100%);
-  background-size: 140% 140%;
-  animation: shimmer 14s ease-in-out infinite alternate;
-}
-
-.section-title {
-  font-family: var(--font-display), Georgia, serif;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 0.95;
-}
-
-.grain {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.08;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }

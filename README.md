@@ -1,42 +1,81 @@
-# Myjiefun
+# Myjiefun Wedding Guest & Seating Manager
 
-Independent website for **Myjiefun** (`https://myjiefun.com`).
+Premium realtime wedding operations app for **Myjiefun**: guest directory, RSVP,
+mobile check-in, table planning, ballroom floor plan, reports, settings, and TV
+reception mode.
 
-This project is **separate** from:
+This project is intentionally separate from Sihamla, The Agarwood, and Venus
+Makeup Artist. Use a dedicated Supabase project, Vercel project, and domain.
 
-| Brand | Keep separate |
+## Stack
+
+- Next.js 15 App Router
+- TypeScript strict mode
+- Tailwind CSS v4
+- Supabase Auth, Postgres, RLS, and Realtime
+- Recharts, Fuse.js, dnd-kit, sonner, xlsx, jsPDF
+
+## Product areas
+
+| Route | Purpose |
 | --- | --- |
-| Sihamla | `v0-sihamla` repo + its Supabase + Vercel |
-| The Agarwood | `theagarwood.com` + its own projects |
-| Venus Makeup Artist | `venusmakeupartist` repo + its Supabase + Vercel |
+| `/dashboard` | Attendance, RSVP, occupancy, and recent arrival analytics |
+| `/guests` | Searchable guest CRUD, filters, CSV import/export, bulk selection |
+| `/check-in` | Mobile-first reception check-in, group/partial entry, walk-ins |
+| `/tables` | Table create/edit/duplicate/delete, capacity and seat controls |
+| `/seating` | Drag-and-drop guest assignment between tables/unassigned |
+| `/floor-plan` | Draggable ballroom canvas with table positions and guest popover |
+| `/reports` | Attendance, occupancy, RSVP, unassigned, VIP, no-show, walk-in, timeline, group reports |
+| `/settings` | Wedding details, theme CSS vars, guest/table/attendance settings |
+| `/reception` | Full-screen TV mode with realtime arrivals and table readiness |
 
-Do **not** reuse those Supabase keys, Vercel projects, or domains.
+The root route redirects to `/dashboard`.
 
-## 1. Create a new Supabase project named `myjiefun`
+## Supabase setup
 
-1. Open [supabase.com/dashboard](https://supabase.com/dashboard)
-2. **New project** → name it exactly **`myjiefun`**
-3. In **SQL Editor**, run in order:
-   - `supabase/migrations/20260811140000_enquiries.sql`
-   - `supabase/migrations/20260811140100_app_settings.sql`
-4. Copy **Project URL**, **anon key**, and **service_role key** from **Project Settings → API**
+1. Create a new Supabase project named **`myjiefun`**.
+2. Apply the schema migration:
 
-## 2. Environment variables
+   ```bash
+   supabase db push
+   ```
+
+   Or run `supabase/migrations/20260811150000_wedding_guest_manager.sql` in the SQL
+   editor.
+
+3. Create staff users in Supabase Auth. New users receive a `profiles` row.
+   Update profile roles as needed:
+   - `admin`
+   - `manager`
+   - `checkin_staff`
+   - `viewer`
+
+4. Enable Realtime for the public tables if your Supabase project requires
+   manual confirmation after the migration.
+
+## Environment variables
 
 ```bash
 cp .env.example .env.local
 ```
 
-Fill in Myjiefun-only values:
+Fill in values from the **myjiefun** Supabase project:
 
 ```env
 NEXT_PUBLIC_SITE_URL=https://myjiefun.com
-NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_PROJECT_ID=myjiefun
 ```
 
-## 3. Run locally
+`SUPABASE_SERVICE_ROLE_KEY` is only required for the seed script and trusted
+server-side maintenance.
+
+Pages render setup instructions instead of mock data when Supabase env vars are
+missing, so `next build` can succeed in unconfigured environments.
+
+## Local development
 
 ```bash
 npm install
@@ -45,31 +84,43 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## 4. Create a new Vercel project named `myjiefun`
+## Seed demo data
 
-1. Push this app to the **`sihamlahq/myjiefun`** GitHub repo (not Sihamla / Venus / Agarwood)
-2. In [vercel.com](https://vercel.com) → **Add New Project**
-3. Import **`sihamlahq/myjiefun`**
-4. Set the Vercel project name to **`myjiefun`**
-5. Root directory: repository root (this app)
-6. Add the same env vars under **Settings → Environment Variables**
-7. Deploy
+The seed script uses the Supabase service role key and clears wedding data before
+inserting deterministic sample data:
 
-After deploy you get a URL like `https://myjiefun.vercel.app`.
+- 40 reception tables
+- 400 seats
+- 12 guest groups
+- 400 guests with varied RSVP, attendance, VIP, walk-in, checked-in, and
+  unassigned states
+- Check-in timeline events for already-arrived guests
 
-## 5. Attach domain `myjiefun.com`
+Run:
 
-1. Vercel project **`myjiefun`** → **Domains**
-2. Add `myjiefun.com` and `www.myjiefun.com`
-3. At your registrar, point DNS to Vercel
+```bash
+npm run seed
+```
 
-## Stack
+The script is intended for development/staging projects. Do not run it against
+production data unless you intentionally want to replace guest/table/group data.
 
-- Next.js 15 (App Router)
-- TypeScript
-- Tailwind CSS 4
-- Supabase (enquiries + site settings)
+## Build and checks
 
-## API
+```bash
+npm run build
+npm run lint
+```
 
-- `POST /api/enquiries` — public reservation / contact form → `enquiries` table in the **myjiefun** Supabase project
+## APIs
+
+- `GET /api/health` -> `{ "ok": true }`
+- `GET /api/export?type=guests` -> authenticated CSV export of guests
+
+## Deployment
+
+1. Create a Vercel project named **`myjiefun`**.
+2. Connect the `sihamlahq/myjiefun` repository.
+3. Add the environment variables above.
+4. Deploy.
+5. Attach `myjiefun.com` and `www.myjiefun.com` in Vercel Domains.

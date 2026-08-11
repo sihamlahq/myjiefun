@@ -1,64 +1,34 @@
 import type { Metadata } from "next";
-import { Syne, Figtree } from "next/font/google";
+import { Cormorant_Garamond, Source_Sans_3 } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
-const display = Syne({
-  variable: "--font-display",
+const heading = Cormorant_Garamond({
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: ["500", "600", "700"],
+  variable: "--font-heading",
 });
 
-const sans = Figtree({
-  variable: "--font-sans",
+const body = Source_Sans_3({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://myjiefun.com";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: "Myjiefun — Eat. Laugh. Linger.",
+  title: "Wedding Guest & Seating Manager",
   description:
-    "Myjiefun is a warm hangout for shared plates, cold drinks, and easy evenings. Come for the food, stay for the fun.",
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
-    type: "website",
-    url: siteUrl,
-    siteName: "Myjiefun",
-    title: "Myjiefun — Eat. Laugh. Linger.",
-    description:
-      "A hangout for shared plates, cold drinks, and unhurried evenings.",
-    images: [
-      {
-        url: "/hero.jpg",
-        width: 1376,
-        height: 768,
-        alt: "Shared plates and warm lights at Myjiefun",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Myjiefun — Eat. Laugh. Linger.",
-    description:
-      "A hangout for shared plates, cold drinks, and unhurried evenings.",
-    images: ["/hero.jpg"],
-  },
+    "Realtime wedding guest list, RSVP, check-in, seating, and ballroom floor plan.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${sans.variable} antialiased`}>
+      <body className={`${heading.variable} ${body.variable} antialiased`}>
         {children}
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   );
