@@ -119,8 +119,14 @@ npm run lint
 
 ## Deployment
 
-1. Create a Vercel project named **`myjiefun`**.
-2. Connect the `sihamlahq/myjiefun` repository.
-3. Add the environment variables above.
-4. Deploy.
-5. Attach `myjiefun.com` and `www.myjiefun.com` in Vercel Domains.
+Vercel project ID: **`prj_0v0fe1nhjA8Eqf6hIB6ospcoLQWK`**
+
+1. In that Vercel project, set Root Directory to `myjiefun-website` if the repo is still `v0-sihamla`, or `/` once hosted in `sihamlahq/myjiefun`.
+2. Add environment variables:
+   - `NEXT_PUBLIC_SITE_URL=https://myjiefun.com`
+   - `NEXT_PUBLIC_SUPABASE_URL=https://rnjsqobnzzgnjmdejeui.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY=...`
+   - `SUPABASE_SERVICE_ROLE_KEY=...` (optional on Vercel; required for seed)
+3. Deploy.
+4. Attach `myjiefun.com` and `www.myjiefun.com` in Vercel Domains.
+5. In Supabase Auth → URL config, allow your Vercel and custom domain callbacks.
