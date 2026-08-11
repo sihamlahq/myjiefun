@@ -4,6 +4,8 @@ import { computeStats } from "@/lib/stats";
 import { formatPercent } from "@/lib/utils";
 import { loadWeddingData, withDefaultSettings } from "@/lib/wedding-data";
 
+export const dynamic = "force-dynamic";
+
 export default async function ReceptionPage() {
   const data = await loadWeddingData();
   const settings = withDefaultSettings(data.settings);

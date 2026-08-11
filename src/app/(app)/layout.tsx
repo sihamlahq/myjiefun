@@ -5,6 +5,8 @@ import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { createClient } from "@/lib/supabase/server";
 import type { AppRole, WeddingSettings } from "@/types/wedding";
 
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({
   children,
 }: {
