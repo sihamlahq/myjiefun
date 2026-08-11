@@ -19,9 +19,14 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
     try {
       const supabase = createClient();
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: cleanPassword,
+      });
       if (err) {
         setError(err.message);
         setLoading(false);
