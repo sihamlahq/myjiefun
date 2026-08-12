@@ -3,9 +3,19 @@
 import Fuse from "fuse.js";
 import { Check, CheckCircle2, Download, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
+import {
+  ChangeEvent,
+  FormEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { toast } from "sonner";
 import { deleteGuest, importGuests, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
+import { suppressRealtimeRefresh } from "@/lib/client-refresh";
 import {
   fileToGuestImportRows,
   guestUploadTemplateCsv,
@@ -27,6 +37,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
 import { GuestTableLink } from "@/components/table-guests-dialog";
+
+const PAGE_SIZE = 40;
 
 type GuestDraft = Pick<
   Guest,
@@ -104,7 +116,7 @@ function download(filename: string, content: string | ArrayBuffer, type = "text/
 }
 
 export function GuestsManager({
-  guests,
+  guests: serverGuests,
   tables,
   groups,
 }: {
@@ -113,7 +125,9 @@ export function GuestsManager({
   groups: GuestGroup[];
 }) {
   const router = useRouter();
+  const [guests, setGuests] = useState(serverGuests);
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [rsvp, setRsvp] = useState("all");
   const [attendance, setAttendance] = useState("all");
   const [vip, setVip] = useState("all");
@@ -125,29 +139,39 @@ export function GuestsManager({
   const [isPending, startTransition] = useTransition();
   const [savingRsvpId, setSavingRsvpId] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const fuse = useMemo(
-    () =>
-      new Fuse(guests, {
-        keys: [
-          "name_en",
-          "name_zh",
-          "nickname",
-          "phone",
-          "email",
-          "guest_code",
-          "guest_groups.name",
-          "reception_tables.table_number",
-        ],
-        threshold: 0.32,
-        ignoreLocation: true,
-      }),
-    [guests],
-  );
+  useEffect(() => {
+    setGuests(serverGuests);
+  }, [serverGuests]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [deferredQuery, rsvp, attendance, vip, table, group]);
+
+  const fuse = useMemo(() => {
+    if (!deferredQuery.trim()) return null;
+    return new Fuse(guests, {
+      keys: [
+        "name_en",
+        "name_zh",
+        "nickname",
+        "phone",
+        "email",
+        "guest_code",
+        "guest_groups.name",
+        "reception_tables.table_number",
+      ],
+      threshold: 0.32,
+      ignoreLocation: true,
+    });
+  }, [deferredQuery, guests]);
 
   const filtered = useMemo(() => {
-    const searched = query.trim() ? fuse.search(query.trim()).map((result) => result.item) : guests;
+    const searched = fuse
+      ? fuse.search(deferredQuery.trim()).map((result) => result.item)
+      : guests;
     return searched.filter((guest) => {
       if (rsvp !== "all" && guest.rsvp_status !== rsvp) return false;
       if (attendance !== "all" && guest.attendance_status !== attendance) return false;
@@ -158,7 +182,10 @@ export function GuestsManager({
       if (group !== "all" && group !== "ungrouped" && guest.group_id !== group) return false;
       return true;
     });
-  }, [attendance, fuse, group, guests, query, rsvp, table, vip]);
+  }, [attendance, fuse, group, guests, deferredQuery, rsvp, table, vip]);
+
+  const visibleGuests = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleCount;
 
   const selectedGuests = filtered.filter((guest) => selected.has(guest.id));
   const pendingCount = guests.filter((guest) => guest.rsvp_status === "pending").length;
@@ -230,11 +257,20 @@ export function GuestsManager({
 
   function removeGuest(guest: GuestWithRelations) {
     if (!confirm(`Delete ${guest.name_en}? This cannot be undone.`)) return;
+    const snapshot = guests;
+    setGuests((prev) => prev.filter((item) => item.id !== guest.id));
+    setSelected((current) => {
+      const next = new Set(current);
+      next.delete(guest.id);
+      return next;
+    });
+    toast.success("Guest deleted.");
+    suppressRealtimeRefresh(1600);
     startTransition(async () => {
       try {
         await deleteGuest(guest.id);
-        toast.success("Guest deleted.");
       } catch (error) {
+        setGuests(snapshot);
         toast.error(error instanceof Error ? error.message : "Unable to delete guest.");
       }
     });
@@ -242,16 +278,20 @@ export function GuestsManager({
 
   function setGuestRsvp(guest: GuestWithRelations, next: RsvpStatus) {
     if (guest.rsvp_status === next) return;
+    const snapshot = guests;
+    setGuests((prev) =>
+      prev.map((item) => (item.id === guest.id ? { ...item, rsvp_status: next } : item)),
+    );
+    toast.success(
+      next === "confirmed" ? `${guest.name_en} confirmed` : `${guest.name_en} → ${next}`,
+    );
+    suppressRealtimeRefresh(1600);
     setSavingRsvpId(guest.id);
     startTransition(async () => {
       try {
         await updateRsvp(guest.id, next);
-        toast.success(
-          next === "confirmed"
-            ? `${guest.name_en} confirmed`
-            : `${guest.name_en} → ${next}`,
-        );
       } catch (error) {
+        setGuests(snapshot);
         toast.error(error instanceof Error ? error.message : "Unable to update RSVP.");
       } finally {
         setSavingRsvpId(null);
@@ -265,12 +305,21 @@ export function GuestsManager({
       toast.error("Select guests first.");
       return;
     }
+    const idSet = new Set(ids);
+    const snapshot = guests;
+    setGuests((prev) =>
+      prev.map((item) =>
+        idSet.has(item.id) ? { ...item, rsvp_status: "confirmed" as RsvpStatus } : item,
+      ),
+    );
+    toast.success(`Confirmed ${ids.length} guest(s).`);
+    setSelected(new Set());
+    suppressRealtimeRefresh(1600);
     startTransition(async () => {
       try {
-        const result = await updateRsvpBulk(ids, "confirmed");
-        toast.success(`Confirmed ${result.updated} guest(s).`);
-        setSelected(new Set());
+        await updateRsvpBulk(ids, "confirmed");
       } catch (error) {
+        setGuests(snapshot);
         toast.error(error instanceof Error ? error.message : "Bulk confirm failed.");
       }
     });
@@ -398,7 +447,8 @@ export function GuestsManager({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--foreground)]/65">
-          Showing {filtered.length} of {guests.length}
+          Showing {Math.min(visibleCount, filtered.length)} of {filtered.length}
+          {filtered.length !== guests.length ? ` · ${guests.length} total` : ""}
           {selected.size ? ` · ${selected.size} selected` : ""}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -454,7 +504,7 @@ export function GuestsManager({
         <CardContent>
           {filtered.length ? (
             <ul className="space-y-2">
-              {filtered.map((guest) => {
+              {visibleGuests.map((guest) => {
                 const busy = isPending && savingRsvpId === guest.id;
                 return (
                   <li
@@ -556,6 +606,16 @@ export function GuestsManager({
           ) : (
             <EmptyState title="No guests found" description="Adjust filters, import a CSV, or add the first guest manually." />
           )}
+          {hasMore ? (
+            <div className="mt-4 flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+              >
+                Show more ({filtered.length - visibleCount} left)
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

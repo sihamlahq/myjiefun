@@ -190,7 +190,7 @@ export async function loadGuestsAndTables(): Promise<{
     const [guests, tables] = await Promise.all([
       supabase
         .from("guests")
-        .select("*, guest_groups(*), reception_tables(*)")
+        .select("*, guest_groups(id,name), reception_tables(id,table_number,name,capacity,table_type,status,location)")
         .order("name_en", { ascending: true }),
       supabase
         .from("reception_tables")
@@ -208,6 +208,56 @@ export async function loadGuestsAndTables(): Promise<{
     return {
       guests: [],
       tables: [],
+      setupError: error instanceof Error ? error.message : "Unable to load wedding data.",
+    };
+  }
+}
+
+/** Guests page only — guests + tables + groups, no seats/events/settings. */
+export async function loadGuestsPageData(): Promise<{
+  guests: GuestWithRelations[];
+  tables: ReceptionTable[];
+  groups: GuestGroup[];
+  setupError: string | null;
+}> {
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try {
+    supabase = await createClient();
+  } catch (error) {
+    return {
+      guests: [],
+      tables: [],
+      groups: [],
+      setupError: error instanceof Error ? error.message : "Supabase is not configured.",
+    };
+  }
+
+  try {
+    const [guests, tables, groups] = await Promise.all([
+      supabase
+        .from("guests")
+        .select("*, guest_groups(id,name), reception_tables(id,table_number,name,capacity,table_type,status,location)")
+        .order("name_en", { ascending: true }),
+      supabase
+        .from("reception_tables")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("table_number", { ascending: true }),
+      supabase.from("guest_groups").select("*").order("name", { ascending: true }),
+    ]);
+
+    return {
+      guests: (guests.data ?? []) as GuestWithRelations[],
+      tables: (tables.data ?? []) as ReceptionTable[],
+      groups: (groups.data ?? []) as GuestGroup[],
+      setupError:
+        guests.error?.message || tables.error?.message || groups.error?.message || null,
+    };
+  } catch (error) {
+    return {
+      guests: [],
+      tables: [],
+      groups: [],
       setupError: error instanceof Error ? error.message : "Unable to load wedding data.",
     };
   }

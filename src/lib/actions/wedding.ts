@@ -89,7 +89,6 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
       after_data: data,
     });
     revalidatePath("/guests");
-    revalidatePath("/dashboard");
     return data as Guest;
   }
 
@@ -111,7 +110,6 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
     after_data: data,
   });
   revalidatePath("/guests");
-  revalidatePath("/dashboard");
   return data as Guest;
 }
 
@@ -319,7 +317,6 @@ export async function deleteGuest(id: string) {
     before_data: before,
   });
   revalidatePath("/guests");
-  revalidatePath("/dashboard");
 }
 
 /** Permanently delete every guest (and cascaded check-in events). Admin only. */
@@ -596,8 +593,6 @@ export async function updateRsvp(guestId: string, rsvp_status: RsvpStatus) {
     meta: { field: "rsvp_status" },
   });
   revalidatePath("/guests");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
 }
 
 export async function updateRsvpBulk(guestIds: string[], rsvp_status: RsvpStatus) {
@@ -620,8 +615,6 @@ export async function updateRsvpBulk(guestIds: string[], rsvp_status: RsvpStatus
   });
 
   revalidatePath("/guests");
-  revalidatePath("/dashboard");
-  revalidatePath("/reports");
   return { updated: data?.length ?? ids.length };
 }
 
