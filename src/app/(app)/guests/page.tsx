@@ -10,7 +10,7 @@ export default async function GuestsPage() {
       <PageHeader
         eyebrow="Guest directory"
         title="Guests"
-        description="Search, import, export, and maintain every invitation field from one polished control room."
+        description="Tap Confirm to mark RSVP, or change status from the list — no extra edit steps."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
       <GuestsManager guests={data.guests} tables={data.tables} groups={data.groups} />

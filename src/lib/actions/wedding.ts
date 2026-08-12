@@ -387,6 +387,32 @@ export async function updateRsvp(guestId: string, rsvp_status: RsvpStatus) {
   });
   revalidatePath("/guests");
   revalidatePath("/dashboard");
+  revalidatePath("/reports");
+}
+
+export async function updateRsvpBulk(guestIds: string[], rsvp_status: RsvpStatus) {
+  const ids = [...new Set(guestIds.filter(Boolean))];
+  if (!ids.length) throw new Error("Select at least one guest.");
+
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("guests")
+    .update({ rsvp_status })
+    .in("id", ids)
+    .select("id");
+  if (error) throw new Error(error.message);
+
+  await writeAudit(supabase, {
+    action: "guest_update",
+    entity_type: "guest",
+    staff_id: user.id,
+    meta: { field: "rsvp_status", bulk: true, count: data?.length ?? ids.length, rsvp_status },
+  });
+
+  revalidatePath("/guests");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  return { updated: data?.length ?? ids.length };
 }
 
 export async function createWalkIn(input: {

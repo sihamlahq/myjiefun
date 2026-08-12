@@ -1,10 +1,10 @@
 "use client";
 
 import Fuse from "fuse.js";
-import { Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Check, Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { deleteGuest, upsertGuest } from "@/lib/actions/wedding";
+import { deleteGuest, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
 import { csvToObjects, guestsToCsv } from "@/lib/csv";
 import { cn } from "@/lib/utils";
 import type {
@@ -16,7 +16,7 @@ import type {
   RsvpStatus,
 } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
-import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
 
@@ -66,6 +66,13 @@ const emptyDraft: GuestDraft = {
   custom_fields: {},
 };
 
+const rsvpTone: Record<RsvpStatus, string> = {
+  confirmed: "border-emerald-300 bg-emerald-50 text-emerald-900",
+  pending: "border-amber-300 bg-amber-50 text-amber-950",
+  maybe: "border-sky-300 bg-sky-50 text-sky-950",
+  declined: "border-rose-300 bg-rose-50 text-rose-950",
+};
+
 function download(filename: string, content: string, type = "text/csv;charset=utf-8") {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -99,6 +106,7 @@ export function GuestsManager({
   const [draft, setDraft] = useState<GuestDraft | null>(null);
   const [customFieldsText, setCustomFieldsText] = useState("{}");
   const [isPending, startTransition] = useTransition();
+  const [savingRsvpId, setSavingRsvpId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fuse = useMemo(
@@ -135,6 +143,8 @@ export function GuestsManager({
   }, [attendance, fuse, group, guests, query, rsvp, table, vip]);
 
   const selectedGuests = filtered.filter((guest) => selected.has(guest.id));
+  const pendingCount = guests.filter((guest) => guest.rsvp_status === "pending").length;
+  const confirmedCount = guests.filter((guest) => guest.rsvp_status === "confirmed").length;
 
   function openGuest(guest?: GuestWithRelations) {
     if (!guest) {
@@ -213,6 +223,42 @@ export function GuestsManager({
     });
   }
 
+  function setGuestRsvp(guest: GuestWithRelations, next: RsvpStatus) {
+    if (guest.rsvp_status === next) return;
+    setSavingRsvpId(guest.id);
+    startTransition(async () => {
+      try {
+        await updateRsvp(guest.id, next);
+        toast.success(
+          next === "confirmed"
+            ? `${guest.name_en} confirmed`
+            : `${guest.name_en} → ${next}`,
+        );
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to update RSVP.");
+      } finally {
+        setSavingRsvpId(null);
+      }
+    });
+  }
+
+  function confirmSelected() {
+    const ids = selectedGuests.map((guest) => guest.id);
+    if (!ids.length) {
+      toast.error("Select guests first.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const result = await updateRsvpBulk(ids, "confirmed");
+        toast.success(`Confirmed ${result.updated} guest(s).`);
+        setSelected(new Set());
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Bulk confirm failed.");
+      }
+    });
+  }
+
   function toggleSelected(id: string) {
     setSelected((current) => {
       const next = new Set(current);
@@ -273,6 +319,17 @@ export function GuestsManager({
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 sm:max-w-md">
+        <div className="rounded-2xl bg-amber-50 px-3 py-2.5 text-center shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900/60">Pending</p>
+          <p className="font-heading text-2xl font-semibold text-amber-950">{pendingCount}</p>
+        </div>
+        <div className="rounded-2xl bg-emerald-50 px-3 py-2.5 text-center shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-900/60">Confirmed</p>
+          <p className="font-heading text-2xl font-semibold text-emerald-950">{confirmedCount}</p>
+        </div>
+      </div>
+
       <Card>
         <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(120px,auto))]">
           <div className="relative">
@@ -280,7 +337,7 @@ export function GuestsManager({
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search names, phone, code, group, table..."
+              placeholder="Search name or phone…"
               className="pl-9"
             />
           </div>
@@ -312,10 +369,16 @@ export function GuestsManager({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--foreground)]/65">
-          Showing {filtered.length} of {guests.length}. {selected.size} selected.
+          Showing {filtered.length} of {guests.length}
+          {selected.size ? ` · ${selected.size} selected` : ""}
         </p>
         <div className="flex flex-wrap gap-2">
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
+          {selected.size > 0 ? (
+            <Button onClick={confirmSelected} disabled={isPending} variant="gold">
+              <Check className="h-4 w-4" /> Confirm selected ({selected.size})
+            </Button>
+          ) : null}
           <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={isPending}>
             <Upload className="h-4 w-4" /> Import CSV
           </Button>
@@ -329,95 +392,117 @@ export function GuestsManager({
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
           <CardTitle>Guest list</CardTitle>
+          <label className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]/70">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={() =>
+                setSelected((current) => {
+                  const next = new Set(current);
+                  if (allVisibleSelected) filtered.forEach((guest) => next.delete(guest.id));
+                  else filtered.forEach((guest) => next.add(guest.id));
+                  return next;
+                })
+              }
+            />
+            Select all shown
+          </label>
         </CardHeader>
         <CardContent>
           {filtered.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1500px] text-left text-sm">
-                <thead className="text-xs uppercase tracking-[0.14em] text-[var(--foreground)]/50">
-                  <tr className="border-b border-black/10">
-                    <th className="py-3 pr-3">
-                      <input
-                        type="checkbox"
-                        checked={allVisibleSelected}
-                        onChange={() =>
-                          setSelected((current) => {
-                            const next = new Set(current);
-                            if (allVisibleSelected) filtered.forEach((guest) => next.delete(guest.id));
-                            else filtered.forEach((guest) => next.add(guest.id));
-                            return next;
-                          })
-                        }
-                      />
-                    </th>
-                    {[
-                      "Code",
-                      "Name",
-                      "Chinese",
-                      "Nickname",
-                      "Phone",
-                      "Email",
-                      "Group",
-                      "RSVP",
-                      "Count",
-                      "Attendance",
-                      "Table",
-                      "Seat",
-                      "VIP",
-                      "Walk-in",
-                      "Dietary",
-                      "Relationship",
-                      "Category",
-                      "Notes",
-                      "Checked in",
-                      "Actions",
-                    ].map((header) => (
-                      <th key={header} className="py-3 pr-3">{header}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((guest) => (
-                    <tr key={guest.id} className="border-b border-black/5 align-top hover:bg-white/55">
-                      <td className="py-3 pr-3">
-                        <input type="checkbox" checked={selected.has(guest.id)} onChange={() => toggleSelected(guest.id)} />
-                      </td>
-                      <td className="py-3 pr-3 font-mono text-xs">{guest.guest_code}</td>
-                      <td className="py-3 pr-3 font-semibold">{guest.name_en}</td>
-                      <td className="py-3 pr-3">{guest.name_zh}</td>
-                      <td className="py-3 pr-3">{guest.nickname}</td>
-                      <td className="py-3 pr-3">{guest.phone}</td>
-                      <td className="py-3 pr-3">{guest.email}</td>
-                      <td className="py-3 pr-3">{guest.guest_groups?.name ?? "—"}</td>
-                      <td className="py-3 pr-3"><Badge className="capitalize">{guest.rsvp_status}</Badge></td>
-                      <td className="py-3 pr-3">{guest.expected_count}</td>
-                      <td className="py-3 pr-3">{guest.attendance_status}</td>
-                      <td className="py-3 pr-3">{guest.reception_tables?.table_number ?? "Unassigned"}</td>
-                      <td className="py-3 pr-3">{guest.seats?.seat_number ?? "—"}</td>
-                      <td className="py-3 pr-3">{guest.is_vip ? "Yes" : "No"}</td>
-                      <td className="py-3 pr-3">{guest.is_walk_in ? "Yes" : "No"}</td>
-                      <td className="py-3 pr-3">{guest.dietary}</td>
-                      <td className="py-3 pr-3">{guest.relationship}</td>
-                      <td className="py-3 pr-3">{guest.category}</td>
-                      <td className="max-w-[220px] py-3 pr-3">{guest.notes}</td>
-                      <td className="py-3 pr-3">{guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleString() : "—"}</td>
-                      <td className="py-3 pr-3">
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => openGuest(guest)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => removeGuest(guest)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+            <ul className="space-y-2">
+              {filtered.map((guest) => {
+                const busy = isPending && savingRsvpId === guest.id;
+                return (
+                  <li
+                    key={guest.id}
+                    className={cn(
+                      "rounded-2xl border bg-white/90 p-3 shadow-sm sm:p-4",
+                      guest.rsvp_status === "confirmed" ? "border-emerald-200/80" : "border-black/8",
+                    )}
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1.5"
+                          checked={selected.has(guest.id)}
+                          onChange={() => toggleSelected(guest.id)}
+                          aria-label={`Select ${guest.name_en}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-lg font-semibold leading-tight">
+                            {guest.name_en}
+                            {guest.is_vip ? (
+                              <span className="ml-2 align-middle rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                                VIP
+                              </span>
+                            ) : null}
+                          </p>
+                          <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
+                            {[guest.name_zh, guest.phone, guest.guest_code].filter(Boolean).join(" · ")}
+                          </p>
+                          <p className="mt-1 text-sm text-[var(--foreground)]/70">
+                            {[
+                              guest.reception_tables?.table_number ?? "No table",
+                              guest.guest_groups?.name,
+                              guest.expected_count > 1 ? `party ${guest.expected_count}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        {guest.rsvp_status !== "confirmed" ? (
+                          <Button
+                            size="sm"
+                            className="h-10 min-w-[7.5rem]"
+                            disabled={busy || isPending}
+                            onClick={() => setGuestRsvp(guest, "confirmed")}
+                          >
+                            <Check className="h-4 w-4" />
+                            Confirm
+                          </Button>
+                        ) : (
+                          <span className="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-3 text-sm font-semibold text-white">
+                            Confirmed
+                          </span>
+                        )}
+
+                        <select
+                          aria-label={`RSVP for ${guest.name_en}`}
+                          className={cn(
+                            "h-10 rounded-xl border px-3 text-sm font-semibold capitalize",
+                            rsvpTone[guest.rsvp_status],
+                          )}
+                          value={guest.rsvp_status}
+                          disabled={busy || isPending}
+                          onChange={(event) => setGuestRsvp(guest, event.target.value as RsvpStatus)}
+                        >
+                          {rsvpOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+
+                        <Button size="sm" variant="outline" className="h-10" onClick={() => openGuest(guest)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="destructive" className="h-10" onClick={() => removeGuest(guest)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           ) : (
             <EmptyState title="No guests found" description="Adjust filters, import a CSV, or add the first guest manually." />
           )}
