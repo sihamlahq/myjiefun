@@ -77,13 +77,27 @@ export function RedPacketPanel({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return guests;
-    return guests.filter((guest) =>
-      [guest.name_en, guest.name_zh, guest.nickname, guest.phone, guest.guest_code]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(q)),
-    );
+    const matched = !q
+      ? [...guests]
+      : guests.filter((guest) =>
+          [guest.name_en, guest.name_zh, guest.nickname, guest.phone, guest.guest_code]
+            .filter(Boolean)
+            .some((value) => value!.toLowerCase().includes(q)),
+        );
+
+    // Unmarked first; saved/marked amounts sink to the bottom.
+    return matched.sort((a, b) => {
+      const aMarked = getRedPacketAmount(a) != null;
+      const bMarked = getRedPacketAmount(b) != null;
+      if (aMarked !== bMarked) return aMarked ? 1 : -1;
+      return a.name_en.localeCompare(b.name_en);
+    });
   }, [guests, query]);
+
+  const unmarkedCount = useMemo(
+    () => filtered.filter((guest) => getRedPacketAmount(guest) == null).length,
+    [filtered],
+  );
 
   const stats = useMemo(() => {
     let total = 0;
@@ -322,6 +336,9 @@ export function RedPacketPanel({
             <CardTitle>Checked-in guests</CardTitle>
             <p className="mt-1 text-sm text-[var(--foreground)]/55">
               Showing {filtered.length} of {guests.length}
+              {unmarkedCount < filtered.length
+                ? ` · ${unmarkedCount} to mark · ${filtered.length - unmarkedCount} marked`
+                : ""}
             </p>
           </div>
           <Gift className="h-5 w-5 text-[var(--danger)]" />
@@ -329,58 +346,78 @@ export function RedPacketPanel({
         <CardContent>
           {filtered.length ? (
             <ul className="space-y-2">
-              {filtered.map((guest) => {
+              {filtered.map((guest, index) => {
                 const busy = busyId === guest.id && isPending;
+                const marked = getRedPacketAmount(guest) != null;
+                const showMarkedDivider =
+                  marked &&
+                  (index === 0 || getRedPacketAmount(filtered[index - 1]) == null);
                 return (
-                  <li
-                    key={guest.id}
-                    className="rounded-2xl border border-black/8 bg-white/90 p-3 shadow-sm sm:p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-lg font-semibold leading-tight">
-                          {guest.name_en}
-                        </p>
-                        <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
-                          {[guest.name_zh, guest.phone].filter(Boolean).join(" · ") ||
-                            guest.guest_code}
-                        </p>
-                        <p className="mt-1 text-sm text-[var(--foreground)]/70">
-                          <GuestTableLink
-                            guest={guest}
-                            tables={tables}
-                            guests={guests}
-                            className="font-medium"
-                          />
-                        </p>
-                      </div>
-                      <div className="flex w-full items-center gap-2 sm:w-auto">
-                        <Input
-                          inputMode="decimal"
-                          placeholder="Amount"
-                          className="h-11 w-full sm:w-32"
-                          value={drafts[guest.id] ?? ""}
-                          disabled={busy}
-                          onChange={(event) =>
-                            setDrafts((current) => ({
-                              ...current,
-                              [guest.id]: event.target.value.replace(/[^\d.]/g, ""),
-                            }))
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              saveAmount(guest);
+                  <li key={guest.id} className="space-y-2">
+                    {showMarkedDivider ? (
+                      <p className="pt-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--foreground)]/45">
+                        Marked guests
+                      </p>
+                    ) : null}
+                    <div
+                      className={cn(
+                        "rounded-2xl border p-3 shadow-sm sm:p-4",
+                        marked
+                          ? "border-emerald-200/80 bg-emerald-50/55"
+                          : "border-black/8 bg-white/90",
+                      )}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-lg font-semibold leading-tight">
+                            {guest.name_en}
+                            {marked ? (
+                              <span className="ml-2 align-middle rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                Marked
+                              </span>
+                            ) : null}
+                          </p>
+                          <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
+                            {[guest.name_zh, guest.phone].filter(Boolean).join(" · ") ||
+                              guest.guest_code}
+                          </p>
+                          <p className="mt-1 text-sm text-[var(--foreground)]/70">
+                            <GuestTableLink
+                              guest={guest}
+                              tables={tables}
+                              guests={guests}
+                              className="font-medium"
+                            />
+                          </p>
+                        </div>
+                        <div className="flex w-full items-center gap-2 sm:w-auto">
+                          <Input
+                            inputMode="decimal"
+                            placeholder="Amount"
+                            className="h-11 w-full sm:w-32"
+                            value={drafts[guest.id] ?? ""}
+                            disabled={busy}
+                            onChange={(event) =>
+                              setDrafts((current) => ({
+                                ...current,
+                                [guest.id]: event.target.value.replace(/[^\d.]/g, ""),
+                              }))
                             }
-                          }}
-                        />
-                        <Button
-                          className="h-11 shrink-0"
-                          disabled={busy}
-                          onClick={() => saveAmount(guest)}
-                        >
-                          Save
-                        </Button>
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                saveAmount(guest);
+                              }
+                            }}
+                          />
+                          <Button
+                            className="h-11 shrink-0"
+                            disabled={busy}
+                            onClick={() => saveAmount(guest)}
+                          >
+                            Save
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </li>
