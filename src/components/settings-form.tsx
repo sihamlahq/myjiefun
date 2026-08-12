@@ -2,7 +2,9 @@
 
 import { FormEvent, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { saveSetting } from "@/lib/actions/wedding";
+import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
+import { saveSetting, wipeAllGuests } from "@/lib/actions/wedding";
 import type { WeddingSettingsMap } from "@/lib/wedding-data";
 import type {
   AttendanceSettings,
@@ -12,16 +14,25 @@ import type {
   WeddingSettings,
 } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
 
-export function SettingsForm({ settings }: { settings: WeddingSettingsMap }) {
+export function SettingsForm({
+  settings,
+  guestCount = 0,
+}: {
+  settings: WeddingSettingsMap;
+  guestCount?: number;
+}) {
+  const router = useRouter();
   const [wedding, setWedding] = useState<WeddingSettings>(settings.wedding);
   const [theme, setTheme] = useState<ThemeSettings>(settings.theme);
   const [guestSettings, setGuestSettings] = useState<GuestSettings>(settings.guestSettings);
   const [tableSettings, setTableSettings] = useState<TableSettings>(settings.tableSettings);
   const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>(settings.attendanceSettings);
+  const [wipeConfirm, setWipeConfirm] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [isWiping, setIsWiping] = useState(false);
 
   function persist(key: keyof WeddingSettingsMap, value: WeddingSettingsMap[keyof WeddingSettingsMap]) {
     startTransition(async () => {
@@ -96,6 +107,65 @@ export function SettingsForm({ settings }: { settings: WeddingSettingsMap }) {
           </label>
         ))}
       </SettingsCard>
+
+      <Card className="border-red-200/80 bg-red-50/40 xl:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-800">
+            <Trash2 className="h-5 w-5" />
+            Danger zone
+          </CardTitle>
+          <CardDescription className="text-red-900/70">
+            Wipe the entire guest list ({guestCount} guests). Tables and seating layout stay.
+            Check-in history for those guests is removed. Admin only — this cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="wipe-confirm">Type DELETE to confirm</Label>
+            <Input
+              id="wipe-confirm"
+              value={wipeConfirm}
+              onChange={(event) => setWipeConfirm(event.target.value)}
+              placeholder="DELETE"
+              autoComplete="off"
+              className="max-w-xs border-red-200 bg-white"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isPending || isWiping || wipeConfirm.trim().toUpperCase() !== "DELETE"}
+            onClick={() => {
+              if (
+                !window.confirm(
+                  `Delete all ${guestCount} guests permanently? This cannot be undone.`,
+                )
+              ) {
+                return;
+              }
+              setIsWiping(true);
+              startTransition(async () => {
+                try {
+                  const result = await wipeAllGuests(wipeConfirm);
+                  toast.success(
+                    result.deleted
+                      ? `Removed ${result.deleted} guests.`
+                      : "Guest list is already empty.",
+                  );
+                  setWipeConfirm("");
+                  router.refresh();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Wipe failed.");
+                } finally {
+                  setIsWiping(false);
+                }
+              });
+            }}
+          >
+            {isWiping ? "Wiping…" : "Wipe all guests"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

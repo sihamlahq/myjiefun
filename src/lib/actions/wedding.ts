@@ -113,6 +113,61 @@ export async function deleteGuest(id: string) {
   revalidatePath("/dashboard");
 }
 
+/** Permanently delete every guest (and cascaded check-in events). Admin only. */
+export async function wipeAllGuests(confirmation: string) {
+  if (confirmation.trim().toUpperCase() !== "DELETE") {
+    throw new Error('Type DELETE to confirm wiping the guest list.');
+  }
+
+  const { supabase, user } = await requireUser();
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profileError) throw new Error(profileError.message);
+  if (profile?.role !== "admin") {
+    throw new Error("Only admins can wipe the entire guest list.");
+  }
+
+  const { count: beforeCount, error: countError } = await supabase
+    .from("guests")
+    .select("id", { count: "exact", head: true });
+  if (countError) throw new Error(countError.message);
+
+  // Supabase requires a filter for deletes; match all existing rows.
+  const { error: deleteError } = await supabase
+    .from("guests")
+    .delete()
+    .neq("guest_code", "__never__");
+  if (deleteError) throw new Error(deleteError.message);
+
+  // Free seat map markers after guests are gone.
+  const { error: seatsError } = await supabase
+    .from("seats")
+    .update({ status: "empty" })
+    .neq("status", "empty");
+  if (seatsError) throw new Error(seatsError.message);
+
+  await writeAudit(supabase, {
+    action: "guest_delete",
+    entity_type: "guest",
+    staff_id: user.id,
+    meta: { wipe_all: true, deleted_count: beforeCount ?? 0 },
+  });
+
+  revalidatePath("/guests");
+  revalidatePath("/dashboard");
+  revalidatePath("/check-in");
+  revalidatePath("/seating");
+  revalidatePath("/floor-plan");
+  revalidatePath("/reports");
+  revalidatePath("/tables");
+  revalidatePath("/settings");
+
+  return { deleted: beforeCount ?? 0 };
+}
+
 export async function checkInGuest(opts: {
   guestId: string;
   mode?: "check_in" | "partial" | "group";

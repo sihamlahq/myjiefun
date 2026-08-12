@@ -14,7 +14,7 @@ export default async function SettingsPage() {
         description="Tune the couple details, premium theme, guest taxonomy, seating defaults, and check-in rules."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
-      <SettingsForm settings={settings} />
+      <SettingsForm settings={settings} guestCount={data.guests.length} />
     </div>
   );
 }
