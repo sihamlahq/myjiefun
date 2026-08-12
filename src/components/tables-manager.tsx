@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
+import { TableNumberButton } from "@/components/table-guests-dialog";
 
 type TableDraft = Pick<
   ReceptionTable,
@@ -182,8 +183,15 @@ export function TablesManager({
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <CardTitle>{table.table_number}</CardTitle>
+                      <CardTitle>
+                        <TableNumberButton
+                          table={table}
+                          guests={guests}
+                          className="font-heading text-2xl no-underline hover:underline"
+                        />
+                      </CardTitle>
                       <p className="text-sm text-[var(--foreground)]/60">{table.name}</p>
+                      <p className="mt-1 text-xs text-[var(--primary)]/80">Tap number to view guest list</p>
                     </div>
                     <Badge className="capitalize">{table.table_type}</Badge>
                   </div>

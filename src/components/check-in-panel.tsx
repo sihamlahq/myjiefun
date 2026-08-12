@@ -31,6 +31,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
 import { cn } from "@/lib/utils";
+import { GuestTableLink } from "@/components/table-guests-dialog";
 
 type FilterTab = "waiting" | "arrived" | "all" | "vip";
 
@@ -227,7 +228,6 @@ export function CheckInPanel({
         <ul className="mx-auto max-w-3xl space-y-2">
           {results.map((guest) => {
             const arrived = guest.attendance_status === "checked_in";
-            const table = guest.reception_tables?.table_number ?? "No table";
             const party = guest.expected_count || 1;
             return (
               <li key={guest.id}>
@@ -238,38 +238,45 @@ export function CheckInPanel({
                     selected?.id === guest.id && "ring-2 ring-[var(--accent)]",
                   )}
                 >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 rounded-xl px-2 py-1.5 text-left"
-                    onClick={() => setSelectedId(guest.id === selectedId ? null : guest.id)}
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-lg font-semibold leading-tight sm:text-xl">
-                          {guest.name_en}
-                          {guest.is_vip ? (
-                            <span className="ml-2 align-middle rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--foreground)]">
-                              VIP
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
-                          {[guest.name_zh, guest.phone].filter(Boolean).join(" · ") || guest.guest_code}
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-[var(--foreground)]/75">
-                          {table}
-                          {guest.guest_groups?.name ? ` · ${guest.guest_groups.name}` : ""}
-                          {party > 1 ? ` · party of ${party}` : ""}
-                        </p>
+                  <div className="min-w-0 flex-1 rounded-xl px-2 py-1.5">
+                    <button
+                      type="button"
+                      className="w-full text-left"
+                      onClick={() => setSelectedId(guest.id === selectedId ? null : guest.id)}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-lg font-semibold leading-tight sm:text-xl">
+                            {guest.name_en}
+                            {guest.is_vip ? (
+                              <span className="ml-2 align-middle rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--foreground)]">
+                                VIP
+                              </span>
+                            ) : null}
+                          </p>
+                          <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
+                            {[guest.name_zh, guest.phone].filter(Boolean).join(" · ") || guest.guest_code}
+                          </p>
+                        </div>
+                        {arrived ? (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            In
+                          </span>
+                        ) : null}
                       </div>
-                      {arrived ? (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          In
-                        </span>
-                      ) : null}
-                    </div>
-                  </button>
+                    </button>
+                    <p className="mt-1 text-sm font-medium text-[var(--foreground)]/75">
+                      <GuestTableLink
+                        guest={guest}
+                        tables={tables}
+                        guests={guests}
+                        className="font-medium"
+                      />
+                      {guest.guest_groups?.name ? ` · ${guest.guest_groups.name}` : ""}
+                      {party > 1 ? ` · party of ${party}` : ""}
+                    </p>
+                  </div>
 
                   <div className="flex shrink-0 flex-col justify-center pr-1">
                     {arrived ? (
@@ -389,9 +396,13 @@ export function CheckInPanel({
             <div className="min-w-0">
               <p className="font-heading text-2xl font-semibold leading-tight">{selected.name_en}</p>
               <p className="text-sm text-[var(--foreground)]/60">
-                {[selected.name_zh, selected.reception_tables?.table_number, selected.guest_groups?.name]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {[selected.name_zh, selected.guest_groups?.name].filter(Boolean).join(" · ")}
+                {selected.table_id ? (
+                  <>
+                    {(selected.name_zh || selected.guest_groups?.name) ? " · " : null}
+                    <GuestTableLink guest={selected} tables={tables} guests={guests} />
+                  </>
+                ) : null}
               </p>
             </div>
             <button

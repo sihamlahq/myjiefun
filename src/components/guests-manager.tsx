@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
+import { GuestTableLink } from "@/components/table-guests-dialog";
 
 type GuestDraft = Pick<
   Guest,
@@ -445,13 +446,14 @@ export function GuestsManager({
                             {[guest.name_zh, guest.phone, guest.guest_code].filter(Boolean).join(" · ")}
                           </p>
                           <p className="mt-1 text-sm text-[var(--foreground)]/70">
-                            {[
-                              guest.reception_tables?.table_number ?? "No table",
-                              guest.guest_groups?.name,
-                              guest.expected_count > 1 ? `party ${guest.expected_count}` : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
+                            <GuestTableLink
+                              guest={guest}
+                              tables={tables}
+                              guests={guests}
+                              className="font-medium"
+                            />
+                            {guest.guest_groups?.name ? ` · ${guest.guest_groups.name}` : ""}
+                            {guest.expected_count > 1 ? ` · party ${guest.expected_count}` : ""}
                           </p>
                         </div>
                       </div>

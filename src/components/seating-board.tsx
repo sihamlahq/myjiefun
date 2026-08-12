@@ -12,6 +12,7 @@ import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/page-chrome";
+import { TableNumberButton } from "@/components/table-guests-dialog";
 
 const unassignedId = "drop:unassigned";
 
@@ -82,6 +83,7 @@ export function SeatingBoard({
                   key={table.id}
                   table={table}
                   guests={guestsByTable.get(table.id) ?? []}
+                  allGuests={guests}
                   onAddSeat={() => addSeat(table)}
                   pending={isPending}
                 />
@@ -123,11 +125,13 @@ function UnassignedDrop({
 function TableDrop({
   table,
   guests,
+  allGuests,
   onAddSeat,
   pending,
 }: {
   table: ReceptionTable;
   guests: GuestWithRelations[];
+  allGuests: GuestWithRelations[];
   onAddSeat: () => void;
   pending: boolean;
 }) {
@@ -140,8 +144,15 @@ function TableDrop({
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle>{table.table_number}</CardTitle>
+            <CardTitle>
+              <TableNumberButton
+                table={table}
+                guests={allGuests}
+                className="font-heading text-2xl no-underline hover:underline"
+              />
+            </CardTitle>
             <p className="text-sm text-[var(--foreground)]/60">{table.name}</p>
+            <p className="mt-1 text-xs text-[var(--primary)]/80">Tap number for full list</p>
           </div>
           <Badge className={cn("capitalize", table.table_type === "vip" && "bg-[var(--accent)]")}>
             {table.table_type}

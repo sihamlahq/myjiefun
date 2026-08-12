@@ -19,6 +19,7 @@ import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/page-chrome";
+import { TableNumberButton } from "@/components/table-guests-dialog";
 
 const TABLE_SIZE = 112;
 
@@ -86,6 +87,7 @@ export function FloorPlanCanvas({
     <TableDetails
       table={selectedTable}
       guests={guestsByTable.get(selectedTable.id) ?? []}
+      allGuests={guests}
       onClose={() => setSelectedTableId(null)}
     />
   ) : (
@@ -273,18 +275,27 @@ export function FloorPlanCanvas({
 function TableDetails({
   table,
   guests,
+  allGuests,
   onClose,
 }: {
   table: ReceptionTable;
   guests: GuestWithRelations[];
+  allGuests: GuestWithRelations[];
   onClose: () => void;
 }) {
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-heading text-3xl font-semibold sm:text-4xl">{table.table_number}</p>
+          <p className="font-heading text-3xl font-semibold sm:text-4xl">
+            <TableNumberButton
+              table={table}
+              guests={allGuests}
+              className="font-heading text-3xl no-underline hover:underline sm:text-4xl"
+            />
+          </p>
           <p className="text-[var(--foreground)]/60">{table.name}</p>
+          <p className="mt-1 text-xs text-[var(--primary)]/80">Tap table number for full seating list</p>
         </div>
         <Button type="button" size="sm" variant="ghost" className="md:hidden" onClick={onClose}>
           Close
