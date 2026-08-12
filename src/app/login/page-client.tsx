@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,10 +45,15 @@ export default function LoginPage() {
     <div className="floral-rail flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
-            Myjiefun
-          </p>
-          <CardTitle className="text-3xl">Staff sign in</CardTitle>
+          <div className="mb-2 flex items-center gap-3">
+            <BrandMark size={52} priority />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
+                TableWedding
+              </p>
+              <CardTitle className="text-3xl">Staff sign in</CardTitle>
+            </div>
+          </div>
           <CardDescription>
             Wedding Guest & Seating Manager — use your Supabase Auth staff account.
           </CardDescription>

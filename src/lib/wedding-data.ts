@@ -46,7 +46,7 @@ export const defaultWeddingSettings: WeddingSettings = {
   title: "Wedding Guest & Seating Manager",
   date: "",
   venue: "Grand Ballroom",
-  logoUrl: "",
+  logoUrl: "/brand/tablewedding-mark.png",
   backgroundImageUrl: "",
 };
 

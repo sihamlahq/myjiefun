@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import { hasMinRole, NAV_ITEMS } from "@/lib/permissions";
 import type { AppRole } from "@/types/wedding";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -93,12 +94,15 @@ export function AppShell({
     <div className="app-shell floral-rail min-h-screen min-h-dvh">
       <div className="mx-auto flex min-h-screen min-h-dvh max-w-[1600px]">
         <aside className="hidden w-64 shrink-0 border-r border-black/8 bg-white/55 p-5 backdrop-blur lg:block">
-          <div className="mb-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
-              Myjiefun
-            </p>
-            <h1 className="font-heading mt-1 text-2xl leading-tight">{coupleNames}</h1>
-            <p className="mt-1 text-xs text-black/50">Wedding Guest & Seating</p>
+          <div className="mb-8 flex items-start gap-3">
+            <BrandMark size={48} priority />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
+                TableWedding
+              </p>
+              <h1 className="font-heading mt-1 text-2xl leading-tight">{coupleNames}</h1>
+              <p className="mt-1 text-xs text-black/50">Wedding Guest & Seating</p>
+            </div>
           </div>
           <nav className="space-y-1">
             {items.map((item) => {
@@ -152,11 +156,14 @@ export function AppShell({
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="mobile-top-bar sticky top-0 z-30 flex items-center justify-between border-b border-black/8 bg-[#f7f3ec]/92 px-4 py-3 backdrop-blur lg:hidden">
-            <div className="min-w-0 pr-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
-                Myjiefun
-              </p>
-              <p className="font-heading truncate text-lg leading-none">{coupleNames}</p>
+            <div className="flex min-w-0 items-center gap-2.5 pr-3">
+              <BrandMark size={36} />
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+                  TableWedding
+                </p>
+                <p className="font-heading truncate text-lg leading-none">{coupleNames}</p>
+              </div>
             </div>
             <Button
               variant="outline"
