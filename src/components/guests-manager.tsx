@@ -119,10 +119,14 @@ export function GuestsManager({
   guests: serverGuests,
   tables,
   groups,
+  categories = [],
+  dietaryCategories = [],
 }: {
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
   groups: GuestGroup[];
+  categories?: string[];
+  dietaryCategories?: string[];
 }) {
   const router = useRouter();
   const [guests, setGuests] = useState(serverGuests);
@@ -133,6 +137,7 @@ export function GuestsManager({
   const [vip, setVip] = useState("all");
   const [table, setTable] = useState("all");
   const [group, setGroup] = useState("all");
+  const [category, setCategory] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<GuestDraft | null>(null);
   const [customFieldsText, setCustomFieldsText] = useState("{}");
@@ -150,7 +155,7 @@ export function GuestsManager({
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [deferredQuery, rsvp, attendance, vip, table, group]);
+  }, [deferredQuery, rsvp, attendance, vip, table, group, category]);
 
   useEffect(() => {
     if (!recordMenuOpen) return;
@@ -200,9 +205,17 @@ export function GuestsManager({
       if (table !== "all" && table !== "unassigned" && guest.table_id !== table) return false;
       if (group === "ungrouped" && guest.group_id) return false;
       if (group !== "all" && group !== "ungrouped" && guest.group_id !== group) return false;
+      if (category === "uncategorized" && guest.category?.trim()) return false;
+      if (
+        category !== "all" &&
+        category !== "uncategorized" &&
+        guest.category !== category
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [attendance, fuse, group, guests, deferredQuery, rsvp, table, vip]);
+  }, [attendance, category, fuse, group, guests, deferredQuery, rsvp, table, vip]);
 
   const visibleGuests = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
@@ -429,7 +442,7 @@ export function GuestsManager({
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(120px,auto))]">
+        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(6,minmax(120px,auto))]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
             <Input
@@ -461,6 +474,19 @@ export function GuestsManager({
             <option value="all">All groups</option>
             <option value="ungrouped">Ungrouped</option>
             {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <select
+            className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
+            <option value="all">All categories</option>
+            <option value="uncategorized">Uncategorized</option>
+            {categories.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </CardContent>
       </Card>
@@ -729,9 +755,41 @@ export function GuestsManager({
                   {tables.map((item) => <option key={item.id} value={item.id}>{item.table_number} · {item.name}</option>)}
                 </select>
               </Field>
-              <Field label="Dietary"><Input value={draft.dietary} onChange={(event) => updateDraft("dietary", event.target.value)} /></Field>
+              <Field label="Dietary">
+                <select
+                  className="h-11 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm"
+                  value={draft.dietary}
+                  onChange={(event) => updateDraft("dietary", event.target.value)}
+                >
+                  <option value="">Select dietary…</option>
+                  {dietaryCategories.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                  {draft.dietary && !dietaryCategories.includes(draft.dietary) ? (
+                    <option value={draft.dietary}>{draft.dietary} (current)</option>
+                  ) : null}
+                </select>
+              </Field>
               <Field label="Relationship"><Input value={draft.relationship} onChange={(event) => updateDraft("relationship", event.target.value)} /></Field>
-              <Field label="Category"><Input value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} /></Field>
+              <Field label="Category">
+                <select
+                  className="h-11 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm"
+                  value={draft.category}
+                  onChange={(event) => updateDraft("category", event.target.value)}
+                >
+                  <option value="">Select category…</option>
+                  {categories.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                  {draft.category && !categories.includes(draft.category) ? (
+                    <option value={draft.category}>{draft.category} (current)</option>
+                  ) : null}
+                </select>
+              </Field>
               <label className="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2 text-sm font-semibold">
                 <input type="checkbox" checked={draft.is_vip} onChange={(event) => updateDraft("is_vip", event.target.checked)} /> VIP guest
               </label>

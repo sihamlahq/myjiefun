@@ -213,11 +213,13 @@ export async function loadGuestsAndTables(): Promise<{
   }
 }
 
-/** Guests page only — guests + tables + groups, no seats/events/settings. */
+/** Guests page only — guests + tables + groups + guest settings categories. */
 export async function loadGuestsPageData(): Promise<{
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
   groups: GuestGroup[];
+  categories: string[];
+  dietaryCategories: string[];
   setupError: string | null;
 }> {
   let supabase: Awaited<ReturnType<typeof createClient>>;
@@ -228,12 +230,14 @@ export async function loadGuestsPageData(): Promise<{
       guests: [],
       tables: [],
       groups: [],
+      categories: defaultGuestSettings.categories,
+      dietaryCategories: defaultGuestSettings.dietaryCategories,
       setupError: error instanceof Error ? error.message : "Supabase is not configured.",
     };
   }
 
   try {
-    const [guests, tables, groups] = await Promise.all([
+    const [guests, tables, groups, guestSettingsRow] = await Promise.all([
       supabase
         .from("guests")
         .select("*, guest_groups(id,name), reception_tables(id,table_number,name,capacity,table_type,status,location)")
@@ -244,20 +248,38 @@ export async function loadGuestsPageData(): Promise<{
         .order("sort_order", { ascending: true })
         .order("table_number", { ascending: true }),
       supabase.from("guest_groups").select("*").order("name", { ascending: true }),
+      supabase.from("app_settings").select("value").eq("key", "guestSettings").maybeSingle(),
     ]);
+
+    const guestSettings = {
+      ...defaultGuestSettings,
+      ...((guestSettingsRow.data?.value as GuestSettings | null) ?? {}),
+    };
 
     return {
       guests: (guests.data ?? []) as GuestWithRelations[],
       tables: (tables.data ?? []) as ReceptionTable[],
       groups: (groups.data ?? []) as GuestGroup[],
+      categories: guestSettings.categories?.length
+        ? guestSettings.categories
+        : defaultGuestSettings.categories,
+      dietaryCategories: guestSettings.dietaryCategories?.length
+        ? guestSettings.dietaryCategories
+        : defaultGuestSettings.dietaryCategories,
       setupError:
-        guests.error?.message || tables.error?.message || groups.error?.message || null,
+        guests.error?.message ||
+        tables.error?.message ||
+        groups.error?.message ||
+        guestSettingsRow.error?.message ||
+        null,
     };
   } catch (error) {
     return {
       guests: [],
       tables: [],
       groups: [],
+      categories: defaultGuestSettings.categories,
+      dietaryCategories: defaultGuestSettings.dietaryCategories,
       setupError: error instanceof Error ? error.message : "Unable to load wedding data.",
     };
   }

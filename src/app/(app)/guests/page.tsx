@@ -9,7 +9,13 @@ export default async function GuestsPage() {
     <div>
       <PageHeader eyebrow="Guest directory" title="Guests" />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
-      <GuestsManager guests={data.guests} tables={data.tables} groups={data.groups} />
+      <GuestsManager
+        guests={data.guests}
+        tables={data.tables}
+        groups={data.groups}
+        categories={data.categories}
+        dietaryCategories={data.dietaryCategories}
+      />
     </div>
   );
 }
