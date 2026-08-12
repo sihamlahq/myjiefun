@@ -72,7 +72,7 @@ export const defaultTableSettings: TableSettings = {
   defaultCapacity: 10,
   namingFormat: "Table {n}",
   seatNumbering: "numeric",
-  tableTypes: ["normal", "vip", "family", "bride_groom", "reserved", "custom"],
+  tableTypes: ["normal", "vip", "family", "bride_groom", "groom_side", "bride_side", "reserved", "custom"],
 };
 
 export const defaultAttendanceSettings: AttendanceSettings = {

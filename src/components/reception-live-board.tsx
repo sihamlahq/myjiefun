@@ -6,11 +6,12 @@ import { computeStats } from "@/lib/stats";
 import { cn, formatPercent } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable, WeddingSettings } from "@/types/wedding";
 import { TableGuestsDialog } from "@/components/table-guests-dialog";
+import { tableSide, tableSideCardClass, tableSideLabel } from "@/lib/table-side";
 
 type LiveGuest = GuestWithRelations;
 type LiveTable = Pick<
   ReceptionTable,
-  "id" | "table_number" | "name" | "capacity" | "table_type" | "status" | "sort_order"
+  "id" | "table_number" | "name" | "capacity" | "table_type" | "status" | "sort_order" | "location"
 >;
 
 type Snapshot = {
@@ -197,15 +198,29 @@ export function ReceptionLiveBoard({
       </div>
 
       <div className="mt-10 w-full max-w-6xl">
-        <p className="mb-4 text-sm font-semibold uppercase tracking-[0.28em] text-[var(--primary)]">
-          Tables — tap a number for the guest list
-        </p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-[var(--primary)]">
+            Tables — tap a number for the guest list
+          </p>
+          <div className="flex flex-wrap items-center gap-3 text-xs font-semibold">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full border border-sky-400 bg-sky-200" />
+              Groom side 男方
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full border border-rose-400 bg-rose-200" />
+              Bride side 女方
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {summaries.map(({ table, seated }) => {
             const full = seated.length >= table.capacity;
             const hasGuests = seated.length > 0 && !full;
             const arrived = seated.filter((g) => g.attendance_status === "checked_in").length;
             const flashing = flashTableId === table.id;
+            const sideClass = tableSideCardClass(table);
+            const side = tableSide(table);
             return (
               <button
                 key={table.id}
@@ -215,20 +230,24 @@ export function ReceptionLiveBoard({
                   "rounded-3xl border px-3 py-4 text-left shadow-sm transition",
                   flashing &&
                     "scale-[1.03] ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--background)]",
-                  full
-                    ? "border-[var(--accent)]/50 bg-[var(--accent)]/70"
-                    : hasGuests
-                      ? "border-[var(--secondary)]/40 bg-[var(--secondary)]/45"
-                      : "border-white/70 bg-white/70",
+                  sideClass
+                    ? sideClass
+                    : full
+                      ? "border-[var(--accent)]/50 bg-[var(--accent)]/70"
+                      : hasGuests
+                        ? "border-[var(--secondary)]/40 bg-[var(--secondary)]/45"
+                        : "border-white/70 bg-white/70",
                 )}
               >
                 <p className="font-heading text-3xl font-semibold leading-none">
                   {table.table_number}
                 </p>
-                <p className="mt-2 truncate text-xs text-[var(--foreground)]/60">{table.name}</p>
+                <p className="mt-2 truncate text-xs opacity-70">
+                  {side ? tableSideLabel(side) : table.name}
+                </p>
                 <p className="mt-3 text-sm font-semibold tabular-nums">
                   {seated.length}/{table.capacity}
-                  <span className="ml-1 font-normal text-[var(--foreground)]/55">
+                  <span className="ml-1 font-normal opacity-60">
                     · {arrived} in
                   </span>
                 </p>

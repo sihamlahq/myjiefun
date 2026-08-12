@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/page-chrome";
 import { TableNumberButton } from "@/components/table-guests-dialog";
+import { tableSide, tableSideMarkerClass, tableTypeLabel } from "@/lib/table-side";
 
 const TABLE_SIZE = 112;
 
@@ -302,7 +303,7 @@ function TableDetails({
         </Button>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Badge>{table.table_type}</Badge>
+        <Badge>{tableTypeLabel(table.table_type)}</Badge>
         <Badge>{table.status}</Badge>
         <Badge>
           {guests.length}/{table.capacity}
@@ -385,6 +386,8 @@ function DraggableTable({
 }
 
 function occupancyState(table: ReceptionTable, guests: GuestWithRelations[]) {
+  if (tableSide(table) === "groom") return "groom_side";
+  if (tableSide(table) === "bride") return "bride_side";
   if (table.table_type === "vip") return "vip";
   if (table.status === "reserved" || table.table_type === "reserved") return "reserved";
   if (guests.length === 0) return "empty";
@@ -394,6 +397,8 @@ function occupancyState(table: ReceptionTable, guests: GuestWithRelations[]) {
 }
 
 function colorForState(state: string) {
+  const side = tableSideMarkerClass(state);
+  if (side) return side;
   const styles: Record<string, string> = {
     empty: "border-[var(--primary)]/25 bg-white text-[var(--foreground)]",
     partial: "border-[var(--secondary)] bg-[var(--secondary)]/30 text-[var(--foreground)]",

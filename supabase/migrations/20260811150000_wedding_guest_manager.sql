@@ -8,7 +8,7 @@ create extension if not exists "pgcrypto";
 do $$ begin create type public.app_role as enum ('admin', 'manager', 'checkin_staff', 'viewer'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.rsvp_status as enum ('pending', 'confirmed', 'declined', 'maybe'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.attendance_status as enum ('not_arrived', 'checked_in', 'no_show', 'walk_in'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.table_type as enum ('normal', 'vip', 'family', 'bride_groom', 'reserved', 'custom'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.table_type as enum ('normal', 'vip', 'family', 'bride_groom', 'groom_side', 'bride_side', 'reserved', 'custom'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.table_status as enum ('active', 'disabled', 'reserved'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.seat_status as enum ('empty', 'occupied', 'reserved', 'vip'); exception when duplicate_object then null; end $$;
 do $$ begin
@@ -389,7 +389,7 @@ insert into public.app_settings (key, value) values
     "defaultCapacity": 10,
     "namingFormat": "Table {n}",
     "seatNumbering": "numeric",
-    "tableTypes": ["normal", "vip", "family", "bride_groom", "reserved", "custom"]
+    "tableTypes": ["normal", "vip", "family", "bride_groom", "groom_side", "bride_side", "reserved", "custom"]
   }'::jsonb),
   ('attendanceSettings', '{
     "allowWalkIns": true,

@@ -12,12 +12,12 @@ export async function GET() {
       supabase
         .from("guests")
         .select(
-          "id, guest_code, name_en, name_zh, phone, table_id, rsvp_status, attendance_status, expected_count, is_vip, is_walk_in, guest_groups(name), reception_tables(id, table_number, name, capacity, table_type, status)",
+          "id, guest_code, name_en, name_zh, phone, table_id, rsvp_status, attendance_status, expected_count, is_vip, is_walk_in, guest_groups(name), reception_tables(id, table_number, name, capacity, table_type, status, location)",
         )
         .order("name_en", { ascending: true }),
       supabase
         .from("reception_tables")
-        .select("id, table_number, name, capacity, table_type, status, sort_order")
+        .select("id, table_number, name, capacity, table_type, status, sort_order, location")
         .order("sort_order", { ascending: true })
         .order("table_number", { ascending: true }),
       supabase.from("app_settings").select("key, value").eq("key", "wedding").maybeSingle(),

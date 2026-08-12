@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/page-chrome";
 import { TableNumberButton } from "@/components/table-guests-dialog";
+import { tableSide, tableSideBadgeClass, tableSideCardClass, tableSideLabel, tableTypeLabel } from "@/lib/table-side";
 
 const unassignedId = "drop:unassigned";
 
@@ -140,7 +141,13 @@ function TableDrop({
   const over = guests.length > table.capacity;
 
   return (
-    <Card className={cn(isOver && "ring-2 ring-[var(--accent)]", over && "border-red-300")}>
+    <Card
+      className={cn(
+        isOver && "ring-2 ring-[var(--accent)]",
+        over && "border-red-300",
+        tableSideCardClass(table),
+      )}
+    >
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -154,8 +161,14 @@ function TableDrop({
             <p className="text-sm text-[var(--foreground)]/60">{table.name}</p>
             <p className="mt-1 text-xs text-[var(--primary)]/80">Tap number for full list</p>
           </div>
-          <Badge className={cn("capitalize", table.table_type === "vip" && "bg-[var(--accent)]")}>
-            {table.table_type}
+          <Badge
+            className={cn(
+              "capitalize",
+              table.table_type === "vip" && "bg-[var(--accent)]",
+              tableSideBadgeClass(table),
+            )}
+          >
+            {tableSide(table) ? tableSideLabel(tableSide(table)) : tableTypeLabel(table.table_type)}
           </Badge>
         </div>
       </CardHeader>

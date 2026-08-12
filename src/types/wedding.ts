@@ -10,6 +10,8 @@ export type TableType =
   | "vip"
   | "family"
   | "bride_groom"
+  | "groom_side"
+  | "bride_side"
   | "reserved"
   | "custom";
 export type TableStatus = "active" | "disabled" | "reserved";

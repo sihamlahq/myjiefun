@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 type ReceptionTableInsert = {
   table_number: string;
   name: string;
-  table_type: "normal" | "vip" | "family" | "bride_groom" | "reserved" | "custom";
+  table_type: "normal" | "vip" | "family" | "bride_groom" | "groom_side" | "bride_side" | "reserved" | "custom";
   capacity: number;
   location: string;
   status: "active" | "disabled" | "reserved";
@@ -163,7 +163,12 @@ async function main() {
       name: index < 2 ? `VIP ${index + 1}` : `Table ${index + 1}`,
       table_type: index < 2 ? "vip" : index === 2 ? "bride_groom" : index < 8 ? "family" : "normal",
       capacity: 10,
-      location: `Zone ${String.fromCharCode(65 + Math.floor(index / 10))}`,
+      location:
+        index < 2 || index === 2
+          ? "Head table"
+          : index % 2 === 0
+            ? "Groom side (男方)"
+            : "Bride side (女方)",
       status: index === 39 ? "reserved" : "active",
       notes: "",
       sort_order: index + 1,

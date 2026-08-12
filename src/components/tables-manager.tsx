@@ -10,13 +10,31 @@ import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
 import { TableNumberButton } from "@/components/table-guests-dialog";
+import {
+  BRIDE_SIDE_LABEL,
+  GROOM_SIDE_LABEL,
+  tableSide,
+  tableSideBadgeClass,
+  tableSideCardClass,
+  tableSideLabel,
+  tableTypeLabel,
+  type TableSide,
+} from "@/lib/table-side";
+import { cn } from "@/lib/utils";
 
 type TableDraft = Pick<
   ReceptionTable,
   "table_number" | "name" | "capacity" | "table_type" | "location" | "status" | "notes" | "sort_order" | "pos_x" | "pos_y"
 > & { id?: string };
 
-const tableTypes: TableType[] = ["normal", "vip", "family", "bride_groom", "reserved", "custom"];
+const tableTypes: TableType[] = [
+  "normal",
+  "vip",
+  "family",
+  "bride_groom",
+  "reserved",
+  "custom",
+];
 const tableStatuses: TableStatus[] = ["active", "reserved", "disabled"];
 
 const emptyDraft: TableDraft = {
@@ -149,7 +167,11 @@ export function TablesManager({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Type">
                 <select className="h-10 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={draft.table_type} onChange={(event) => updateDraft("table_type", event.target.value as TableType)}>
-                  {tableTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                  {tableTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {tableTypeLabel(type)}
+                    </option>
+                  ))}
                 </select>
               </Field>
               <Field label="Status">
@@ -158,7 +180,23 @@ export function TablesManager({
                 </select>
               </Field>
             </div>
-            <Field label="Location"><Input value={draft.location} onChange={(event) => updateDraft("location", event.target.value)} /></Field>
+            <Field label="Side">
+              <select
+                className="h-10 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-sm"
+                value={tableSide(draft) ?? ""}
+                onChange={(event) => {
+                  const side = event.target.value as TableSide | "";
+                  if (side === "groom") updateDraft("location", GROOM_SIDE_LABEL);
+                  else if (side === "bride") updateDraft("location", BRIDE_SIDE_LABEL);
+                  else if (tableSide(draft)) updateDraft("location", "");
+                }}
+              >
+                <option value="">Unassigned</option>
+                <option value="groom">{GROOM_SIDE_LABEL}</option>
+                <option value="bride">{BRIDE_SIDE_LABEL}</option>
+              </select>
+            </Field>
+            <Field label="Location"><Input value={draft.location} onChange={(event) => updateDraft("location", event.target.value)} placeholder="Groom side / Bride side / Zone…" /></Field>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Sort"><Input type="number" value={draft.sort_order} onChange={(event) => updateDraft("sort_order", Number(event.target.value))} /></Field>
               <Field label="X"><Input type="number" value={draft.pos_x} onChange={(event) => updateDraft("pos_x", Number(event.target.value))} /></Field>
@@ -179,7 +217,10 @@ export function TablesManager({
             const assigned = assignedByTable.get(table.id) ?? 0;
             const rate = table.capacity ? assigned / table.capacity : 0;
             return (
-              <Card key={table.id}>
+              <Card
+                key={table.id}
+                className={cn(tableSideCardClass(table))}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -193,7 +234,9 @@ export function TablesManager({
                       <p className="text-sm text-[var(--foreground)]/60">{table.name}</p>
                       <p className="mt-1 text-xs text-[var(--primary)]/80">Tap number to view guest list</p>
                     </div>
-                    <Badge className="capitalize">{table.table_type}</Badge>
+                    <Badge className={cn("capitalize", tableSideBadgeClass(table))}>
+                      {tableSide(table) ? tableSideLabel(tableSide(table)) : tableTypeLabel(table.table_type)}
+                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
