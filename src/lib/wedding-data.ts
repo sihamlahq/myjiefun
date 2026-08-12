@@ -332,6 +332,40 @@ function mapSettings(rows: SettingsRow[]): Partial<WeddingSettingsMap> {
   return settingsMap;
 }
 
+/** Settings log book — recent audit entries with staff profile. */
+export async function loadAuditLogs(limit = 150): Promise<{
+  logs: import("@/types/wedding").AuditLog[];
+  setupError: string | null;
+}> {
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try {
+    supabase = await createClient();
+  } catch (error) {
+    return {
+      logs: [],
+      setupError: error instanceof Error ? error.message : "Supabase is not configured.",
+    };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("audit_logs")
+      .select("*, profiles(id, full_name, email, role)")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    return {
+      logs: (data ?? []) as import("@/types/wedding").AuditLog[],
+      setupError: error?.message || null,
+    };
+  } catch (error) {
+    return {
+      logs: [],
+      setupError: error instanceof Error ? error.message : "Unable to load audit logs.",
+    };
+  }
+}
+
 export function withDefaultSettings(settings: Partial<WeddingSettingsMap>): WeddingSettingsMap {
   return {
     wedding: { ...defaultSettings.wedding, ...settings.wedding },

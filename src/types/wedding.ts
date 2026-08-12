@@ -105,6 +105,19 @@ export type CheckInEvent = {
   created_at: string;
 };
 
+export type AuditLog = {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  staff_id: string | null;
+  before_data: unknown;
+  after_data: unknown;
+  meta: Record<string, unknown>;
+  created_at: string;
+  profiles?: Pick<Profile, "id" | "full_name" | "email" | "role"> | null;
+};
+
 export type WeddingSettings = {
   coupleNames: string;
   title: string;

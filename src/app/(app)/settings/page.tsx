@@ -1,9 +1,10 @@
 import { PageHeader, SetupCard } from "@/components/page-chrome";
 import { SettingsForm } from "@/components/settings-form";
-import { loadWeddingData, withDefaultSettings } from "@/lib/wedding-data";
+import { SettingsLogBook } from "@/components/settings-log-book";
+import { loadAuditLogs, loadWeddingData, withDefaultSettings } from "@/lib/wedding-data";
 
 export default async function SettingsPage() {
-  const data = await loadWeddingData();
+  const [data, audit] = await Promise.all([loadWeddingData(), loadAuditLogs(200)]);
   const settings = withDefaultSettings(data.settings);
 
   return (
@@ -11,10 +12,17 @@ export default async function SettingsPage() {
       <PageHeader
         eyebrow="Wedding control"
         title="Settings"
-        description="Tune the couple details, premium theme, guest taxonomy, seating defaults, and check-in rules."
+        description="Tune wedding details, theme, guest rules, and review the staff activity log book."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
-      <SettingsForm settings={settings} guestCount={data.guests.length} />
+      <div className="space-y-5">
+        <SettingsForm settings={settings} guestCount={data.guests.length} />
+        {audit.setupError ? (
+          <SetupCard message={audit.setupError} />
+        ) : (
+          <SettingsLogBook logs={audit.logs} />
+        )}
+      </div>
     </div>
   );
 }
