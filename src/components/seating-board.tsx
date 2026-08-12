@@ -1,10 +1,10 @@
 "use client";
 
-import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import { DndContext, type DragEndEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { CheckCircle2, Plus, UserPlus } from "lucide-react";
+import { CheckCircle2, GripVertical, Plus, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addSeatToTable, assignGuestToTable } from "@/lib/actions/wedding";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,18 @@ import {
 
 const unassignedId = "drop:unassigned";
 
+function useDesktopDrag() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px) and (pointer: fine)");
+    const sync = () => setEnabled(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+  return enabled;
+}
+
 export function SeatingBoard({
   guests,
   tables,
@@ -31,6 +43,13 @@ export function SeatingBoard({
   tables: ReceptionTable[];
 }) {
   const [isPending, startTransition] = useTransition();
+  const desktopDrag = useDesktopDrag();
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  );
+
   const guestsByTable = useMemo(() => {
     const map = new Map<string, GuestWithRelations[]>();
     for (const table of tables) map.set(table.id, []);
@@ -39,6 +58,7 @@ export function SeatingBoard({
     }
     return map;
   }, [guests, tables]);
+
   const unassigned = guests.filter((guest) => !guest.table_id);
   const activeTables = useMemo(
     () =>
@@ -51,9 +71,16 @@ export function SeatingBoard({
     [tables],
   );
 
-  function assignTable(guestId: string, tableId: string | null, fromTableId?: string | null) {
+  function assignTable(
+    guestId: string,
+    tableId: string | null,
+    fromTableId?: string | null,
+    opts?: { confirmMove?: boolean },
+  ) {
     if ((fromTableId ?? null) === tableId) return;
-    if (fromTableId && !confirm("Move this guest from their current table?")) return;
+    if (opts?.confirmMove && fromTableId && !confirm("Move this guest from their current table?")) {
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -66,13 +93,14 @@ export function SeatingBoard({
   }
 
   function onDragEnd(event: DragEndEvent) {
+    if (!desktopDrag) return;
     const guestId = String(event.active.id).replace("guest:", "");
     const guest = guests.find((item) => item.id === guestId);
     const overId = event.over ? String(event.over.id) : "";
     if (!guest || !overId) return;
 
     const tableId = overId === unassignedId ? null : overId.replace("drop:table:", "");
-    assignTable(guestId, tableId, guest.table_id);
+    assignTable(guestId, tableId, guest.table_id, { confirmMove: true });
   }
 
   function addSeat(table: ReceptionTable) {
@@ -87,41 +115,57 @@ export function SeatingBoard({
   }
 
   return (
-    <DndContext onDragEnd={onDragEnd}>
-      <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+      <div className="space-y-4 lg:hidden">
+        <p className="rounded-2xl bg-[var(--muted)]/70 px-3 py-2 text-sm text-[var(--foreground)]/70">
+          On mobile, use <span className="font-semibold">Assign / Move to table</span> under each guest.
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
         <UnassignedDrop
           guests={unassigned}
           tables={activeTables}
           guestsByTable={guestsByTable}
           pending={isPending}
+          desktopDrag={desktopDrag}
           onAssign={(guestId, tableId) => assignTable(guestId, tableId, null)}
         />
 
         <div className="space-y-4">
-          <div className="flex flex-wrap justify-end gap-2">
-            <Link href="/guests">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="hidden text-sm text-[var(--foreground)]/60 lg:block">
+              Desktop: drag guests, or use the table menu on each card.
+            </p>
+            <Link href="/guests" className="ml-auto">
               <Button variant="outline">
                 <UserPlus className="h-4 w-4" /> Add guest
               </Button>
             </Link>
           </div>
           {tables.length ? (
-            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {tables.map((table) => (
                 <TableDrop
                   key={table.id}
                   table={table}
                   guests={guestsByTable.get(table.id) ?? []}
                   allGuests={guests}
+                  tables={activeTables}
+                  guestsByTable={guestsByTable}
                   onAddSeat={() => addSeat(table)}
                   pending={isPending}
+                  desktopDrag={desktopDrag}
+                  onAssign={(guestId, tableId) =>
+                    assignTable(guestId, tableId, table.id)
+                  }
                 />
               ))}
             </div>
           ) : (
             <EmptyState
               title="No tables to seat"
-              description="Create tables first, then drag guests into their table cards."
+              description="Create tables first, then assign guests with the table menu."
             />
           )}
         </div>
@@ -130,45 +174,107 @@ export function SeatingBoard({
   );
 }
 
+function TableSelect({
+  guest,
+  tables,
+  guestsByTable,
+  pending,
+  currentTableId,
+  placeholder,
+  onAssign,
+}: {
+  guest: GuestWithRelations;
+  tables: ReceptionTable[];
+  guestsByTable: Map<string, GuestWithRelations[]>;
+  pending: boolean;
+  currentTableId?: string | null;
+  placeholder: string;
+  onAssign: (guestId: string, tableId: string | null) => void;
+}) {
+  return (
+    <label className="mt-2 block">
+      <span className="sr-only">{placeholder}</span>
+      <select
+        className="h-10 w-full rounded-xl border border-black/10 bg-[var(--background)] px-2.5 text-sm font-semibold text-[var(--foreground)]"
+        defaultValue=""
+        disabled={pending || !tables.length}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          const value = event.target.value;
+          if (!value) return;
+          onAssign(guest.id, value === "__unassigned__" ? null : value);
+          event.target.value = "";
+        }}
+      >
+        <option value="" disabled>
+          {tables.length ? placeholder : "No active tables"}
+        </option>
+        {currentTableId ? <option value="__unassigned__">Unassigned</option> : null}
+        {tables.map((table) => {
+          const seated = guestsByTable.get(table.id)?.length ?? 0;
+          const side = tableSide(table);
+          const fullness = seated >= table.capacity ? "full" : `${seated}/${table.capacity}`;
+          const current = table.id === currentTableId ? " · current" : "";
+          return (
+            <option key={table.id} value={table.id} disabled={table.id === currentTableId}>
+              {table.table_number}
+              {side ? ` · ${side === "groom" ? "男方" : "女方"}` : ""}
+              {` · ${fullness}`}
+              {current}
+            </option>
+          );
+        })}
+      </select>
+    </label>
+  );
+}
+
 function UnassignedDrop({
   guests,
   tables,
   guestsByTable,
   pending,
+  desktopDrag,
   onAssign,
 }: {
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
   guestsByTable: Map<string, GuestWithRelations[]>;
   pending: boolean;
+  desktopDrag: boolean;
   onAssign: (guestId: string, tableId: string) => void;
 }) {
-  const { isOver, setNodeRef } = useDroppable({ id: unassignedId });
+  const { isOver, setNodeRef } = useDroppable({ id: unassignedId, disabled: !desktopDrag });
   return (
     <Card className={cn("h-fit xl:sticky xl:top-6", isOver && "ring-2 ring-[var(--accent)]")}>
       <CardHeader>
         <CardTitle>Unassigned guests</CardTitle>
         <p className="text-sm text-[var(--foreground)]/60">
-          Pick a table from the list, or drag onto a table card.
+          Choose a table number below each name.
         </p>
       </CardHeader>
       <CardContent>
-        <div ref={setNodeRef} className="min-h-40 space-y-2">
+        <div ref={setNodeRef} className="min-h-24 space-y-2">
           {guests.length ? (
             guests.map((guest) => (
-              <UnassignedGuestChip
+              <GuestCard
                 key={guest.id}
                 guest={guest}
                 tables={tables}
                 guestsByTable={guestsByTable}
                 pending={pending}
-                onAssign={onAssign}
+                desktopDrag={desktopDrag}
+                placeholder="Assign to table…"
+                onAssign={(guestId, tableId) => {
+                  if (tableId) onAssign(guestId, tableId);
+                }}
               />
             ))
           ) : (
             <EmptyState
               title="All assigned"
-              description="Drag guests here to remove a table assignment."
+              description="Use Move to table on a seated guest to free a seat."
             />
           )}
         </div>
@@ -177,108 +283,31 @@ function UnassignedDrop({
   );
 }
 
-function UnassignedGuestChip({
-  guest,
-  tables,
-  guestsByTable,
-  pending,
-  onAssign,
-}: {
-  guest: GuestWithRelations;
-  tables: ReceptionTable[];
-  guestsByTable: Map<string, GuestWithRelations[]>;
-  pending: boolean;
-  onAssign: (guestId: string, tableId: string) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `guest:${guest.id}`,
-    disabled: pending,
-  });
-  const style = {
-    transform: CSS.Translate.toString(transform),
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "rounded-xl border border-black/8 bg-white/85 px-3 py-2.5 text-sm shadow-sm",
-        isDragging && "opacity-60 shadow-xl",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          className="min-w-0 flex-1 cursor-grab touch-none text-left"
-          {...listeners}
-          {...attributes}
-        >
-          <p className="font-semibold leading-tight">{guest.name_en}</p>
-          <p className="mt-0.5 text-xs text-[var(--foreground)]/55">
-            {[guest.name_zh, guest.guest_groups?.name, `party ${guest.expected_count}`]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </button>
-        <div className="flex shrink-0 items-center gap-1">
-          {guest.is_vip ? <Badge className="bg-[var(--accent)]">VIP</Badge> : null}
-          {guest.attendance_status === "checked_in" ? (
-            <CheckCircle2 className="h-4 w-4 text-green-700" />
-          ) : null}
-        </div>
-      </div>
-
-      <label className="mt-2 block">
-        <span className="sr-only">Assign {guest.name_en} to table</span>
-        <select
-          className="h-9 w-full rounded-lg border border-black/10 bg-[var(--background)] px-2 text-xs font-semibold text-[var(--foreground)]"
-          defaultValue=""
-          disabled={pending || !tables.length}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => event.stopPropagation()}
-          onChange={(event) => {
-            const tableId = event.target.value;
-            if (!tableId) return;
-            onAssign(guest.id, tableId);
-            event.target.value = "";
-          }}
-        >
-          <option value="" disabled>
-            {tables.length ? "Assign to table…" : "No active tables"}
-          </option>
-          {tables.map((table) => {
-            const seated = guestsByTable.get(table.id)?.length ?? 0;
-            const side = tableSide(table);
-            const fullness = seated >= table.capacity ? "full" : `${seated}/${table.capacity}`;
-            return (
-              <option key={table.id} value={table.id}>
-                {table.table_number}
-                {side ? ` · ${side === "groom" ? "男方" : "女方"}` : ""}
-                {` · ${fullness}`}
-              </option>
-            );
-          })}
-        </select>
-      </label>
-    </div>
-  );
-}
-
 function TableDrop({
   table,
   guests,
   allGuests,
+  tables,
+  guestsByTable,
   onAddSeat,
   pending,
+  desktopDrag,
+  onAssign,
 }: {
   table: ReceptionTable;
   guests: GuestWithRelations[];
   allGuests: GuestWithRelations[];
+  tables: ReceptionTable[];
+  guestsByTable: Map<string, GuestWithRelations[]>;
   onAddSeat: () => void;
   pending: boolean;
+  desktopDrag: boolean;
+  onAssign: (guestId: string, tableId: string | null) => void;
 }) {
-  const { isOver, setNodeRef } = useDroppable({ id: `drop:table:${table.id}` });
+  const { isOver, setNodeRef } = useDroppable({
+    id: `drop:table:${table.id}`,
+    disabled: !desktopDrag,
+  });
   const occupancy = table.capacity ? guests.length / table.capacity : 0;
   const over = guests.length > table.capacity;
 
@@ -301,7 +330,6 @@ function TableDrop({
               />
             </CardTitle>
             <p className="text-sm text-[var(--foreground)]/60">{table.name}</p>
-            <p className="mt-1 text-xs text-[var(--primary)]/80">Tap number for full list</p>
           </div>
           <Badge
             className={cn(
@@ -315,7 +343,7 @@ function TableDrop({
         </div>
       </CardHeader>
       <CardContent>
-        <div ref={setNodeRef} className="min-h-44 space-y-3">
+        <div ref={setNodeRef} className="min-h-32 space-y-3">
           <div>
             <div className="mb-1 flex justify-between text-xs text-[var(--foreground)]/60">
               <span>
@@ -331,9 +359,25 @@ function TableDrop({
             </div>
           </div>
           <div className="space-y-2">
-            {guests.map((guest) => (
-              <GuestChip key={guest.id} guest={guest} pending={pending} />
-            ))}
+            {guests.length ? (
+              guests.map((guest) => (
+                <GuestCard
+                  key={guest.id}
+                  guest={guest}
+                  tables={tables}
+                  guestsByTable={guestsByTable}
+                  pending={pending}
+                  desktopDrag={desktopDrag}
+                  currentTableId={table.id}
+                  placeholder="Move to table…"
+                  onAssign={onAssign}
+                />
+              ))
+            ) : (
+              <p className="rounded-xl border border-dashed border-black/10 px-3 py-4 text-center text-sm text-[var(--foreground)]/55">
+                No guests yet — assign from the unassigned list.
+              </p>
+            )}
           </div>
           <Button size="sm" variant="outline" onClick={onAddSeat} disabled={pending}>
             <Plus className="h-3.5 w-3.5" /> Add seat
@@ -344,16 +388,28 @@ function TableDrop({
   );
 }
 
-function GuestChip({
+function GuestCard({
   guest,
+  tables,
+  guestsByTable,
   pending,
+  desktopDrag,
+  currentTableId = null,
+  placeholder,
+  onAssign,
 }: {
   guest: GuestWithRelations;
+  tables: ReceptionTable[];
+  guestsByTable: Map<string, GuestWithRelations[]>;
   pending: boolean;
+  desktopDrag: boolean;
+  currentTableId?: string | null;
+  placeholder: string;
+  onAssign: (guestId: string, tableId: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `guest:${guest.id}`,
-    disabled: pending,
+    disabled: pending || !desktopDrag,
   });
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -363,24 +419,51 @@ function GuestChip({
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
       className={cn(
-        "flex cursor-grab items-center justify-between gap-2 rounded-xl border border-black/8 bg-white/85 px-3 py-2 text-sm shadow-sm",
+        "rounded-xl border border-black/8 bg-white/90 px-3 py-2.5 text-sm shadow-sm",
         isDragging && "opacity-60 shadow-xl",
       )}
     >
-      <div>
-        <p className="font-semibold">{guest.name_en}</p>
-        <p className="text-xs text-[var(--foreground)]/55">
-          {guest.guest_code} · party {guest.expected_count}
-        </p>
-      </div>
-      <div className="flex items-center gap-1">
-        {guest.is_vip ? <Badge className="bg-[var(--accent)]">VIP</Badge> : null}
-        {guest.attendance_status === "checked_in" ? (
-          <CheckCircle2 className="h-4 w-4 text-green-700" />
+      <div className="flex items-start gap-2">
+        {desktopDrag ? (
+          <button
+            type="button"
+            className="mt-0.5 hidden cursor-grab touch-none text-[var(--foreground)]/35 lg:block"
+            aria-label={`Drag ${guest.name_en}`}
+            {...listeners}
+            {...attributes}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
         ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-semibold leading-tight">{guest.name_en}</p>
+              <p className="mt-0.5 text-xs text-[var(--foreground)]/55">
+                {[guest.name_zh, guest.guest_groups?.name, `party ${guest.expected_count}`]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              {guest.is_vip ? <Badge className="bg-[var(--accent)]">VIP</Badge> : null}
+              {guest.attendance_status === "checked_in" ? (
+                <CheckCircle2 className="h-4 w-4 text-green-700" />
+              ) : null}
+            </div>
+          </div>
+
+          <TableSelect
+            guest={guest}
+            tables={tables}
+            guestsByTable={guestsByTable}
+            pending={pending}
+            currentTableId={currentTableId}
+            placeholder={placeholder}
+            onAssign={onAssign}
+          />
+        </div>
       </div>
     </div>
   );
