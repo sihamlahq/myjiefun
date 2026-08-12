@@ -6,6 +6,7 @@ import { computeStats } from "@/lib/stats";
 import { cn, formatPercent } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable, WeddingSettings } from "@/types/wedding";
 import { TableGuestsDialog } from "@/components/table-guests-dialog";
+import { CheckInPopouts, type CheckInToast } from "@/components/check-in-popouts";
 import { tableSide, tableSideCardClass, tableSideLabel } from "@/lib/table-side";
 
 type LiveGuest = GuestWithRelations;
@@ -19,6 +20,17 @@ type Snapshot = {
   tables: LiveTable[];
   wedding?: WeddingSettings | null;
 };
+
+type GuestChangeRow = {
+  id?: string;
+  name_en?: string | null;
+  name_zh?: string | null;
+  table_id?: string | null;
+  attendance_status?: string | null;
+};
+
+const TOAST_TTL_MS = 6500;
+const MAX_TOASTS = 4;
 
 export function ReceptionLiveBoard({
   initialGuests,
@@ -39,18 +51,92 @@ export function ReceptionLiveBoard({
   const [liveState, setLiveState] = useState<"connecting" | "live" | "polling">("connecting");
   const [lastBeat, setLastBeat] = useState<Date | null>(null);
   const [flashTableId, setFlashTableId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<CheckInToast[]>([]);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchLock = useRef(false);
+  const checkedInIds = useRef(
+    new Set(
+      initialGuests
+        .filter((guest) => guest.attendance_status === "checked_in")
+        .map((guest) => guest.id),
+    ),
+  );
+  const toastTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const tablesRef = useRef(tables);
+  tablesRef.current = tables;
 
-  const applySnapshot = useCallback((json: Snapshot) => {
-    setGuests(json.guests);
-    setTables(json.tables);
-    if (json.wedding?.coupleNames) setNames(json.wedding.coupleNames);
-    if (json.wedding) {
-      setLine([json.wedding.date, json.wedding.venue].filter(Boolean).join(" · "));
+  const dismissToast = useCallback((id: string) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+    const timer = toastTimers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      toastTimers.current.delete(id);
     }
-    setLastBeat(new Date());
   }, []);
+
+  const pushCheckInToast = useCallback(
+    (guest: {
+      id: string;
+      nameEn: string;
+      nameZh: string;
+      tableId?: string | null;
+    }) => {
+      if (!guest.id) return;
+      const tableNumber =
+        tablesRef.current.find((table) => table.id === guest.tableId)?.table_number ?? null;
+      const toastId = `${guest.id}-${Date.now()}`;
+      const toast: CheckInToast = {
+        id: toastId,
+        guestId: guest.id,
+        nameEn: guest.nameEn || "Guest",
+        nameZh: guest.nameZh || "",
+        tableNumber,
+        createdAt: Date.now(),
+      };
+      setToasts((current) =>
+        [toast, ...current.filter((item) => item.guestId !== guest.id)].slice(0, MAX_TOASTS),
+      );
+      const timer = setTimeout(() => dismissToast(toastId), TOAST_TTL_MS);
+      toastTimers.current.set(toastId, timer);
+    },
+    [dismissToast],
+  );
+
+  const noteNewCheckIns = useCallback(
+    (nextGuests: LiveGuest[]) => {
+      const nextIds = new Set(
+        nextGuests
+          .filter((guest) => guest.attendance_status === "checked_in")
+          .map((guest) => guest.id),
+      );
+      for (const guest of nextGuests) {
+        if (guest.attendance_status !== "checked_in") continue;
+        if (checkedInIds.current.has(guest.id)) continue;
+        pushCheckInToast({
+          id: guest.id,
+          nameEn: guest.name_en,
+          nameZh: guest.name_zh,
+          tableId: guest.table_id,
+        });
+      }
+      checkedInIds.current = nextIds;
+    },
+    [pushCheckInToast],
+  );
+
+  const applySnapshot = useCallback(
+    (json: Snapshot) => {
+      noteNewCheckIns(json.guests);
+      setGuests(json.guests);
+      setTables(json.tables);
+      if (json.wedding?.coupleNames) setNames(json.wedding.coupleNames);
+      if (json.wedding) {
+        setLine([json.wedding.date, json.wedding.venue].filter(Boolean).join(" · "));
+      }
+      setLastBeat(new Date());
+    },
+    [noteNewCheckIns],
+  );
 
   const pulseTable = useCallback((tableId: string | null | undefined) => {
     if (!tableId) return;
@@ -101,8 +187,29 @@ export function ReceptionLiveBoard({
           (payload) => {
             setLiveState("live");
             setLastBeat(new Date());
-            const row = (payload.new || payload.old) as { table_id?: string | null } | null;
-            pulseTable(row?.table_id ?? null);
+            const next = payload.new as GuestChangeRow | null;
+            const prev = payload.old as GuestChangeRow | null;
+            pulseTable(next?.table_id ?? prev?.table_id ?? null);
+
+            const becameCheckedIn =
+              next?.attendance_status === "checked_in" &&
+              prev?.attendance_status !== "checked_in" &&
+              Boolean(next?.id);
+
+            if (becameCheckedIn && next?.id) {
+              if (!checkedInIds.current.has(next.id)) {
+                checkedInIds.current.add(next.id);
+                pushCheckInToast({
+                  id: next.id,
+                  nameEn: next.name_en || "",
+                  nameZh: next.name_zh || "",
+                  tableId: next.table_id,
+                });
+              }
+            } else if (next?.id && next.attendance_status !== "checked_in") {
+              checkedInIds.current.delete(next.id);
+            }
+
             scheduleSnapshot();
           },
         )
@@ -141,9 +248,12 @@ export function ReceptionLiveBoard({
       clearInterval(poll);
       if (debounceTimer) clearTimeout(debounceTimer);
       if (flashTimer.current) clearTimeout(flashTimer.current);
+      const timers = toastTimers.current;
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
       if (supabase && channel) void supabase.removeChannel(channel);
     };
-  }, [fetchSnapshot, pulseTable]);
+  }, [fetchSnapshot, pulseTable, pushCheckInToast]);
 
   const stats = useMemo(() => computeStats(guests, tables as ReceptionTable[]), [guests, tables]);
   const summaries = useMemo(() => {
@@ -167,6 +277,8 @@ export function ReceptionLiveBoard({
 
   return (
     <>
+      <CheckInPopouts toasts={toasts} onDismiss={dismissToast} />
+
       <div className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.22em]">
         <span
           className={cn(

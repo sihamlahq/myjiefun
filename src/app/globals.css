@@ -90,6 +90,69 @@ h3,
   }
 }
 
+.checkin-popout {
+  animation: checkin-popout-in 0.55s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+.checkin-popout-badge {
+  animation: checkin-popout-bounce 1.1s ease-in-out infinite;
+}
+
+.checkin-popout-shine {
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.55) 48%,
+    transparent 62%
+  );
+  transform: translateX(-120%);
+  animation: checkin-popout-shine 2.4s ease-in-out infinite;
+}
+
+@keyframes checkin-popout-in {
+  0% {
+    opacity: 0;
+    transform: translateX(110%) scale(0.92) rotate(2deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-4%) scale(1.02) rotate(-0.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes checkin-popout-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.05);
+  }
+}
+
+@keyframes checkin-popout-shine {
+  0%,
+  40% {
+    transform: translateX(-120%);
+  }
+  70%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkin-popout,
+  .checkin-popout-badge,
+  .checkin-popout-shine {
+    animation: none;
+  }
+}
+
 @media (max-width: 768px) {
   .app-shell {
     padding-bottom: 5rem;
