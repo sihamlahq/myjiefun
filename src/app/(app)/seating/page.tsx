@@ -10,7 +10,7 @@ export default async function SeatingPage() {
       <PageHeader
         eyebrow="Seat every guest"
         title="Seating"
-        description="On phone, pick a table under each guest. On desktop you can also drag."
+        description="On each table, pick guests from the list to seat them. On phone you can also move guests with the table menu."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
       <SeatingBoard guests={data.guests} tables={data.tables} />

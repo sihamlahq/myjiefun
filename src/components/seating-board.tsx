@@ -154,7 +154,8 @@ export function SeatingBoard({
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="space-y-4 lg:hidden">
         <p className="rounded-2xl bg-[var(--muted)]/70 px-3 py-2 text-sm text-[var(--foreground)]/70">
-          On mobile, use <span className="font-semibold">Assign / Move to table</span> under each guest.
+          On mobile, use <span className="font-semibold">Add guest to this table</span> on each
+          table, or <span className="font-semibold">Assign / Move to table</span> under a guest.
         </p>
       </div>
 
@@ -196,6 +197,13 @@ export function SeatingBoard({
                   onAssign={(guestId, tableId) =>
                     assignTable(guestId, tableId, table.id)
                   }
+                  onAddGuest={(guestId) => {
+                    const guest = guests.find((item) => item.id === guestId);
+                    if (!guest) return;
+                    assignTable(guestId, table.id, guest.table_id, {
+                      confirmMove: Boolean(guest.table_id),
+                    });
+                  }}
                 />
               ))}
             </div>
@@ -331,6 +339,7 @@ function TableDrop({
   busyIds,
   desktopDrag,
   onAssign,
+  onAddGuest,
 }: {
   table: ReceptionTable;
   guests: GuestWithRelations[];
@@ -342,6 +351,7 @@ function TableDrop({
   busyIds: Set<string>;
   desktopDrag: boolean;
   onAssign: (guestId: string, tableId: string | null) => void;
+  onAddGuest: (guestId: string) => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `drop:table:${table.id}`,
@@ -349,6 +359,18 @@ function TableDrop({
   });
   const occupancy = table.capacity ? guests.length / table.capacity : 0;
   const over = guests.length > table.capacity;
+  const addableGuests = useMemo(() => {
+    const unassigned = allGuests
+      .filter((guest) => !guest.table_id)
+      .sort((a, b) => a.name_en.localeCompare(b.name_en));
+    const elsewhere = allGuests
+      .filter((guest) => guest.table_id && guest.table_id !== table.id)
+      .sort((a, b) => a.name_en.localeCompare(b.name_en));
+    return { unassigned, elsewhere };
+  }, [allGuests, table.id]);
+  const addDisabled =
+    seatPending ||
+    (addableGuests.unassigned.length === 0 && addableGuests.elsewhere.length === 0);
 
   return (
     <Card
@@ -414,10 +436,57 @@ function TableDrop({
               ))
             ) : (
               <p className="rounded-xl border border-dashed border-black/10 px-3 py-4 text-center text-sm text-[var(--foreground)]/55">
-                No guests yet — assign from the unassigned list.
+                No guests yet — pick someone below.
               </p>
             )}
           </div>
+
+          <label className="block space-y-1.5">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/55">
+              <UserPlus className="h-3.5 w-3.5" />
+              Add guest to this table
+            </span>
+            <select
+              className="h-11 w-full rounded-xl border border-black/10 bg-white px-2.5 text-sm font-semibold text-[var(--foreground)] disabled:opacity-60"
+              defaultValue=""
+              disabled={addDisabled}
+              onChange={(event) => {
+                const guestId = event.target.value;
+                if (!guestId) return;
+                onAddGuest(guestId);
+                event.target.value = "";
+              }}
+            >
+              <option value="" disabled>
+                {addDisabled ? "No guests available" : "Choose a guest…"}
+              </option>
+              {addableGuests.unassigned.length ? (
+                <optgroup label="Unassigned">
+                  {addableGuests.unassigned.map((guest) => (
+                    <option key={guest.id} value={guest.id} disabled={busyIds.has(guest.id)}>
+                      {guest.name_en}
+                      {guest.name_zh ? ` · ${guest.name_zh}` : ""}
+                      {guest.is_vip ? " · VIP" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {addableGuests.elsewhere.length ? (
+                <optgroup label="Seated elsewhere">
+                  {addableGuests.elsewhere.map((guest) => (
+                    <option key={guest.id} value={guest.id} disabled={busyIds.has(guest.id)}>
+                      {guest.name_en}
+                      {guest.name_zh ? ` · ${guest.name_zh}` : ""}
+                      {guest.reception_tables?.table_number
+                        ? ` · now ${guest.reception_tables.table_number}`
+                        : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+            </select>
+          </label>
+
           <Button size="sm" variant="outline" onClick={onAddSeat} disabled={seatPending}>
             <Plus className="h-3.5 w-3.5" /> Add seat
           </Button>
