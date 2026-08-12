@@ -263,6 +263,61 @@ export async function loadGuestsPageData(): Promise<{
   }
 }
 
+/** Red packet page — checked-in guests + tables + passcode setting. */
+export async function loadRedPacketData(): Promise<{
+  guests: GuestWithRelations[];
+  tables: ReceptionTable[];
+  passcode: string;
+  setupError: string | null;
+}> {
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try {
+    supabase = await createClient();
+  } catch (error) {
+    return {
+      guests: [],
+      tables: [],
+      passcode: "0000",
+      setupError: error instanceof Error ? error.message : "Supabase is not configured.",
+    };
+  }
+
+  try {
+    const [guests, tables, settings] = await Promise.all([
+      supabase
+        .from("guests")
+        .select(
+          "*, guest_groups(id,name), reception_tables(id,table_number,name,capacity,table_type,status,location)",
+        )
+        .eq("attendance_status", "checked_in")
+        .order("name_en", { ascending: true }),
+      supabase
+        .from("reception_tables")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("table_number", { ascending: true }),
+      supabase.from("app_settings").select("value").eq("key", "redPacket").maybeSingle(),
+    ]);
+
+    const passcode =
+      ((settings.data?.value as { passcode?: string } | null)?.passcode || "0000").toString();
+
+    return {
+      guests: (guests.data ?? []) as GuestWithRelations[],
+      tables: (tables.data ?? []) as ReceptionTable[],
+      passcode: /^\d{4}$/.test(passcode) ? passcode : "0000",
+      setupError: guests.error?.message || tables.error?.message || settings.error?.message || null,
+    };
+  } catch (error) {
+    return {
+      guests: [],
+      tables: [],
+      passcode: "0000",
+      setupError: error instanceof Error ? error.message : "Unable to load red packet data.",
+    };
+  }
+}
+
 function mapSettings(rows: SettingsRow[]): Partial<WeddingSettingsMap> {
   const settingsMap: Partial<WeddingSettingsMap> = {};
   for (const row of rows) {

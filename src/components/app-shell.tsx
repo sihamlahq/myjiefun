@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  Gift,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +29,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/guests": Users,
   "/check-in": ClipboardCheck,
   "/seating": Armchair,
+  "/red-packet": Gift,
   "/floor-plan": Map,
   "/tables": Table2,
   "/reports": BarChart3,

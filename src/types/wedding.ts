@@ -82,6 +82,7 @@ export type Guest = {
   category: string;
   notes: string;
   custom_fields: Record<string, unknown>;
+  red_packet_amount?: number | null;
   checked_in_at: string | null;
   checked_in_by: string | null;
   created_at: string;

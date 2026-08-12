@@ -778,3 +778,94 @@ export async function updateTablePosition(id: string, pos_x: number, pos_y: numb
   if (error) throw new Error(error.message);
   revalidatePath("/floor-plan");
 }
+
+export async function updateRedPacketAmount(guestId: string, amount: number | null) {
+  const { supabase, user } = await requireUser();
+  if (amount != null && (!Number.isFinite(amount) || amount < 0)) {
+    throw new Error("Amount must be zero or a positive number.");
+  }
+
+  const { data: before, error: readError } = await supabase
+    .from("guests")
+    .select("*")
+    .eq("id", guestId)
+    .single();
+  if (readError || !before) throw new Error(readError?.message || "Guest not found");
+
+  const customFields = {
+    ...((before.custom_fields as Record<string, unknown> | null) ?? {}),
+  };
+  if (amount == null) delete customFields.red_packet_amount;
+  else customFields.red_packet_amount = amount;
+
+  const payload: Record<string, unknown> = {
+    custom_fields: customFields,
+  };
+  // Prefer dedicated column when migration is applied.
+  payload.red_packet_amount = amount;
+
+  let { data, error } = await supabase
+    .from("guests")
+    .update(payload)
+    .eq("id", guestId)
+    .select("*")
+    .single();
+
+  if (error && /red_packet_amount/i.test(error.message)) {
+    const fallback = await supabase
+      .from("guests")
+      .update({ custom_fields: customFields })
+      .eq("id", guestId)
+      .select("*")
+      .single();
+    data = fallback.data;
+    error = fallback.error;
+  }
+  if (error) throw new Error(error.message);
+
+  await writeAudit(supabase, {
+    action: "guest_update",
+    entity_type: "guest",
+    entity_id: guestId,
+    staff_id: user.id,
+    before_data: before,
+    after_data: data,
+    meta: { field: "red_packet_amount", amount },
+  });
+  revalidatePath("/red-packet");
+  return data as Guest;
+}
+
+export async function updateRedPacketPasscode(nextPasscode: string, currentPasscode: string) {
+  const { supabase, user } = await requireUser();
+  if (!/^\d{4}$/.test(nextPasscode)) throw new Error("Passcode must be exactly 4 digits.");
+  if (!/^\d{4}$/.test(currentPasscode)) throw new Error("Current passcode must be 4 digits.");
+
+  const { data: row } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "redPacket")
+    .maybeSingle();
+  const current =
+    (row?.value as { passcode?: string } | null)?.passcode?.toString() || "0000";
+  if (current !== currentPasscode) throw new Error("Current passcode is incorrect.");
+
+  const value = { passcode: nextPasscode };
+  const { error } = await supabase.from("app_settings").upsert({
+    key: "redPacket",
+    value,
+    updated_at: new Date().toISOString(),
+    updated_by: user.id,
+  });
+  if (error) throw new Error(error.message);
+
+  await writeAudit(supabase, {
+    action: "settings_update",
+    entity_type: "settings",
+    entity_id: null,
+    staff_id: user.id,
+    after_data: { key: "redPacket", passcodeUpdated: true },
+  });
+  revalidatePath("/red-packet");
+  return value;
+}
