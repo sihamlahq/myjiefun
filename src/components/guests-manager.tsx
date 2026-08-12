@@ -584,7 +584,7 @@ export function GuestsManager({
                         <select
                           aria-label={`RSVP for ${guest.name_en}`}
                           className={cn(
-                            "h-10 rounded-xl border px-3 text-sm font-semibold capitalize",
+                            "h-11 rounded-xl border px-3 text-base font-semibold capitalize md:h-10 md:text-sm",
                             rsvpTone[guest.rsvp_status],
                           )}
                           value={guest.rsvp_status}
@@ -648,13 +648,13 @@ export function GuestsManager({
               <Field label="RSVP"><Select value={draft.rsvp_status} onChange={(value) => updateDraft("rsvp_status", value as RsvpStatus)} options={rsvpOptions} /></Field>
               <Field label="Attendance"><Select value={draft.attendance_status} onChange={(value) => updateDraft("attendance_status", value as AttendanceStatus)} options={attendanceOptions} /></Field>
               <Field label="Group">
-                <select className="h-10 rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={draft.group_id ?? ""} onChange={(event) => updateDraft("group_id", event.target.value || null)}>
+                <select className="h-11 rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm" value={draft.group_id ?? ""} onChange={(event) => updateDraft("group_id", event.target.value || null)}>
                   <option value="">No group</option>
                   {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </Field>
               <Field label="Table">
-                <select className="h-10 rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={draft.table_id ?? ""} onChange={(event) => updateDraft("table_id", event.target.value || null)}>
+                <select className="h-11 rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm" value={draft.table_id ?? ""} onChange={(event) => updateDraft("table_id", event.target.value || null)}>
                   <option value="">Unassigned</option>
                   {tables.map((item) => <option key={item.id} value={item.id}>{item.table_number} · {item.name}</option>)}
                 </select>
@@ -788,7 +788,7 @@ function Select({
   options: string[];
 }) {
   return (
-    <select className="h-10 rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)}>
+    <select className="h-11 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm" value={value} onChange={(event) => onChange(event.target.value)}>
       {options.map((option) => <option key={option} value={option}>{option}</option>)}
     </select>
   );
