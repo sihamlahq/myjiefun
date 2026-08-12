@@ -1,7 +1,7 @@
 "use client";
 
 import Fuse from "fuse.js";
-import { Check, CheckCircle2, Download, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, Download, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   ChangeEvent,
@@ -140,7 +140,9 @@ export function GuestsManager({
   const [savingRsvpId, setSavingRsvpId] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [recordMenuOpen, setRecordMenuOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const recordMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setGuests(serverGuests);
@@ -149,6 +151,24 @@ export function GuestsManager({
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
   }, [deferredQuery, rsvp, attendance, vip, table, group]);
+
+  useEffect(() => {
+    if (!recordMenuOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!recordMenuRef.current?.contains(event.target as Node)) {
+        setRecordMenuOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setRecordMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [recordMenuOpen]);
 
   const fuse = useMemo(() => {
     if (!deferredQuery.trim()) return null;
@@ -451,7 +471,7 @@ export function GuestsManager({
           {filtered.length !== guests.length ? ` · ${guests.length} total` : ""}
           {selected.size ? ` · ${selected.size} selected` : ""}
         </p>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 touch-scroll sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             ref={fileRef}
             type="file"
@@ -464,23 +484,73 @@ export function GuestsManager({
               <Check className="h-4 w-4" /> Confirm selected ({selected.size})
             </Button>
           ) : null}
-          <Button variant="outline" onClick={downloadTemplate} className="shrink-0">
-            <Download className="h-4 w-4" /> Excel template
-          </Button>
-          <Button variant="outline" onClick={downloadCsvTemplate} className="shrink-0">
-            <Download className="h-4 w-4" /> CSV template
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => fileRef.current?.click()}
-            disabled={isPending}
-            className="shrink-0"
-          >
-            <Upload className="h-4 w-4" /> Import file
-          </Button>
-          <Button variant="outline" onClick={exportCsv} className="shrink-0">
-            <Download className="h-4 w-4" /> Export CSV
-          </Button>
+
+          <div className="relative" ref={recordMenuRef}>
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0"
+              aria-expanded={recordMenuOpen}
+              aria-haspopup="menu"
+              onClick={() => setRecordMenuOpen((open) => !open)}
+            >
+              Guest record setting
+              <ChevronDown className={cn("h-4 w-4 transition", recordMenuOpen && "rotate-180")} />
+            </Button>
+            {recordMenuOpen ? (
+              <div
+                role="menu"
+                className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-black/10 bg-white py-1 shadow-xl"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium hover:bg-black/5"
+                  onClick={() => {
+                    downloadTemplate();
+                    setRecordMenuOpen(false);
+                  }}
+                >
+                  <Download className="h-4 w-4" /> Excel template
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium hover:bg-black/5"
+                  onClick={() => {
+                    downloadCsvTemplate();
+                    setRecordMenuOpen(false);
+                  }}
+                >
+                  <Download className="h-4 w-4" /> CSV template
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium hover:bg-black/5 disabled:opacity-50"
+                  disabled={isPending}
+                  onClick={() => {
+                    setRecordMenuOpen(false);
+                    fileRef.current?.click();
+                  }}
+                >
+                  <Upload className="h-4 w-4" /> Import file
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium hover:bg-black/5"
+                  onClick={() => {
+                    exportCsv();
+                    setRecordMenuOpen(false);
+                  }}
+                >
+                  <Download className="h-4 w-4" /> Export CSV
+                </button>
+              </div>
+            ) : null}
+          </div>
+
           <Button onClick={() => openGuest()} className="shrink-0">
             <Plus className="h-4 w-4" /> Add guest
           </Button>
