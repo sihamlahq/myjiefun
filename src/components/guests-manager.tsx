@@ -203,7 +203,6 @@ export function GuestsManager({
         "nickname",
         "phone",
         "email",
-        "guest_code",
         "category",
         "reception_tables.table_number",
       ],
@@ -661,9 +660,6 @@ export function GuestsManager({
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
-                          <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
-                            {[guest.name_zh, guest.phone, guest.guest_code].filter(Boolean).join(" · ")}
-                          </p>
                           <p className="mt-1 text-sm text-[var(--foreground)]/70">
                             <GuestTableLink
                               guest={guest}
@@ -672,7 +668,7 @@ export function GuestsManager({
                               className="font-medium"
                             />
                             {guest.category ? ` · ${guest.category}` : ""}
-                            {guest.expected_count > 1 ? ` · party ${guest.expected_count}` : ""}
+                            {` · party ${guest.expected_count}`}
                           </p>
                         </div>
                       </div>
@@ -754,7 +750,6 @@ export function GuestsManager({
               <Field label="English name"><Input required value={draft.name_en} onChange={(event) => updateDraft("name_en", event.target.value)} /></Field>
               <Field label="Chinese name"><Input value={draft.name_zh} onChange={(event) => updateDraft("name_zh", event.target.value)} /></Field>
               <Field label="Nickname"><Input value={draft.nickname} onChange={(event) => updateDraft("nickname", event.target.value)} /></Field>
-              <Field label="Guest code"><Input value={draft.guest_code} onChange={(event) => updateDraft("guest_code", event.target.value)} /></Field>
               <Field label="Phone"><Input value={draft.phone} onChange={(event) => updateDraft("phone", event.target.value)} /></Field>
               <Field label="Email"><Input type="email" value={draft.email} onChange={(event) => updateDraft("email", event.target.value)} /></Field>
               <Field label="Expected count"><Input type="number" min={0} value={draft.expected_count} onChange={(event) => updateDraft("expected_count", Number(event.target.value))} /></Field>
