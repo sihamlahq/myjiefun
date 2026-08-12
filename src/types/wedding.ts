@@ -155,6 +155,7 @@ export type TableSettings = {
 
 export type GuestSettings = {
   categories: string[];
+  relationships: string[];
   rsvpStatuses: string[];
   dietaryCategories: string[];
 };

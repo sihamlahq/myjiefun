@@ -73,6 +73,11 @@ export function SettingsForm({
 
       <SettingsCard title="Guest settings" onSubmit={(event) => { event.preventDefault(); persist("guestSettings", guestSettings); }} pending={isPending}>
         <TextList label="Categories" value={guestSettings.categories} onChange={(categories) => setGuestSettings({ ...guestSettings, categories })} />
+        <TextList
+          label="Relationships"
+          value={guestSettings.relationships ?? []}
+          onChange={(relationships) => setGuestSettings({ ...guestSettings, relationships })}
+        />
         <TextList label="RSVP statuses" value={guestSettings.rsvpStatuses} onChange={(rsvpStatuses) => setGuestSettings({ ...guestSettings, rsvpStatuses })} />
         <TextList label="Dietary categories" value={guestSettings.dietaryCategories} onChange={(dietaryCategories) => setGuestSettings({ ...guestSettings, dietaryCategories })} />
       </SettingsCard>

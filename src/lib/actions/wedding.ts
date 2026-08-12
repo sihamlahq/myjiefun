@@ -182,26 +182,6 @@ export async function importGuests(rows: GuestImportRow[]) {
     throw new Error("CSV import is limited to 2000 rows at a time.");
   }
 
-  const { data: groups } = await supabase.from("guest_groups").select("id, name");
-  const groupByName = new Map(
-    (groups ?? []).map((item) => [String(item.name).trim().toLowerCase(), item.id as string]),
-  );
-
-  async function resolveGroupId(groupName: string) {
-    const key = groupName.trim().toLowerCase();
-    if (!key) return null;
-    const existing = groupByName.get(key);
-    if (existing) return existing;
-    const { data, error } = await supabase
-      .from("guest_groups")
-      .insert({ name: groupName.trim(), notes: "Created from CSV import" })
-      .select("id, name")
-      .single();
-    if (error) throw new Error(error.message);
-    groupByName.set(key, data.id);
-    return data.id as string;
-  }
-
   let created = 0;
   let updated = 0;
   let skipped = 0;
@@ -216,29 +196,21 @@ export async function importGuests(rows: GuestImportRow[]) {
     }
 
     const expectedCount = Number(raw.expected_count || 1);
-    const groupName = (raw.group || raw.group_name || "").trim();
 
     try {
-      const groupId = await resolveGroupId(groupName);
       const payload = {
         name_en: name,
         rsvp_status: normalizeRsvp(raw.rsvp_status || raw.rsvp),
         expected_count: Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1,
-        group_id: groupId,
         relationship: raw.relationship ?? "",
         category: raw.category ?? "",
       };
 
-      // Prefer update when same name + group already exists.
-      let existingQuery = supabase
+      const { data: existingRows } = await supabase
         .from("guests")
         .select("id")
         .ilike("name_en", name)
         .limit(1);
-      existingQuery = groupId
-        ? existingQuery.eq("group_id", groupId)
-        : existingQuery.is("group_id", null);
-      const { data: existingRows } = await existingQuery;
       const existingId = existingRows?.[0]?.id ?? null;
 
       if (existingId) {

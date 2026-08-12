@@ -64,6 +64,14 @@ export const defaultThemeSettings: ThemeSettings = {
 
 export const defaultGuestSettings: GuestSettings = {
   categories: ["Family", "Friends", "Colleagues", "VIP", "Other"],
+  relationships: [
+    "Bride's family",
+    "Groom's family",
+    "Friend",
+    "Colleague",
+    "Schoolmate",
+    "Other",
+  ],
   rsvpStatuses: ["pending", "confirmed", "declined", "maybe"],
   dietaryCategories: ["None", "Vegetarian", "Vegan", "Halal", "Kosher", "Gluten-free", "Allergy"],
 };
@@ -213,12 +221,12 @@ export async function loadGuestsAndTables(): Promise<{
   }
 }
 
-/** Guests page only — guests + tables + groups + guest settings categories. */
+/** Guests page only — guests + tables + guest settings lists. */
 export async function loadGuestsPageData(): Promise<{
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
-  groups: GuestGroup[];
   categories: string[];
+  relationships: string[];
   dietaryCategories: string[];
   setupError: string | null;
 }> {
@@ -229,15 +237,15 @@ export async function loadGuestsPageData(): Promise<{
     return {
       guests: [],
       tables: [],
-      groups: [],
       categories: defaultGuestSettings.categories,
+      relationships: defaultGuestSettings.relationships,
       dietaryCategories: defaultGuestSettings.dietaryCategories,
       setupError: error instanceof Error ? error.message : "Supabase is not configured.",
     };
   }
 
   try {
-    const [guests, tables, groups, guestSettingsRow] = await Promise.all([
+    const [guests, tables, guestSettingsRow] = await Promise.all([
       supabase
         .from("guests")
         .select("*, guest_groups(id,name), reception_tables(id,table_number,name,capacity,table_type,status,location)")
@@ -247,7 +255,6 @@ export async function loadGuestsPageData(): Promise<{
         .select("*")
         .order("sort_order", { ascending: true })
         .order("table_number", { ascending: true }),
-      supabase.from("guest_groups").select("*").order("name", { ascending: true }),
       supabase.from("app_settings").select("value").eq("key", "guestSettings").maybeSingle(),
     ]);
 
@@ -259,17 +266,18 @@ export async function loadGuestsPageData(): Promise<{
     return {
       guests: (guests.data ?? []) as GuestWithRelations[],
       tables: (tables.data ?? []) as ReceptionTable[],
-      groups: (groups.data ?? []) as GuestGroup[],
       categories: guestSettings.categories?.length
         ? guestSettings.categories
         : defaultGuestSettings.categories,
+      relationships: guestSettings.relationships?.length
+        ? guestSettings.relationships
+        : defaultGuestSettings.relationships,
       dietaryCategories: guestSettings.dietaryCategories?.length
         ? guestSettings.dietaryCategories
         : defaultGuestSettings.dietaryCategories,
       setupError:
         guests.error?.message ||
         tables.error?.message ||
-        groups.error?.message ||
         guestSettingsRow.error?.message ||
         null,
     };
@@ -277,8 +285,8 @@ export async function loadGuestsPageData(): Promise<{
     return {
       guests: [],
       tables: [],
-      groups: [],
       categories: defaultGuestSettings.categories,
+      relationships: defaultGuestSettings.relationships,
       dietaryCategories: defaultGuestSettings.dietaryCategories,
       setupError: error instanceof Error ? error.message : "Unable to load wedding data.",
     };

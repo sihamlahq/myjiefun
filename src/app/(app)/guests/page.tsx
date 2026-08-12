@@ -13,6 +13,7 @@ export default async function GuestsPage() {
         guests={data.guests}
         tables={data.tables}
         categories={data.categories}
+        relationships={data.relationships}
         dietaryCategories={data.dietaryCategories}
       />
     </div>

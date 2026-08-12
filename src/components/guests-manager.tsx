@@ -141,11 +141,13 @@ export function GuestsManager({
   guests: serverGuests,
   tables,
   categories = [],
+  relationships = [],
   dietaryCategories = [],
 }: {
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
   categories?: string[];
+  relationships?: string[];
   dietaryCategories?: string[];
 }) {
   const router = useRouter();
@@ -394,11 +396,17 @@ export function GuestsManager({
   }
 
   function downloadTemplate() {
-    download("myjiefun-guest-upload-template.xlsx", guestUploadTemplateXlsx());
+    download(
+      "myjiefun-guest-upload-template.xlsx",
+      guestUploadTemplateXlsx({ categories, relationships }),
+    );
   }
 
   function downloadCsvTemplate() {
-    download("myjiefun-guest-upload-template.csv", guestUploadTemplateCsv());
+    download(
+      "myjiefun-guest-upload-template.csv",
+      guestUploadTemplateCsv({ categories, relationships }),
+    );
   }
 
   function closeImportResult() {
@@ -778,7 +786,23 @@ export function GuestsManager({
                   ) : null}
                 </select>
               </Field>
-              <Field label="Relationship"><Input value={draft.relationship} onChange={(event) => updateDraft("relationship", event.target.value)} /></Field>
+              <Field label="Relationship">
+                <select
+                  className="h-11 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm"
+                  value={draft.relationship}
+                  onChange={(event) => updateDraft("relationship", event.target.value)}
+                >
+                  <option value="">Select relationship…</option>
+                  {relationships.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                  {draft.relationship && !relationships.includes(draft.relationship) ? (
+                    <option value={draft.relationship}>{draft.relationship} (current)</option>
+                  ) : null}
+                </select>
+              </Field>
               <Field label="Category">
                 <select
                   className="h-11 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm"
