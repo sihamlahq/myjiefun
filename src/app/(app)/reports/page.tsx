@@ -10,7 +10,7 @@ export default async function ReportsPage() {
       <PageHeader
         eyebrow="Planner intelligence"
         title="Reports"
-        description="Export operational views for attendance, RSVP, occupancy, VIPs, no-shows, walk-ins, timelines, and groups."
+        description="Export operational views for attendance, RSVP, occupancy, VIPs, no-shows, timelines, and groups."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
       <ReportsPanel

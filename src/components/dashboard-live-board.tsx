@@ -158,7 +158,7 @@ export function DashboardLiveBoard({
       </div>
 
       <div className="stat-grid my-6">
-        <MetricCard label="Invited" value={stats.totalInvited} detail="Excluding walk-ins" />
+        <MetricCard label="Invited" value={stats.totalInvited} detail="All guests on the list" />
         <MetricCard label="Confirmed" value={stats.confirmed} detail={`${stats.pendingRsvp} pending`} />
         <MetricCard
           label="Need seating"
@@ -170,7 +170,6 @@ export function DashboardLiveBoard({
           value={stats.checkedIn}
           detail={`${formatPercent(attendanceRate)} attendance`}
         />
-        <MetricCard label="Walk-ins" value={stats.walkIns} detail="Created at reception" />
         <MetricCard label="Tables" value={stats.totalTables} detail={`${stats.availableSeats} seats free`} />
         <MetricCard label="VIPs" value={stats.vipGuests} detail={`${stats.unassignedGuests} total unassigned`} />
       </div>

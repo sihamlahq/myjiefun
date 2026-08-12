@@ -20,7 +20,6 @@ type ReportTab =
   | "unassigned"
   | "vip"
   | "noShows"
-  | "walkIns"
   | "timeline"
   | "groups";
 
@@ -33,7 +32,6 @@ const tabs: { id: ReportTab; label: string }[] = [
   { id: "unassigned", label: "Unassigned" },
   { id: "vip", label: "VIP" },
   { id: "noShows", label: "No-shows" },
-  { id: "walkIns", label: "Walk-ins" },
   { id: "timeline", label: "Timeline" },
   { id: "groups", label: "Groups" },
 ];
@@ -227,7 +225,6 @@ function buildRows(
     unassigned: (guest) => !guest.table_id,
     vip: (guest) => guest.is_vip,
     noShows: (guest) => guest.attendance_status === "no_show",
-    walkIns: (guest) => guest.is_walk_in || guest.attendance_status === "walk_in",
   };
 
   return guests.filter(predicates[tab]).map((guest) => ({
@@ -240,7 +237,6 @@ function buildRows(
     attendance: guest.attendance_status,
     table: guest.reception_tables?.table_number ?? "Unassigned",
     vip: guest.is_vip,
-    walk_in: guest.is_walk_in,
     checked_in_at: guest.checked_in_at ?? "",
   }));
 }

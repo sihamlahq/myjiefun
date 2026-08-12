@@ -42,7 +42,6 @@ type GuestDraft = Pick<
   | "group_id"
   | "table_id"
   | "is_vip"
-  | "is_walk_in"
   | "dietary"
   | "relationship"
   | "category"
@@ -60,7 +59,7 @@ type ImportResult = {
 };
 
 const rsvpOptions: RsvpStatus[] = ["pending", "confirmed", "maybe", "declined"];
-const attendanceOptions: AttendanceStatus[] = ["not_arrived", "checked_in", "no_show", "walk_in"];
+const attendanceOptions: AttendanceStatus[] = ["not_arrived", "checked_in", "no_show"];
 
 const emptyDraft: GuestDraft = {
   name_en: "",
@@ -75,7 +74,6 @@ const emptyDraft: GuestDraft = {
   group_id: null,
   table_id: null,
   is_vip: false,
-  is_walk_in: false,
   dietary: "",
   relationship: "",
   category: "",
@@ -186,7 +184,6 @@ export function GuestsManager({
       group_id: guest.group_id,
       table_id: guest.table_id,
       is_vip: guest.is_vip,
-      is_walk_in: guest.is_walk_in,
       dietary: guest.dietary,
       relationship: guest.relationship,
       category: guest.category,
@@ -596,9 +593,6 @@ export function GuestsManager({
               <Field label="Category"><Input value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} /></Field>
               <label className="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2 text-sm font-semibold">
                 <input type="checkbox" checked={draft.is_vip} onChange={(event) => updateDraft("is_vip", event.target.checked)} /> VIP guest
-              </label>
-              <label className="flex items-center gap-2 rounded-xl bg-white/60 px-3 py-2 text-sm font-semibold">
-                <input type="checkbox" checked={draft.is_walk_in} onChange={(event) => updateDraft("is_walk_in", event.target.checked)} /> Walk-in
               </label>
               <Field label="Notes" className="md:col-span-2"><Textarea value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} /></Field>
               <Field label="Custom fields JSON" className="md:col-span-2"><Textarea className="font-mono" value={customFieldsText} onChange={(event) => setCustomFieldsText(event.target.value)} /></Field>

@@ -76,7 +76,6 @@ export const defaultTableSettings: TableSettings = {
 };
 
 export const defaultAttendanceSettings: AttendanceSettings = {
-  allowWalkIns: true,
   allowPartialGroupCheckIn: true,
   allowOvercapacity: false,
   requireCheckInStaff: true,

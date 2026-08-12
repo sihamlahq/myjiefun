@@ -4,7 +4,7 @@ export type AttendanceStatus =
   | "not_arrived"
   | "checked_in"
   | "no_show"
-  | "walk_in";
+  | "walk_in"; // legacy DB value; not used in UI
 export type TableType =
   | "normal"
   | "vip"
@@ -126,7 +126,6 @@ export type ThemeSettings = {
 };
 
 export type AttendanceSettings = {
-  allowWalkIns: boolean;
   allowPartialGroupCheckIn: boolean;
   allowOvercapacity: boolean;
   requireCheckInStaff: boolean;
@@ -152,7 +151,6 @@ export type DashboardStats = {
   pendingRsvp: number;
   checkedIn: number;
   notArrived: number;
-  walkIns: number;
   totalTables: number;
   occupiedSeats: number;
   availableSeats: number;

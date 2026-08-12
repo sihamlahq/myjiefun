@@ -3,15 +3,12 @@
 import Fuse from "fuse.js";
 import {
   CheckCircle2,
-  ChevronDown,
   RotateCcw,
   Search,
-  UserPlus,
   Users,
   X,
 } from "lucide-react";
 import {
-  FormEvent,
   KeyboardEvent,
   useEffect,
   useMemo,
@@ -22,12 +19,10 @@ import { toast } from "sonner";
 import {
   assignGuestToTable,
   checkInGuest,
-  createWalkIn,
   undoCheckIn,
 } from "@/lib/actions/wedding";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
 import { cn } from "@/lib/utils";
@@ -47,11 +42,6 @@ export function CheckInPanel({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [partialOpen, setPartialOpen] = useState(false);
   const [partialCount, setPartialCount] = useState(1);
-  const [walkInOpen, setWalkInOpen] = useState(false);
-  const [walkInName, setWalkInName] = useState("");
-  const [walkInPhone, setWalkInPhone] = useState("");
-  const [walkInCount, setWalkInCount] = useState(1);
-  const [walkInTable, setWalkInTable] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const fuse = useMemo(
@@ -139,24 +129,6 @@ export function CheckInPanel({
     event.preventDefault();
     const firstWaiting = results.find((g) => g.attendance_status !== "checked_in");
     if (firstWaiting) checkIn(firstWaiting);
-  }
-
-  function createWalkInGuest(event: FormEvent) {
-    event.preventDefault();
-    if (!walkInName.trim()) return;
-    runAction("Walk-in checked in.", async () => {
-      await createWalkIn({
-        name_en: walkInName.trim(),
-        phone: walkInPhone.trim(),
-        expected_count: walkInCount,
-        table_id: walkInTable || null,
-      });
-      setWalkInName("");
-      setWalkInPhone("");
-      setWalkInCount(1);
-      setWalkInTable("");
-      setWalkInOpen(false);
-    });
   }
 
   const tabs: { id: FilterTab; label: string; count: number }[] = [
@@ -316,79 +288,10 @@ export function CheckInPanel({
               ? "Try another name, phone, or table number."
               : filter === "waiting"
                 ? "Everyone is checked in — nice work."
-                : "Switch filters or add a walk-in."
+                : "Switch filters to see more guests."
           }
         />
       )}
-
-      <div className="mx-auto mt-4 max-w-3xl">
-        <button
-          type="button"
-          onClick={() => setWalkInOpen((open) => !open)}
-          className="flex w-full items-center justify-between rounded-2xl border border-dashed border-black/15 bg-white/70 px-4 py-3 text-left"
-        >
-          <span className="flex items-center gap-2 font-semibold">
-            <UserPlus className="h-5 w-5 text-[var(--primary)]" />
-            Add walk-in guest
-          </span>
-          <ChevronDown className={cn("h-5 w-5 transition", walkInOpen && "rotate-180")} />
-        </button>
-        {walkInOpen ? (
-          <Card className="mt-2 border-black/8 bg-white/90">
-            <CardContent className="p-4">
-              <form onSubmit={createWalkInGuest} className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label>Name</Label>
-                  <Input
-                    value={walkInName}
-                    onChange={(event) => setWalkInName(event.target.value)}
-                    placeholder="Guest name"
-                    required
-                    autoFocus
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label>Phone</Label>
-                    <Input
-                      value={walkInPhone}
-                      onChange={(event) => setWalkInPhone(event.target.value)}
-                      placeholder="Optional"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Party size</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={walkInCount}
-                      onChange={(event) => setWalkInCount(Number(event.target.value))}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Table</Label>
-                  <select
-                    className="h-11 w-full rounded-xl border border-black/10 bg-white px-3 text-sm"
-                    value={walkInTable}
-                    onChange={(event) => setWalkInTable(event.target.value)}
-                  >
-                    <option value="">Assign later</option>
-                    {tables.map((table) => (
-                      <option key={table.id} value={table.id}>
-                        {table.table_number} · {table.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Button className="w-full" size="lg" disabled={isPending}>
-                  Create & check in
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
 
       {selected ? (
         <div className="fixed inset-x-0 bottom-16 z-40 border-t border-black/10 bg-white/95 p-4 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md md:bottom-0 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-[380px] lg:rounded-3xl lg:border lg:shadow-xl">

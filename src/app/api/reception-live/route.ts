@@ -12,7 +12,7 @@ export async function GET() {
       supabase
         .from("guests")
         .select(
-          "id, guest_code, name_en, name_zh, phone, table_id, rsvp_status, attendance_status, expected_count, is_vip, is_walk_in, guest_groups(name), reception_tables(id, table_number, name, capacity, table_type, status, location)",
+          "id, guest_code, name_en, name_zh, phone, table_id, rsvp_status, attendance_status, expected_count, is_vip, guest_groups(name), reception_tables(id, table_number, name, capacity, table_type, status, location)",
         )
         .order("name_en", { ascending: true }),
       supabase

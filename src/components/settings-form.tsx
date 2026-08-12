@@ -86,7 +86,6 @@ export function SettingsForm({
 
       <SettingsCard title="Attendance settings" onSubmit={(event) => { event.preventDefault(); persist("attendanceSettings", attendanceSettings); }} pending={isPending}>
         {[
-          ["allowWalkIns", "Allow walk-ins"],
           ["allowPartialGroupCheckIn", "Allow partial group check-in"],
           ["allowOvercapacity", "Allow overcapacity"],
           ["requireCheckInStaff", "Require check-in staff"],

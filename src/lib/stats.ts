@@ -7,7 +7,6 @@ export function computeStats(
     | "attendance_status"
     | "table_id"
     | "is_vip"
-    | "is_walk_in"
     | "expected_count"
   >[],
   tables: Pick<ReceptionTable, "id" | "capacity" | "status">[],
@@ -15,14 +14,15 @@ export function computeStats(
   const activeTables = tables.filter((t) => t.status === "active");
   const totalCapacity = activeTables.reduce((sum, t) => sum + t.capacity, 0);
   const assigned = guests.filter((g) => g.table_id).length;
+  const isArrived = (status: Guest["attendance_status"]) =>
+    status === "checked_in" || status === "walk_in";
 
   return {
-    totalInvited: guests.filter((g) => !g.is_walk_in).length,
+    totalInvited: guests.length,
     confirmed: guests.filter((g) => g.rsvp_status === "confirmed").length,
     pendingRsvp: guests.filter((g) => g.rsvp_status === "pending").length,
-    checkedIn: guests.filter((g) => g.attendance_status === "checked_in").length,
+    checkedIn: guests.filter((g) => isArrived(g.attendance_status)).length,
     notArrived: guests.filter((g) => g.attendance_status === "not_arrived").length,
-    walkIns: guests.filter((g) => g.is_walk_in || g.attendance_status === "walk_in").length,
     totalTables: activeTables.length,
     occupiedSeats: assigned,
     availableSeats: Math.max(totalCapacity - assigned, 0),

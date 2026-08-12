@@ -89,7 +89,7 @@ export function DashboardCharts({
   const attendanceData = [
     { name: "Arrived", value: stats.checkedIn },
     { name: "Waiting", value: stats.notArrived },
-    { name: "Walk-ins", value: stats.walkIns },
+    { name: "No-shows", value: guests.filter((g) => g.attendance_status === "no_show").length },
   ];
 
   if (!totalGuests && !stats.totalTables) {

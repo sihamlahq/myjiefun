@@ -29,10 +29,9 @@ type GuestInsert = {
   group_id: string | null;
   rsvp_status: "pending" | "confirmed" | "declined" | "maybe";
   expected_count: number;
-  attendance_status: "not_arrived" | "checked_in" | "no_show" | "walk_in";
+  attendance_status: "not_arrived" | "checked_in" | "no_show";
   table_id: string | null;
   is_vip: boolean;
-  is_walk_in: boolean;
   dietary: string;
   relationship: string;
   category: string;
@@ -195,11 +194,10 @@ async function main() {
   const guests = Array.from({ length: 400 }, (_, index): GuestInsert => {
     const first = firstNames[index % firstNames.length];
     const last = lastNames[Math.floor(index / firstNames.length) % lastNames.length];
-    const isWalkIn = index >= 380;
     const isVip = index < 28 || index % 37 === 0;
     const assignedTable = index < 340 ? tableIds[index % tableIds.length]?.id ?? null : null;
     const rsvp = index % 17 === 0 ? "declined" : index % 11 === 0 ? "maybe" : index % 7 === 0 ? "pending" : "confirmed";
-    const checkedIn = index % 3 === 0 || isWalkIn;
+    const checkedIn = index % 3 === 0;
     const noShow = rsvp === "confirmed" && index % 29 === 0;
     const checkedInAt = checkedIn
       ? new Date(Date.now() - (index % 180) * 60_000).toISOString()
@@ -215,10 +213,9 @@ async function main() {
       group_id: groupIds[index % groupIds.length]?.id ?? null,
       rsvp_status: rsvp,
       expected_count: 1 + (index % 4 === 0 ? 1 : 0),
-      attendance_status: isWalkIn ? "walk_in" : checkedIn ? "checked_in" : noShow ? "no_show" : "not_arrived",
+      attendance_status: checkedIn ? "checked_in" : noShow ? "no_show" : "not_arrived",
       table_id: assignedTable,
       is_vip: isVip,
-      is_walk_in: isWalkIn,
       dietary: dietary[index % dietary.length],
       relationship: relationships[index % relationships.length],
       category: isVip ? "VIP" : categories[index % categories.length],
@@ -228,12 +225,14 @@ async function main() {
     };
   });
 
-  const { data: insertedGuests } = await must(supabase.from("guests").insert(guests).select("id, checked_in_at, expected_count, is_walk_in"));
+  const { data: insertedGuests } = await must(
+    supabase.from("guests").insert(guests).select("id, checked_in_at, expected_count"),
+  );
   const events = (insertedGuests ?? [])
     .filter((guest) => guest.checked_in_at)
     .map((guest) => ({
       guest_id: guest.id,
-      event_type: guest.is_walk_in ? "check_in" : "check_in",
+      event_type: "check_in" as const,
       party_count: guest.expected_count,
       created_at: guest.checked_in_at,
     }));

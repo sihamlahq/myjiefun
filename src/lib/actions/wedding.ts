@@ -55,7 +55,6 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
     attendance_status: normalizeAttendance(input.attendance_status),
     table_id: input.table_id || null,
     is_vip: Boolean(input.is_vip),
-    is_walk_in: Boolean(input.is_walk_in),
     dietary: input.dietary ?? "",
     relationship: input.relationship ?? "",
     category: input.category ?? "",
@@ -117,7 +116,7 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
 }
 
 const RSVP_VALUES = new Set(["pending", "confirmed", "declined", "maybe"]);
-const ATTENDANCE_VALUES = new Set(["not_arrived", "checked_in", "no_show", "walk_in"]);
+const ATTENDANCE_VALUES = new Set(["not_arrived", "checked_in", "no_show"]);
 
 function normalizeRsvp(value: unknown): RsvpStatus {
   const raw = String(value ?? "")
@@ -165,9 +164,9 @@ function normalizeAttendance(value: unknown): AttendanceStatus {
     noshow: "no_show",
     no_show: "no_show",
     "no-show": "no_show",
-    walkin: "walk_in",
-    walk_in: "walk_in",
-    "walk-in": "walk_in",
+    walkin: "checked_in",
+    walk_in: "checked_in",
+    "walk-in": "checked_in",
   };
   if (aliases[raw]) return aliases[raw];
   if (ATTENDANCE_VALUES.has(raw)) return raw as AttendanceStatus;
@@ -623,34 +622,6 @@ export async function updateRsvpBulk(guestIds: string[], rsvp_status: RsvpStatus
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   return { updated: data?.length ?? ids.length };
-}
-
-export async function createWalkIn(input: {
-  name_en: string;
-  expected_count?: number;
-  table_id?: string | null;
-  phone?: string;
-}) {
-  const { supabase, user } = await requireUser();
-  const guest = await upsertGuest({
-    name_en: input.name_en,
-    expected_count: input.expected_count ?? 1,
-    table_id: input.table_id ?? null,
-    phone: input.phone ?? "",
-    is_walk_in: true,
-    attendance_status: "checked_in",
-    rsvp_status: "confirmed",
-    checked_in_at: new Date().toISOString(),
-    checked_in_by: user.id,
-  });
-  await writeAudit(supabase, {
-    action: "walk_in_create",
-    entity_type: "guest",
-    entity_id: guest.id,
-    staff_id: user.id,
-    after_data: guest,
-  });
-  return guest;
 }
 
 export async function upsertTable(input: {
