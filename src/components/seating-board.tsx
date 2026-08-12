@@ -290,19 +290,33 @@ function UnassignedDrop({
   desktopDrag: boolean;
   onAssign: (guestId: string, tableId: string) => void;
 }) {
+  const pageSize = 15;
+  const [page, setPage] = useState(0);
   const { isOver, setNodeRef } = useDroppable({ id: unassignedId, disabled: !desktopDrag });
+
+  const totalPages = Math.max(1, Math.ceil(guests.length / pageSize));
+  const currentPage = Math.min(page, totalPages - 1);
+  const start = currentPage * pageSize;
+  const visibleGuests = guests.slice(start, start + pageSize);
+
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
+  }, [page, totalPages]);
+
   return (
     <Card className={cn("h-fit xl:sticky xl:top-6", isOver && "ring-2 ring-[var(--accent)]")}>
       <CardHeader>
         <CardTitle>Unassigned guests</CardTitle>
         <p className="text-sm text-[var(--foreground)]/60">
-          Choose a table number below each name.
+          {guests.length
+            ? `${guests.length} left · showing ${start + 1}–${Math.min(start + pageSize, guests.length)}`
+            : "Choose a table number below each name."}
         </p>
       </CardHeader>
       <CardContent>
         <div ref={setNodeRef} className="min-h-24 space-y-2">
-          {guests.length ? (
-            guests.map((guest) => (
+          {visibleGuests.length ? (
+            visibleGuests.map((guest) => (
               <GuestCard
                 key={guest.id}
                 guest={guest}
@@ -323,6 +337,29 @@ function UnassignedDrop({
             />
           )}
         </div>
+        {guests.length > pageSize ? (
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={currentPage === 0}
+              onClick={() => setPage((value) => Math.max(0, value - 1))}
+            >
+              Previous
+            </Button>
+            <p className="text-xs font-semibold text-[var(--foreground)]/55">
+              Page {currentPage + 1} / {totalPages}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={currentPage >= totalPages - 1}
+              onClick={() => setPage((value) => Math.min(totalPages - 1, value + 1))}
+            >
+              Next
+            </Button>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
