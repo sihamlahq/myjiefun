@@ -4,7 +4,7 @@ import Fuse from "fuse.js";
 import { Check, Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { deleteGuest, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
+import { deleteGuest, importGuests, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
 import { csvToObjects, guestsToCsv } from "@/lib/csv";
 import { cn } from "@/lib/utils";
 import type {
@@ -82,10 +82,6 @@ function download(filename: string, content: string, type = "text/csv;charset=ut
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function toBoolean(value: string) {
-  return ["1", "true", "yes", "y"].includes(value.trim().toLowerCase());
 }
 
 export function GuestsManager({
@@ -279,35 +275,27 @@ export function GuestsManager({
     if (!file) return;
     const text = await file.text();
     const rows = csvToObjects(text);
-    const tableByNumber = new Map(tables.map((item) => [item.table_number.toLowerCase(), item.id]));
-    const groupByName = new Map(groups.map((item) => [item.name.toLowerCase(), item.id]));
+    if (!rows.length) {
+      toast.error("CSV has no data rows.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
 
     startTransition(async () => {
       try {
-        for (const row of rows) {
-          const name = row.name_en || row.name || row.guest_name;
-          if (!name) continue;
-          await upsertGuest({
-            name_en: name,
-            name_zh: row.name_zh ?? "",
-            nickname: row.nickname ?? "",
-            phone: row.phone ?? "",
-            email: row.email ?? "",
-            guest_code: row.guest_code || undefined,
-            rsvp_status: (row.rsvp_status as RsvpStatus) || "pending",
-            attendance_status: (row.attendance_status as AttendanceStatus) || "not_arrived",
-            expected_count: Number(row.expected_count || 1),
-            group_id: row.group_id || groupByName.get((row.group || "").toLowerCase()) || null,
-            table_id: row.table_id || tableByNumber.get((row.table || "").toLowerCase()) || null,
-            is_vip: toBoolean(row.is_vip || ""),
-            is_walk_in: toBoolean(row.is_walk_in || ""),
-            dietary: row.dietary ?? "",
-            relationship: row.relationship ?? "",
-            category: row.category ?? "",
-            notes: row.notes ?? "",
-          });
+        const result = await importGuests(rows);
+        const parts = [
+          result.created ? `${result.created} added` : null,
+          result.updated ? `${result.updated} updated` : null,
+          result.skipped ? `${result.skipped} skipped` : null,
+        ].filter(Boolean);
+        if (result.errors.length) {
+          toast.error(
+            `Imported with issues (${parts.join(", ") || "none"}). ${result.errors[0]}`,
+          );
+        } else {
+          toast.success(`Import complete: ${parts.join(", ") || "no changes"}.`);
         }
-        toast.success(`Imported ${rows.length} CSV rows.`);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "CSV import failed.");
       } finally {

@@ -105,9 +105,18 @@ export function parseCsv(text: string) {
 }
 
 export function csvToObjects(text: string) {
-  const [headers, ...rows] = parseCsv(text);
+  const [headers, ...rows] = parseCsv(text.replace(/^\uFEFF/, ""));
   if (!headers) return [];
   return rows.map((row) =>
-    Object.fromEntries(headers.map((header, index) => [header.trim(), row[index]?.trim() ?? ""])),
+    Object.fromEntries(
+      headers.map((header, index) => [
+        header
+          .replace(/^\uFEFF/, "")
+          .trim()
+          .toLowerCase()
+          .replace(/[\s-]+/g, "_"),
+        row[index]?.trim() ?? "",
+      ]),
+    ),
   );
 }

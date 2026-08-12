@@ -42,16 +42,31 @@ async function writeAudit(
 
 export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
   const { supabase, user } = await requireUser();
-  const guestCode =
-    input.guest_code ||
-    `G-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-
-  const row = {
-    ...input,
-    guest_code: guestCode,
+  const expectedCount = Number(input.expected_count);
+  const row: Record<string, unknown> = {
     name_en: input.name_en.trim(),
-    expected_count: input.expected_count ?? 1,
+    name_zh: input.name_zh ?? "",
+    nickname: input.nickname ?? "",
+    phone: input.phone ?? "",
+    email: input.email ?? "",
+    group_id: input.group_id || null,
+    rsvp_status: normalizeRsvp(input.rsvp_status),
+    expected_count: Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1,
+    attendance_status: normalizeAttendance(input.attendance_status),
+    table_id: input.table_id || null,
+    is_vip: Boolean(input.is_vip),
+    is_walk_in: Boolean(input.is_walk_in),
+    dietary: input.dietary ?? "",
+    relationship: input.relationship ?? "",
+    category: input.category ?? "",
+    notes: input.notes ?? "",
+    custom_fields: input.custom_fields ?? {},
   };
+
+  if (input.guest_code?.trim()) row.guest_code = input.guest_code.trim();
+  if ("seat_id" in input) row.seat_id = input.seat_id || null;
+  if ("checked_in_at" in input) row.checked_in_at = input.checked_in_at ?? null;
+  if ("checked_in_by" in input) row.checked_in_by = input.checked_in_by ?? null;
 
   if (input.id) {
     const { data: before } = await supabase
@@ -79,6 +94,10 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
     return data as Guest;
   }
 
+  if (!row.guest_code) {
+    row.guest_code = `G-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  }
+
   const { data, error } = await supabase
     .from("guests")
     .insert(row)
@@ -95,6 +114,201 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
   revalidatePath("/guests");
   revalidatePath("/dashboard");
   return data as Guest;
+}
+
+const RSVP_VALUES = new Set(["pending", "confirmed", "declined", "maybe"]);
+const ATTENDANCE_VALUES = new Set(["not_arrived", "checked_in", "no_show", "walk_in"]);
+
+function normalizeRsvp(value: unknown): RsvpStatus {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const aliases: Record<string, RsvpStatus> = {
+    yes: "confirmed",
+    y: "confirmed",
+    confirm: "confirmed",
+    confirmed: "confirmed",
+    attending: "confirmed",
+    no: "declined",
+    n: "declined",
+    decline: "declined",
+    declined: "declined",
+    reject: "declined",
+    maybe: "maybe",
+    perhaps: "maybe",
+    pending: "pending",
+    await: "pending",
+    awaiting: "pending",
+  };
+  if (aliases[raw]) return aliases[raw];
+  if (RSVP_VALUES.has(raw)) return raw as RsvpStatus;
+  return "pending";
+}
+
+function normalizeAttendance(value: unknown): AttendanceStatus {
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const aliases: Record<string, AttendanceStatus> = {
+    arrived: "checked_in",
+    checkedin: "checked_in",
+    checked_in: "checked_in",
+    "check-in": "checked_in",
+    check_in: "checked_in",
+    present: "checked_in",
+    waiting: "not_arrived",
+    notarrived: "not_arrived",
+    not_arrived: "not_arrived",
+    "not-arrived": "not_arrived",
+    noshow: "no_show",
+    no_show: "no_show",
+    "no-show": "no_show",
+    walkin: "walk_in",
+    walk_in: "walk_in",
+    "walk-in": "walk_in",
+  };
+  if (aliases[raw]) return aliases[raw];
+  if (ATTENDANCE_VALUES.has(raw)) return raw as AttendanceStatus;
+  return "not_arrived";
+}
+
+export type GuestImportRow = Record<string, string>;
+
+export async function importGuests(rows: GuestImportRow[]) {
+  const { supabase, user } = await requireUser();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("CSV has no data rows.");
+  }
+  if (rows.length > 2000) {
+    throw new Error("CSV import is limited to 2000 rows at a time.");
+  }
+
+  const [{ data: tables }, { data: groups }] = await Promise.all([
+    supabase.from("reception_tables").select("id, table_number"),
+    supabase.from("guest_groups").select("id, name"),
+  ]);
+  const tableByNumber = new Map(
+    (tables ?? []).map((item) => [String(item.table_number).trim().toLowerCase(), item.id as string]),
+  );
+  const groupByName = new Map(
+    (groups ?? []).map((item) => [String(item.name).trim().toLowerCase(), item.id as string]),
+  );
+
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const raw = normalizeImportRow(rows[index] ?? {});
+    const name = raw.name_en || raw.name || raw.guest_name;
+    if (!name) {
+      skipped += 1;
+      continue;
+    }
+
+    const expectedCount = Number(raw.expected_count || 1);
+    const guestCode = (raw.guest_code || "").trim();
+    const tableKey = (raw.table || raw.table_number || "").trim().toLowerCase();
+    const groupKey = (raw.group || raw.group_name || "").trim().toLowerCase();
+    const tableId =
+      (isUuid(raw.table_id) ? raw.table_id : null) ||
+      (tableKey ? tableByNumber.get(tableKey) ?? null : null);
+    const groupId =
+      (isUuid(raw.group_id) ? raw.group_id : null) ||
+      (groupKey ? groupByName.get(groupKey) ?? null : null);
+
+    const payload = {
+      name_en: name,
+      name_zh: raw.name_zh ?? "",
+      nickname: raw.nickname ?? "",
+      phone: raw.phone ?? "",
+      email: raw.email ?? "",
+      guest_code: guestCode || undefined,
+      rsvp_status: normalizeRsvp(raw.rsvp_status || raw.rsvp),
+      attendance_status: normalizeAttendance(raw.attendance_status || raw.attendance),
+      expected_count: Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1,
+      group_id: groupId,
+      table_id: tableId,
+      is_vip: toBoolean(raw.is_vip),
+      is_walk_in: toBoolean(raw.is_walk_in),
+      dietary: raw.dietary ?? "",
+      relationship: raw.relationship ?? "",
+      category: raw.category ?? "",
+      notes: raw.notes ?? "",
+    };
+
+    try {
+      let existingId: string | null = null;
+      if (guestCode) {
+        const { data: existing } = await supabase
+          .from("guests")
+          .select("id")
+          .eq("guest_code", guestCode)
+          .maybeSingle();
+        existingId = existing?.id ?? null;
+      }
+
+      if (existingId) {
+        const { error } = await supabase.from("guests").update(payload).eq("id", existingId);
+        if (error) throw new Error(error.message);
+        updated += 1;
+      } else {
+        const code =
+          guestCode ||
+          `G-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+        const { error } = await supabase.from("guests").insert({ ...payload, guest_code: code });
+        if (error) throw new Error(error.message);
+        created += 1;
+      }
+    } catch (error) {
+      errors.push(`Row ${index + 2}: ${error instanceof Error ? error.message : "failed"}`);
+      if (errors.length >= 15) break;
+    }
+  }
+
+  await writeAudit(supabase, {
+    action: "guest_import",
+    entity_type: "guest",
+    staff_id: user.id,
+    meta: { created, updated, skipped, errorCount: errors.length, total: rows.length },
+  });
+
+  revalidatePath("/guests");
+  revalidatePath("/dashboard");
+  revalidatePath("/seating");
+  revalidatePath("/reports");
+  revalidatePath("/check-in");
+  revalidatePath("/floor-plan");
+  revalidatePath("/reception");
+
+  return { created, updated, skipped, errors, total: rows.length };
+}
+
+function normalizeImportRow(row: GuestImportRow) {
+  const next: GuestImportRow = {};
+  for (const [key, value] of Object.entries(row)) {
+    const normalized = key
+      .replace(/^\uFEFF/, "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
+    next[normalized] = value ?? "";
+  }
+  return next;
+}
+
+function toBoolean(value: string | undefined) {
+  return ["1", "true", "yes", "y"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+function isUuid(value: string | undefined) {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value),
+  );
 }
 
 export async function deleteGuest(id: string) {
