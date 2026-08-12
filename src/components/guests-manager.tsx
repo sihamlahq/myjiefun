@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { deleteGuest, importGuests, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
 import { suppressRealtimeRefresh } from "@/lib/client-refresh";
+import { getRedPacketAmount } from "@/lib/red-packet";
 import {
   fileToGuestImportRows,
   guestUploadTemplateCsv,
@@ -27,7 +28,6 @@ import { cn } from "@/lib/utils";
 import type {
   AttendanceStatus,
   Guest,
-  GuestGroup,
   GuestWithRelations,
   ReceptionTable,
   RsvpStatus,
@@ -115,16 +115,36 @@ function download(filename: string, content: string | ArrayBuffer, type = "text/
   URL.revokeObjectURL(url);
 }
 
+function customFieldsWithoutRedPacket(fields: Guest["custom_fields"] | null | undefined) {
+  const base =
+    fields && typeof fields === "object" && !Array.isArray(fields)
+      ? (fields as Record<string, unknown>)
+      : {};
+  const next = { ...base };
+  delete next.red_packet_amount;
+  return next;
+}
+
+function restoreRedPacketInCustomFields(
+  edited: Record<string, unknown>,
+  guest?: GuestWithRelations | null,
+) {
+  const next = { ...edited };
+  delete next.red_packet_amount;
+  if (!guest) return next;
+  const amount = getRedPacketAmount(guest);
+  if (amount != null) next.red_packet_amount = amount;
+  return next;
+}
+
 export function GuestsManager({
   guests: serverGuests,
   tables,
-  groups,
   categories = [],
   dietaryCategories = [],
 }: {
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
-  groups: GuestGroup[];
   categories?: string[];
   dietaryCategories?: string[];
 }) {
@@ -136,7 +156,6 @@ export function GuestsManager({
   const [attendance, setAttendance] = useState("all");
   const [vip, setVip] = useState("all");
   const [table, setTable] = useState("all");
-  const [group, setGroup] = useState("all");
   const [category, setCategory] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<GuestDraft | null>(null);
@@ -155,7 +174,7 @@ export function GuestsManager({
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [deferredQuery, rsvp, attendance, vip, table, group, category]);
+  }, [deferredQuery, rsvp, attendance, vip, table, category]);
 
   useEffect(() => {
     if (!recordMenuOpen) return;
@@ -185,7 +204,7 @@ export function GuestsManager({
         "phone",
         "email",
         "guest_code",
-        "guest_groups.name",
+        "category",
         "reception_tables.table_number",
       ],
       threshold: 0.32,
@@ -203,8 +222,6 @@ export function GuestsManager({
       if (vip !== "all" && guest.is_vip !== (vip === "yes")) return false;
       if (table === "unassigned" && guest.table_id) return false;
       if (table !== "all" && table !== "unassigned" && guest.table_id !== table) return false;
-      if (group === "ungrouped" && guest.group_id) return false;
-      if (group !== "all" && group !== "ungrouped" && guest.group_id !== group) return false;
       if (category === "uncategorized" && guest.category?.trim()) return false;
       if (
         category !== "all" &&
@@ -215,7 +232,7 @@ export function GuestsManager({
       }
       return true;
     });
-  }, [attendance, category, fuse, group, guests, deferredQuery, rsvp, table, vip]);
+  }, [attendance, category, fuse, guests, deferredQuery, rsvp, table, vip]);
 
   const visibleGuests = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
@@ -251,7 +268,9 @@ export function GuestsManager({
       custom_fields: guest.custom_fields,
     };
     setDraft(nextDraft);
-    setCustomFieldsText(JSON.stringify(guest.custom_fields ?? {}, null, 2));
+    setCustomFieldsText(
+      JSON.stringify(customFieldsWithoutRedPacket(guest.custom_fields), null, 2),
+    );
   }
 
   function updateDraft<K extends keyof GuestDraft>(key: K, value: GuestDraft[K]) {
@@ -269,6 +288,9 @@ export function GuestsManager({
       toast.error("Custom fields must be valid JSON.");
       return;
     }
+
+    const existingGuest = draft.id ? guests.find((item) => item.id === draft.id) : null;
+    customFields = restoreRedPacketInCustomFields(customFields, existingGuest);
 
     startTransition(async () => {
       try {
@@ -442,7 +464,7 @@ export function GuestsManager({
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(6,minmax(120px,auto))]">
+        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(120px,auto))]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
             <Input
@@ -469,11 +491,6 @@ export function GuestsManager({
             <option value="all">All tables</option>
             <option value="unassigned">Unassigned</option>
             {tables.map((item) => <option key={item.id} value={item.id}>{item.table_number}</option>)}
-          </select>
-          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={group} onChange={(event) => setGroup(event.target.value)}>
-            <option value="all">All groups</option>
-            <option value="ungrouped">Ungrouped</option>
-            {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
           <select
             className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm"
@@ -654,7 +671,7 @@ export function GuestsManager({
                               guests={guests}
                               className="font-medium"
                             />
-                            {guest.guest_groups?.name ? ` · ${guest.guest_groups.name}` : ""}
+                            {guest.category ? ` · ${guest.category}` : ""}
                             {guest.expected_count > 1 ? ` · party ${guest.expected_count}` : ""}
                           </p>
                         </div>
@@ -743,12 +760,6 @@ export function GuestsManager({
               <Field label="Expected count"><Input type="number" min={0} value={draft.expected_count} onChange={(event) => updateDraft("expected_count", Number(event.target.value))} /></Field>
               <Field label="RSVP"><Select value={draft.rsvp_status} onChange={(value) => updateDraft("rsvp_status", value as RsvpStatus)} options={rsvpOptions} /></Field>
               <Field label="Attendance"><Select value={draft.attendance_status} onChange={(value) => updateDraft("attendance_status", value as AttendanceStatus)} options={attendanceOptions} /></Field>
-              <Field label="Group">
-                <select className="h-11 rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm" value={draft.group_id ?? ""} onChange={(event) => updateDraft("group_id", event.target.value || null)}>
-                  <option value="">No group</option>
-                  {groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </Field>
               <Field label="Table">
                 <select className="h-11 rounded-xl border border-black/10 bg-white/80 px-3 text-base md:h-10 md:text-sm" value={draft.table_id ?? ""} onChange={(event) => updateDraft("table_id", event.target.value || null)}>
                   <option value="">Unassigned</option>

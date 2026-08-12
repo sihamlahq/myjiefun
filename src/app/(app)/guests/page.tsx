@@ -12,7 +12,6 @@ export default async function GuestsPage() {
       <GuestsManager
         guests={data.guests}
         tables={data.tables}
-        groups={data.groups}
         categories={data.categories}
         dietaryCategories={data.dietaryCategories}
       />
