@@ -12,52 +12,37 @@ export function rowsToCsv(headers: string[], rows: unknown[][]) {
     .join("\n");
 }
 
-export function guestsToCsv(guests: GuestWithRelations[]) {
-  const headers = [
-    "guest_code",
-    "name_en",
-    "name_zh",
-    "nickname",
-    "phone",
-    "email",
-    "group",
-    "rsvp_status",
-    "expected_count",
-    "attendance_status",
-    "table",
-    "seat",
-    "is_vip",
-    "is_walk_in",
-    "dietary",
-    "relationship",
-    "category",
-    "notes",
-    "checked_in_at",
-  ];
+/** Columns used for guest CSV upload / download template. */
+export const GUEST_UPLOAD_HEADERS = [
+  "name",
+  "group",
+  "rsvp_status",
+  "expected_count",
+  "relationship",
+  "category",
+] as const;
 
+export function guestsToCsv(guests: GuestWithRelations[]) {
+  const headers = [...GUEST_UPLOAD_HEADERS];
   const rows = guests.map((guest) => [
-    guest.guest_code,
     guest.name_en,
-    guest.name_zh,
-    guest.nickname,
-    guest.phone,
-    guest.email,
     guest.guest_groups?.name ?? "",
     guest.rsvp_status,
     guest.expected_count,
-    guest.attendance_status,
-    guest.reception_tables?.table_number ?? "",
-    guest.seats?.seat_number ?? "",
-    guest.is_vip ? "yes" : "no",
-    guest.is_walk_in ? "yes" : "no",
-    guest.dietary,
     guest.relationship,
     guest.category,
-    guest.notes,
-    guest.checked_in_at ?? "",
   ]);
-
   return rowsToCsv(headers, rows);
+}
+
+export function guestUploadTemplateCsv() {
+  return rowsToCsv(
+    [...GUEST_UPLOAD_HEADERS],
+    [
+      ["Alex Tan", "Family", "confirmed", "2", "Cousin", "Family"],
+      ["Jordan Lim", "Friends", "pending", "1", "Colleague", "Friends"],
+    ],
+  );
 }
 
 export function parseCsv(text: string) {

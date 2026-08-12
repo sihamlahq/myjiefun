@@ -5,7 +5,7 @@ import { Check, Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-re
 import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteGuest, importGuests, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
-import { csvToObjects, guestsToCsv } from "@/lib/csv";
+import { csvToObjects, guestUploadTemplateCsv, guestsToCsv, GUEST_UPLOAD_HEADERS } from "@/lib/csv";
 import { cn } from "@/lib/utils";
 import type {
   AttendanceStatus,
@@ -270,6 +270,10 @@ export function GuestsManager({
     download(`myjiefun-guests-${new Date().toISOString().slice(0, 10)}.csv`, guestsToCsv(rows));
   }
 
+  function downloadTemplate() {
+    download("myjiefun-guest-upload-template.csv", guestUploadTemplateCsv());
+  }
+
   async function importCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -357,10 +361,15 @@ export function GuestsManager({
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-[var(--foreground)]/65">
-          Showing {filtered.length} of {guests.length}
-          {selected.size ? ` · ${selected.size} selected` : ""}
-        </p>
+        <div className="min-w-0">
+          <p className="text-sm text-[var(--foreground)]/65">
+            Showing {filtered.length} of {guests.length}
+            {selected.size ? ` · ${selected.size} selected` : ""}
+          </p>
+          <p className="mt-1 text-xs text-[var(--foreground)]/50">
+            CSV upload columns: {GUEST_UPLOAD_HEADERS.join(", ")}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
           {selected.size > 0 ? (
@@ -368,6 +377,9 @@ export function GuestsManager({
               <Check className="h-4 w-4" /> Confirm selected ({selected.size})
             </Button>
           ) : null}
+          <Button variant="outline" onClick={downloadTemplate}>
+            <Download className="h-4 w-4" /> Template
+          </Button>
           <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={isPending}>
             <Upload className="h-4 w-4" /> Import CSV
           </Button>

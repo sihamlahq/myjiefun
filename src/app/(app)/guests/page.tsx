@@ -10,7 +10,7 @@ export default async function GuestsPage() {
       <PageHeader
         eyebrow="Guest directory"
         title="Guests"
-        description="Tap Confirm to mark RSVP, or change status from the list — no extra edit steps."
+        description="CSV upload uses name, group, rsvp_status, expected_count, relationship, category. Tap Confirm to mark RSVP."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
       <GuestsManager guests={data.guests} tables={data.tables} groups={data.groups} />

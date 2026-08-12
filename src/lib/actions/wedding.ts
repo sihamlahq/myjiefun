@@ -185,16 +185,25 @@ export async function importGuests(rows: GuestImportRow[]) {
     throw new Error("CSV import is limited to 2000 rows at a time.");
   }
 
-  const [{ data: tables }, { data: groups }] = await Promise.all([
-    supabase.from("reception_tables").select("id, table_number"),
-    supabase.from("guest_groups").select("id, name"),
-  ]);
-  const tableByNumber = new Map(
-    (tables ?? []).map((item) => [String(item.table_number).trim().toLowerCase(), item.id as string]),
-  );
+  const { data: groups } = await supabase.from("guest_groups").select("id, name");
   const groupByName = new Map(
     (groups ?? []).map((item) => [String(item.name).trim().toLowerCase(), item.id as string]),
   );
+
+  async function resolveGroupId(groupName: string) {
+    const key = groupName.trim().toLowerCase();
+    if (!key) return null;
+    const existing = groupByName.get(key);
+    if (existing) return existing;
+    const { data, error } = await supabase
+      .from("guest_groups")
+      .insert({ name: groupName.trim(), notes: "Created from CSV import" })
+      .select("id, name")
+      .single();
+    if (error) throw new Error(error.message);
+    groupByName.set(key, data.id);
+    return data.id as string;
+  }
 
   let created = 0;
   let updated = 0;
@@ -203,63 +212,61 @@ export async function importGuests(rows: GuestImportRow[]) {
 
   for (let index = 0; index < rows.length; index += 1) {
     const raw = normalizeImportRow(rows[index] ?? {});
-    const name = raw.name_en || raw.name || raw.guest_name;
+    const name = (raw.name || raw.name_en || raw.guest_name || "").trim();
     if (!name) {
       skipped += 1;
       continue;
     }
 
     const expectedCount = Number(raw.expected_count || 1);
-    const guestCode = (raw.guest_code || "").trim();
-    const tableKey = (raw.table || raw.table_number || "").trim().toLowerCase();
-    const groupKey = (raw.group || raw.group_name || "").trim().toLowerCase();
-    const tableId =
-      (isUuid(raw.table_id) ? raw.table_id : null) ||
-      (tableKey ? tableByNumber.get(tableKey) ?? null : null);
-    const groupId =
-      (isUuid(raw.group_id) ? raw.group_id : null) ||
-      (groupKey ? groupByName.get(groupKey) ?? null : null);
-
-    const payload = {
-      name_en: name,
-      name_zh: raw.name_zh ?? "",
-      nickname: raw.nickname ?? "",
-      phone: raw.phone ?? "",
-      email: raw.email ?? "",
-      guest_code: guestCode || undefined,
-      rsvp_status: normalizeRsvp(raw.rsvp_status || raw.rsvp),
-      attendance_status: normalizeAttendance(raw.attendance_status || raw.attendance),
-      expected_count: Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1,
-      group_id: groupId,
-      table_id: tableId,
-      is_vip: toBoolean(raw.is_vip),
-      is_walk_in: toBoolean(raw.is_walk_in),
-      dietary: raw.dietary ?? "",
-      relationship: raw.relationship ?? "",
-      category: raw.category ?? "",
-      notes: raw.notes ?? "",
-    };
+    const groupName = (raw.group || raw.group_name || "").trim();
 
     try {
-      let existingId: string | null = null;
-      if (guestCode) {
-        const { data: existing } = await supabase
-          .from("guests")
-          .select("id")
-          .eq("guest_code", guestCode)
-          .maybeSingle();
-        existingId = existing?.id ?? null;
-      }
+      const groupId = await resolveGroupId(groupName);
+      const payload = {
+        name_en: name,
+        rsvp_status: normalizeRsvp(raw.rsvp_status || raw.rsvp),
+        expected_count: Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1,
+        group_id: groupId,
+        relationship: raw.relationship ?? "",
+        category: raw.category ?? "",
+      };
+
+      // Prefer update when same name + group already exists.
+      let existingQuery = supabase
+        .from("guests")
+        .select("id")
+        .ilike("name_en", name)
+        .limit(1);
+      existingQuery = groupId
+        ? existingQuery.eq("group_id", groupId)
+        : existingQuery.is("group_id", null);
+      const { data: existingRows } = await existingQuery;
+      const existingId = existingRows?.[0]?.id ?? null;
 
       if (existingId) {
         const { error } = await supabase.from("guests").update(payload).eq("id", existingId);
         if (error) throw new Error(error.message);
         updated += 1;
       } else {
-        const code =
-          guestCode ||
-          `G-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-        const { error } = await supabase.from("guests").insert({ ...payload, guest_code: code });
+        const guestCode = `G-${Date.now().toString(36).toUpperCase()}-${Math.random()
+          .toString(36)
+          .slice(2, 6)
+          .toUpperCase()}`;
+        const { error } = await supabase.from("guests").insert({
+          ...payload,
+          guest_code: guestCode,
+          name_zh: "",
+          nickname: "",
+          phone: "",
+          email: "",
+          attendance_status: "not_arrived",
+          is_vip: false,
+          is_walk_in: false,
+          dietary: "",
+          notes: "",
+          custom_fields: {},
+        });
         if (error) throw new Error(error.message);
         created += 1;
       }
@@ -298,17 +305,6 @@ function normalizeImportRow(row: GuestImportRow) {
     next[normalized] = value ?? "";
   }
   return next;
-}
-
-function toBoolean(value: string | undefined) {
-  return ["1", "true", "yes", "y"].includes(String(value ?? "").trim().toLowerCase());
-}
-
-function isUuid(value: string | undefined) {
-  return Boolean(
-    value &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value),
-  );
 }
 
 export async function deleteGuest(id: string) {
