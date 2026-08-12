@@ -38,7 +38,7 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
 import { GuestTableLink } from "@/components/table-guests-dialog";
 
-const PAGE_SIZE = 40;
+const PAGE_SIZE = 15;
 
 type GuestDraft = Pick<
   Guest,
