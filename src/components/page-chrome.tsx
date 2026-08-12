@@ -14,12 +14,12 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div className="mb-4 flex flex-col gap-3 md:mb-6 md:flex-row md:items-end md:justify-between md:gap-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--primary)]">
           {eyebrow}
         </p>
-        <h1 className="font-heading mt-1 text-4xl font-semibold tracking-tight md:text-5xl">
+        <h1 className="font-heading mt-1 text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
           {title}
         </h1>
         {description ? (

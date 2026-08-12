@@ -445,13 +445,13 @@ export function GuestsManager({
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p className="text-sm text-[var(--foreground)]/65">
           Showing {Math.min(visibleCount, filtered.length)} of {filtered.length}
           {filtered.length !== guests.length ? ` · ${guests.length} total` : ""}
           {selected.size ? ` · ${selected.size} selected` : ""}
         </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 touch-scroll sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
           <input
             ref={fileRef}
             type="file"
@@ -460,23 +460,28 @@ export function GuestsManager({
             onChange={importGuestFile}
           />
           {selected.size > 0 ? (
-            <Button onClick={confirmSelected} disabled={isPending} variant="gold">
+            <Button onClick={confirmSelected} disabled={isPending} variant="gold" className="shrink-0">
               <Check className="h-4 w-4" /> Confirm selected ({selected.size})
             </Button>
           ) : null}
-          <Button variant="outline" onClick={downloadTemplate}>
+          <Button variant="outline" onClick={downloadTemplate} className="shrink-0">
             <Download className="h-4 w-4" /> Excel template
           </Button>
-          <Button variant="outline" onClick={downloadCsvTemplate}>
+          <Button variant="outline" onClick={downloadCsvTemplate} className="shrink-0">
             <Download className="h-4 w-4" /> CSV template
           </Button>
-          <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={isPending}>
+          <Button
+            variant="outline"
+            onClick={() => fileRef.current?.click()}
+            disabled={isPending}
+            className="shrink-0"
+          >
             <Upload className="h-4 w-4" /> Import file
           </Button>
-          <Button variant="outline" onClick={exportCsv}>
+          <Button variant="outline" onClick={exportCsv} className="shrink-0">
             <Download className="h-4 w-4" /> Export CSV
           </Button>
-          <Button onClick={() => openGuest()}>
+          <Button onClick={() => openGuest()} className="shrink-0">
             <Plus className="h-4 w-4" /> Add guest
           </Button>
         </div>
@@ -620,8 +625,11 @@ export function GuestsManager({
       </Card>
 
       {draft ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4 backdrop-blur-sm">
-          <form onSubmit={saveGuest} className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/50 bg-[var(--background)] p-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/35 p-0 backdrop-blur-sm sm:place-items-center sm:p-4">
+          <form
+            onSubmit={saveGuest}
+            className="mobile-safe-bottom max-h-[min(92dvh,100%)] w-full max-w-4xl overflow-y-auto rounded-t-3xl border border-white/50 bg-[var(--background)] p-5 shadow-2xl touch-scroll sm:max-h-[90vh] sm:rounded-3xl"
+          >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">Guest details</p>

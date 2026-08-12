@@ -1,6 +1,6 @@
 export default function GuestsLoading() {
   return (
-    <div className="animate-pulse space-y-4 pb-24 md:pb-0" aria-busy="true" aria-label="Loading guests">
+    <div className="animate-pulse space-y-4" aria-busy="true" aria-label="Loading guests">
       <div className="space-y-2">
         <div className="h-3 w-28 rounded-full bg-[var(--primary)]/20" />
         <div className="h-10 w-36 rounded-2xl bg-black/10" />

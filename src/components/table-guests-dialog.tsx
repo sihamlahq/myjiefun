@@ -111,7 +111,7 @@ export function TableGuestsDialog({
       role="presentation"
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/50 bg-[var(--background)] shadow-2xl sm:rounded-3xl"
+        className="mobile-safe-bottom flex max-h-[min(88dvh,100%)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/50 bg-[var(--background)] shadow-2xl sm:max-h-[88vh] sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -145,7 +145,7 @@ export function TableGuestsDialog({
           ) : null}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 touch-scroll">
           {guests.length ? (
             <ol className="space-y-2">
               {guests.map((guest, index) => {

@@ -263,8 +263,8 @@ export function FloorPlanCanvas({
 
       {/* Mobile bottom sheet when a table is selected while viewing the map */}
       {selectedTable && mobileView === "map" ? (
-        <div className="fixed inset-x-0 bottom-16 z-40 px-3 md:hidden">
-          <Card className="max-h-[42vh] overflow-auto border-[var(--accent)]/40 shadow-2xl">
+        <div className="mobile-sheet-above-nav fixed inset-x-0 z-40 px-3 md:hidden">
+          <Card className="max-h-[min(42vh,calc(100dvh-var(--mobile-nav-offset)-1rem))] overflow-auto border-[var(--accent)]/40 shadow-2xl touch-scroll">
             <CardContent className="p-4">{details}</CardContent>
           </Card>
         </div>

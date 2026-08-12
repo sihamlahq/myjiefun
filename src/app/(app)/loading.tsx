@@ -1,6 +1,6 @@
 export default function AppLoading() {
   return (
-    <div className="animate-pulse space-y-5 pb-24 md:pb-0" aria-busy="true" aria-label="Loading">
+    <div className="animate-pulse space-y-5" aria-busy="true" aria-label="Loading">
       <div className="space-y-2">
         <div className="h-3 w-24 rounded-full bg-[var(--primary)]/20" />
         <div className="h-10 w-48 rounded-2xl bg-black/10 md:h-12 md:w-64" />

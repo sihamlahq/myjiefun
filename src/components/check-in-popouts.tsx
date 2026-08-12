@@ -28,7 +28,7 @@ export function CheckInPopouts({
 
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-y-0 right-0 z-[80] flex w-full max-w-sm flex-col justify-end gap-3 p-4 sm:justify-center sm:p-6"
+      className="pointer-events-none fixed inset-y-0 right-0 z-[80] flex w-full max-w-sm flex-col justify-end gap-3 p-4 pb-[calc(var(--mobile-nav-offset)+0.75rem)] sm:justify-center sm:p-6 sm:pb-6"
       aria-live="polite"
       aria-relevant="additions"
     >

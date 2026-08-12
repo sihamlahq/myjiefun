@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -12,6 +12,21 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Myjiefun",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f7f3ec",
 };
 
 export default function RootLayout({
@@ -29,7 +44,11 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         {children}
-        <Toaster richColors position="top-center" />
+        <Toaster
+          richColors
+          position="top-center"
+          offset="calc(env(safe-area-inset-top, 0px) + 12px)"
+        />
       </body>
     </html>
   );

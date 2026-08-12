@@ -188,7 +188,7 @@ export function CheckInPanel({
   ];
 
   return (
-    <div className="relative pb-28 lg:pb-4">
+    <div className="relative pb-8 lg:pb-4">
       <div className="sticky top-0 z-20 -mx-1 mb-4 space-y-3 bg-[color-mix(in_oklab,var(--background)_92%,white)] px-1 py-3 backdrop-blur-md lg:top-2">
         <div className="grid grid-cols-3 gap-2 sm:max-w-md">
           <Stat label="Waiting" value={counts.waiting} tone="warn" />
@@ -221,7 +221,7 @@ export function CheckInPanel({
           ) : null}
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pb-1 touch-scroll">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -231,7 +231,7 @@ export function CheckInPanel({
                 setSelectedId(null);
               }}
               className={cn(
-                "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-150 active:scale-95",
+                "min-h-10 shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-150 active:scale-95",
                 filter === tab.id
                   ? "bg-[var(--primary)] text-white shadow-sm"
                   : "bg-white/80 text-[var(--foreground)]/70 ring-1 ring-black/8",
@@ -360,7 +360,7 @@ export function CheckInPanel({
       )}
 
       {selected ? (
-        <div className="fixed inset-x-0 bottom-16 z-40 border-t border-black/10 bg-white/95 p-4 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md md:bottom-0 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:w-[380px] lg:rounded-3xl lg:border lg:shadow-xl">
+        <div className="mobile-sheet-above-nav fixed inset-x-0 z-40 max-h-[min(70vh,calc(100dvh-var(--mobile-nav-offset)-1rem))] overflow-y-auto border-t border-black/10 bg-white/95 p-4 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md touch-scroll md:bottom-0 lg:inset-x-auto lg:bottom-6 lg:right-6 lg:max-h-none lg:w-[380px] lg:overflow-visible lg:rounded-3xl lg:border lg:shadow-xl">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="font-heading text-2xl font-semibold leading-tight">{selected.name_en}</p>
@@ -376,7 +376,7 @@ export function CheckInPanel({
             </div>
             <button
               type="button"
-              className="rounded-full bg-black/5 p-2"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/5"
               onClick={() => setSelectedId(null)}
               aria-label="Close"
             >
