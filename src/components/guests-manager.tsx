@@ -397,15 +397,10 @@ export function GuestsManager({
       </Card>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm text-[var(--foreground)]/65">
-            Showing {filtered.length} of {guests.length}
-            {selected.size ? ` · ${selected.size} selected` : ""}
-          </p>
-          <p className="mt-1 text-xs text-[var(--foreground)]/50">
-            Upload CSV or Excel (.xlsx / .xls). Columns: {GUEST_UPLOAD_HEADERS.join(", ")}
-          </p>
-        </div>
+        <p className="text-sm text-[var(--foreground)]/65">
+          Showing {filtered.length} of {guests.length}
+          {selected.size ? ` · ${selected.size} selected` : ""}
+        </p>
         <div className="flex flex-wrap gap-2">
           <input
             ref={fileRef}
@@ -479,14 +474,25 @@ export function GuestsManager({
                           aria-label={`Select ${guest.name_en}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-lg font-semibold leading-tight">
-                            {guest.name_en}
-                            {guest.is_vip ? (
-                              <span className="ml-2 align-middle rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                                VIP
-                              </span>
-                            ) : null}
-                          </p>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="min-w-0 truncate text-lg font-semibold leading-tight">
+                              {guest.name_en}
+                              {guest.is_vip ? (
+                                <span className="ml-2 align-middle rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                                  VIP
+                                </span>
+                              ) : null}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-9 w-9 shrink-0 p-0"
+                              onClick={() => removeGuest(guest)}
+                              aria-label={`Delete ${guest.name_en}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                           <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
                             {[guest.name_zh, guest.phone, guest.guest_code].filter(Boolean).join(" · ")}
                           </p>
@@ -540,9 +546,6 @@ export function GuestsManager({
                         <Button size="sm" variant="outline" className="h-10" onClick={() => openGuest(guest)}>
                           <Pencil className="h-3.5 w-3.5" />
                           Edit
-                        </Button>
-                        <Button size="sm" variant="destructive" className="h-10" onClick={() => removeGuest(guest)}>
-                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
