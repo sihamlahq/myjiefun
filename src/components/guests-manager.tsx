@@ -1,7 +1,8 @@
 "use client";
 
 import Fuse from "fuse.js";
-import { Check, Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Check, CheckCircle2, Download, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteGuest, importGuests, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
@@ -48,6 +49,15 @@ type GuestDraft = Pick<
   | "notes"
   | "custom_fields"
 > & { id?: string };
+
+type ImportResult = {
+  fileName: string;
+  created: number;
+  updated: number;
+  skipped: number;
+  total: number;
+  errors: string[];
+};
 
 const rsvpOptions: RsvpStatus[] = ["pending", "confirmed", "maybe", "declined"];
 const attendanceOptions: AttendanceStatus[] = ["not_arrived", "checked_in", "no_show", "walk_in"];
@@ -104,6 +114,7 @@ export function GuestsManager({
   tables: ReceptionTable[];
   groups: GuestGroup[];
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [rsvp, setRsvp] = useState("all");
   const [attendance, setAttendance] = useState("all");
@@ -115,6 +126,7 @@ export function GuestsManager({
   const [customFieldsText, setCustomFieldsText] = useState("{}");
   const [isPending, startTransition] = useTransition();
   const [savingRsvpId, setSavingRsvpId] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fuse = useMemo(
@@ -289,6 +301,12 @@ export function GuestsManager({
     download("myjiefun-guest-upload-template.csv", guestUploadTemplateCsv());
   }
 
+  function closeImportResult() {
+    setImportResult(null);
+    setSelected(new Set());
+    router.refresh();
+  }
+
   async function importGuestFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -311,18 +329,16 @@ export function GuestsManager({
     startTransition(async () => {
       try {
         const result = await importGuests(rows);
-        const parts = [
-          result.created ? `${result.created} added` : null,
-          result.updated ? `${result.updated} updated` : null,
-          result.skipped ? `${result.skipped} skipped` : null,
-        ].filter(Boolean);
-        if (result.errors.length) {
-          toast.error(
-            `Imported with issues (${parts.join(", ") || "none"}). ${result.errors[0]}`,
-          );
-        } else {
-          toast.success(`Import complete: ${parts.join(", ") || "no changes"}.`);
-        }
+        setImportResult({
+          fileName: file.name,
+          created: result.created,
+          updated: result.updated,
+          skipped: result.skipped,
+          total: result.total,
+          errors: result.errors,
+        });
+        setSelected(new Set());
+        router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Guest file import failed.");
       } finally {
@@ -594,6 +610,88 @@ export function GuestsManager({
           </form>
         </div>
       ) : null}
+
+      {importResult ? (
+        <div
+          className="fixed inset-0 z-[60] grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={closeImportResult}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-white/60 bg-[var(--background)] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Upload complete"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-black/8 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <span
+                  className={cn(
+                    "mt-0.5 grid h-11 w-11 place-items-center rounded-2xl",
+                    importResult.errors.length
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-emerald-100 text-emerald-800",
+                  )}
+                >
+                  <CheckCircle2 className="h-6 w-6" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+                    Upload complete
+                  </p>
+                  <h2 className="font-heading text-3xl font-semibold leading-tight">
+                    Guest list updated
+                  </h2>
+                  <p className="mt-1 truncate text-sm text-[var(--foreground)]/60">{importResult.fileName}</p>
+                </div>
+              </div>
+              <Button type="button" size="icon" variant="ghost" onClick={closeImportResult} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 px-5 py-4 sm:grid-cols-4">
+              <ImportStat label="Added" value={importResult.created} />
+              <ImportStat label="Updated" value={importResult.updated} />
+              <ImportStat label="Skipped" value={importResult.skipped} />
+              <ImportStat label="Rows" value={importResult.total} />
+            </div>
+
+            {importResult.errors.length ? (
+              <div className="mx-5 mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-left text-sm text-amber-950">
+                <p className="font-semibold">Some rows need attention</p>
+                <ul className="mt-2 space-y-1 text-amber-900/80">
+                  {importResult.errors.slice(0, 5).map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="px-5 pb-2 text-sm text-[var(--foreground)]/65">
+                The latest guest list has been refreshed automatically.
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2 border-t border-black/8 px-5 py-4">
+              <Button type="button" onClick={closeImportResult}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ImportStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl bg-[var(--muted)]/70 px-3 py-2.5 text-center">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/55">
+        {label}
+      </p>
+      <p className="font-heading text-2xl font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
