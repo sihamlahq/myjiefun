@@ -5,7 +5,13 @@ import { Check, Download, Pencil, Plus, Search, Trash2, Upload } from "lucide-re
 import { ChangeEvent, FormEvent, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteGuest, importGuests, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
-import { csvToObjects, guestUploadTemplateCsv, guestsToCsv, GUEST_UPLOAD_HEADERS } from "@/lib/csv";
+import {
+  fileToGuestImportRows,
+  guestUploadTemplateCsv,
+  guestUploadTemplateXlsx,
+  guestsToCsv,
+  GUEST_UPLOAD_HEADERS,
+} from "@/lib/csv";
 import { cn } from "@/lib/utils";
 import type {
   AttendanceStatus,
@@ -74,8 +80,13 @@ const rsvpTone: Record<RsvpStatus, string> = {
   declined: "border-rose-300 bg-rose-50 text-rose-950",
 };
 
-function download(filename: string, content: string, type = "text/csv;charset=utf-8") {
-  const blob = new Blob([content], { type });
+function download(filename: string, content: string | ArrayBuffer, type = "text/csv;charset=utf-8") {
+  const blob =
+    typeof content === "string"
+      ? new Blob([content], { type })
+      : new Blob([content], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -271,16 +282,28 @@ export function GuestsManager({
   }
 
   function downloadTemplate() {
+    download("myjiefun-guest-upload-template.xlsx", guestUploadTemplateXlsx());
+  }
+
+  function downloadCsvTemplate() {
     download("myjiefun-guest-upload-template.csv", guestUploadTemplateCsv());
   }
 
-  async function importCsv(event: ChangeEvent<HTMLInputElement>) {
+  async function importGuestFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const text = await file.text();
-    const rows = csvToObjects(text);
+
+    let rows: Record<string, string>[] = [];
+    try {
+      rows = await fileToGuestImportRows(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to read that file.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+
     if (!rows.length) {
-      toast.error("CSV has no data rows.");
+      toast.error("File has no data rows. Use columns: " + GUEST_UPLOAD_HEADERS.join(", "));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
@@ -301,7 +324,7 @@ export function GuestsManager({
           toast.success(`Import complete: ${parts.join(", ") || "no changes"}.`);
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "CSV import failed.");
+        toast.error(error instanceof Error ? error.message : "Guest file import failed.");
       } finally {
         if (fileRef.current) fileRef.current.value = "";
       }
@@ -367,21 +390,30 @@ export function GuestsManager({
             {selected.size ? ` · ${selected.size} selected` : ""}
           </p>
           <p className="mt-1 text-xs text-[var(--foreground)]/50">
-            CSV upload columns: {GUEST_UPLOAD_HEADERS.join(", ")}
+            Upload CSV or Excel (.xlsx / .xls). Columns: {GUEST_UPLOAD_HEADERS.join(", ")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,.xlsx,.xls,.xlsm,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={importGuestFile}
+          />
           {selected.size > 0 ? (
             <Button onClick={confirmSelected} disabled={isPending} variant="gold">
               <Check className="h-4 w-4" /> Confirm selected ({selected.size})
             </Button>
           ) : null}
           <Button variant="outline" onClick={downloadTemplate}>
-            <Download className="h-4 w-4" /> Template
+            <Download className="h-4 w-4" /> Excel template
+          </Button>
+          <Button variant="outline" onClick={downloadCsvTemplate}>
+            <Download className="h-4 w-4" /> CSV template
           </Button>
           <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={isPending}>
-            <Upload className="h-4 w-4" /> Import CSV
+            <Upload className="h-4 w-4" /> Import file
           </Button>
           <Button variant="outline" onClick={exportCsv}>
             <Download className="h-4 w-4" /> Export CSV
