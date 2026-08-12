@@ -27,6 +27,9 @@ export function computeStats(
     occupiedSeats: assigned,
     availableSeats: Math.max(totalCapacity - assigned, 0),
     unassignedGuests: guests.filter((g) => !g.table_id).length,
+    unassignedConfirmed: guests.filter(
+      (g) => g.rsvp_status === "confirmed" && !g.table_id,
+    ).length,
     vipGuests: guests.filter((g) => g.is_vip).length,
   };
 }

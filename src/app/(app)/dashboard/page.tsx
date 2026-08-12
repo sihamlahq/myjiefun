@@ -29,13 +29,18 @@ export default async function DashboardPage() {
         <MetricCard label="Invited" value={stats.totalInvited} detail="Excluding walk-ins" />
         <MetricCard label="Confirmed" value={stats.confirmed} detail={`${stats.pendingRsvp} pending`} />
         <MetricCard
+          label="Need seating"
+          value={stats.unassignedConfirmed}
+          detail="Confirmed, no table yet"
+        />
+        <MetricCard
           label="Arrived"
           value={stats.checkedIn}
           detail={`${formatPercent(attendanceRate)} attendance`}
         />
         <MetricCard label="Walk-ins" value={stats.walkIns} detail="Created at reception" />
         <MetricCard label="Tables" value={stats.totalTables} detail={`${stats.availableSeats} seats free`} />
-        <MetricCard label="VIPs" value={stats.vipGuests} detail={`${stats.unassignedGuests} unassigned`} />
+        <MetricCard label="VIPs" value={stats.vipGuests} detail={`${stats.unassignedGuests} total unassigned`} />
       </div>
 
       <DashboardCharts stats={stats} guests={data.guests} />
@@ -59,8 +64,11 @@ export default async function DashboardPage() {
               </p>
             </div>
             <div className="rounded-2xl bg-[var(--muted)]/70 p-4">
-              <p className="text-sm text-[var(--foreground)]/60">No table</p>
-              <p className="font-heading mt-1 text-3xl font-semibold">{stats.unassignedGuests}</p>
+              <p className="text-sm text-[var(--foreground)]/60">Confirmed, no table</p>
+              <p className="font-heading mt-1 text-3xl font-semibold">{stats.unassignedConfirmed}</p>
+              <p className="mt-1 text-xs text-[var(--foreground)]/50">
+                {stats.unassignedGuests} total unassigned
+              </p>
             </div>
           </CardContent>
         </Card>

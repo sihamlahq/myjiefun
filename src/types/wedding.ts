@@ -157,5 +157,7 @@ export type DashboardStats = {
   occupiedSeats: number;
   availableSeats: number;
   unassignedGuests: number;
+  /** Confirmed guests with no table (and therefore no seat) assigned. */
+  unassignedConfirmed: number;
   vipGuests: number;
 };

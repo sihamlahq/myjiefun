@@ -158,6 +158,9 @@ export function DashboardCharts({
           </svg>
           <p className="mt-3 text-sm text-[var(--foreground)]/60">
             {stats.availableSeats} seats remain across {stats.totalTables} active tables.
+            {stats.unassignedConfirmed > 0
+              ? ` ${stats.unassignedConfirmed} confirmed guests still need a table.`
+              : ""}
           </p>
         </CardContent>
       </Card>
