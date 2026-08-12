@@ -1,9 +1,9 @@
 import { PageHeader, SetupCard } from "@/components/page-chrome";
 import { SeatingBoard } from "@/components/seating-board";
-import { loadWeddingData } from "@/lib/wedding-data";
+import { loadGuestsAndTables } from "@/lib/wedding-data";
 
 export default async function SeatingPage() {
-  const data = await loadWeddingData();
+  const data = await loadGuestsAndTables();
 
   return (
     <div>

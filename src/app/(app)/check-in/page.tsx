@@ -1,9 +1,9 @@
 import { CheckInPanel } from "@/components/check-in-panel";
 import { PageHeader, SetupCard } from "@/components/page-chrome";
-import { loadWeddingData } from "@/lib/wedding-data";
+import { loadGuestsAndTables } from "@/lib/wedding-data";
 
 export default async function CheckInPage() {
-  const data = await loadWeddingData();
+  const data = await loadGuestsAndTables();
 
   return (
     <div>

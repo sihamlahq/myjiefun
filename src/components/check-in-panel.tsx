@@ -21,6 +21,7 @@ import {
   checkInGuest,
   undoCheckIn,
 } from "@/lib/actions/wedding";
+import { suppressRealtimeRefresh } from "@/lib/client-refresh";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -31,18 +32,24 @@ import { GuestTableLink } from "@/components/table-guests-dialog";
 type FilterTab = "waiting" | "arrived" | "all" | "vip";
 
 export function CheckInPanel({
-  guests,
+  guests: serverGuests,
   tables,
 }: {
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
 }) {
+  const [guests, setGuests] = useState(serverGuests);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterTab>("waiting");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [partialOpen, setPartialOpen] = useState(false);
   const [partialCount, setPartialCount] = useState(1);
-  const [isPending, startTransition] = useTransition();
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    setGuests(serverGuests);
+  }, [serverGuests]);
 
   const fuse = useMemo(
     () =>
@@ -94,17 +101,57 @@ export function CheckInPanel({
     if (selected) setPartialCount(selected.expected_count || 1);
   }, [selected]);
 
-  function runAction(label: string, action: () => Promise<unknown>, closeAfter = false) {
+  function markBusy(guestId: string, busy: boolean) {
+    setBusyIds((prev) => {
+      const next = new Set(prev);
+      if (busy) next.add(guestId);
+      else next.delete(guestId);
+      return next;
+    });
+  }
+
+  function runMutation(
+    guestId: string,
+    label: string,
+    optimistic: () => void,
+    action: () => Promise<unknown>,
+    closeAfter = false,
+  ) {
+    const snapshot = guests;
+    optimistic();
+    toast.success(label);
+    if (closeAfter) setSelectedId(null);
+    setQuery("");
+    suppressRealtimeRefresh(1600);
+    markBusy(guestId, true);
     startTransition(async () => {
       try {
         await action();
-        toast.success(label);
-        if (closeAfter) setSelectedId(null);
-        setQuery("");
       } catch (error) {
+        setGuests(snapshot);
         toast.error(error instanceof Error ? error.message : "Action failed.");
+      } finally {
+        markBusy(guestId, false);
       }
     });
+  }
+
+  function applyCheckedIn(guest: GuestWithRelations, mode: "check_in" | "group" | "partial") {
+    const now = new Date().toISOString();
+    setGuests((prev) =>
+      prev.map((item) => {
+        const match =
+          mode === "group" && guest.group_id
+            ? item.group_id === guest.group_id && item.attendance_status !== "checked_in"
+            : item.id === guest.id;
+        if (!match) return item;
+        return {
+          ...item,
+          attendance_status: "checked_in",
+          checked_in_at: now,
+        };
+      }),
+    );
   }
 
   function checkIn(
@@ -113,12 +160,14 @@ export function CheckInPanel({
     partyCount?: number,
   ) {
     const count = partyCount ?? (guest.expected_count || 1);
-    runAction(
+    runMutation(
+      guest.id,
       mode === "group"
         ? "Group checked in."
         : mode === "partial"
           ? `Checked in ${count} guest(s).`
           : `${guest.name_en} checked in.`,
+      () => applyCheckedIn(guest, mode),
       () => checkInGuest({ guestId: guest.id, mode, partyCount: count }),
       true,
     );
@@ -183,7 +232,7 @@ export function CheckInPanel({
                 setSelectedId(null);
               }}
               className={cn(
-                "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition",
+                "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-150 active:scale-95",
                 filter === tab.id
                   ? "bg-[var(--primary)] text-white shadow-sm"
                   : "bg-white/80 text-[var(--foreground)]/70 ring-1 ring-black/8",
@@ -201,6 +250,7 @@ export function CheckInPanel({
           {results.map((guest) => {
             const arrived = guest.attendance_status === "checked_in";
             const party = guest.expected_count || 1;
+            const busy = busyIds.has(guest.id);
             return (
               <li key={guest.id}>
                 <div
@@ -256,9 +306,26 @@ export function CheckInPanel({
                         variant="outline"
                         size="sm"
                         className="h-11 min-w-[5.5rem] px-3"
-                        disabled={isPending}
+                        disabled={busy}
                         onClick={() =>
-                          runAction("Check-in undone.", () => undoCheckIn(guest.id))
+                          runMutation(
+                            guest.id,
+                            "Check-in undone.",
+                            () =>
+                              setGuests((prev) =>
+                                prev.map((item) =>
+                                  item.id === guest.id
+                                    ? {
+                                        ...item,
+                                        attendance_status: "not_arrived",
+                                        checked_in_at: null,
+                                        checked_in_by: null,
+                                      }
+                                    : item,
+                                ),
+                              ),
+                            () => undoCheckIn(guest.id),
+                          )
                         }
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -268,7 +335,7 @@ export function CheckInPanel({
                       <Button
                         size="lg"
                         className="h-12 min-w-[6.5rem] px-4 text-base"
-                        disabled={isPending}
+                        disabled={busy}
                         onClick={() => checkIn(guest)}
                       >
                         Check in
@@ -333,9 +400,27 @@ export function CheckInPanel({
                 variant="outline"
                 className="w-full"
                 size="lg"
-                disabled={isPending}
+                disabled={busyIds.has(selected.id)}
                 onClick={() =>
-                  runAction("Check-in undone.", () => undoCheckIn(selected.id), true)
+                  runMutation(
+                    selected.id,
+                    "Check-in undone.",
+                    () =>
+                      setGuests((prev) =>
+                        prev.map((item) =>
+                          item.id === selected.id
+                            ? {
+                                ...item,
+                                attendance_status: "not_arrived",
+                                checked_in_at: null,
+                                checked_in_by: null,
+                              }
+                            : item,
+                        ),
+                      ),
+                    () => undoCheckIn(selected.id),
+                    true,
+                  )
                 }
               >
                 <RotateCcw className="h-4 w-4" /> Undo check-in
@@ -345,7 +430,7 @@ export function CheckInPanel({
                 <Button
                   className="w-full"
                   size="xl"
-                  disabled={isPending}
+                  disabled={busyIds.has(selected.id)}
                   onClick={() => checkIn(selected)}
                 >
                   <CheckCircle2 className="h-5 w-5" /> Check in now
@@ -355,7 +440,7 @@ export function CheckInPanel({
                     variant="gold"
                     className="w-full"
                     size="lg"
-                    disabled={isPending}
+                    disabled={busyIds.has(selected.id)}
                     onClick={() => checkIn(selected, "group")}
                   >
                     <Users className="h-4 w-4" /> Check in whole group
@@ -366,7 +451,7 @@ export function CheckInPanel({
                     variant="secondary"
                     className="w-full"
                     size="lg"
-                    disabled={isPending}
+                    disabled={busyIds.has(selected.id)}
                     onClick={() => setPartialOpen(true)}
                   >
                     Partial party…
@@ -400,7 +485,7 @@ export function CheckInPanel({
                       </Button>
                       <Button
                         className="h-11 flex-1"
-                        disabled={isPending}
+                        disabled={busyIds.has(selected.id)}
                         onClick={() => checkIn(selected, "partial", partialCount)}
                       >
                         Confirm
@@ -416,10 +501,27 @@ export function CheckInPanel({
               <select
                 className="h-11 w-full rounded-xl border border-black/10 bg-white px-3 text-sm"
                 value={selected.table_id ?? ""}
+                disabled={busyIds.has(selected.id)}
                 onChange={(event) => {
                   const tableId = event.target.value || null;
-                  runAction("Table updated.", () =>
-                    assignGuestToTable({ guestId: selected.id, tableId }),
+                  const table = tables.find((item) => item.id === tableId) ?? null;
+                  runMutation(
+                    selected.id,
+                    "Table updated.",
+                    () =>
+                      setGuests((prev) =>
+                        prev.map((item) =>
+                          item.id === selected.id
+                            ? {
+                                ...item,
+                                table_id: tableId,
+                                seat_id: null,
+                                reception_tables: table,
+                              }
+                            : item,
+                        ),
+                      ),
+                    () => assignGuestToTable({ guestId: selected.id, tableId }),
                   );
                 }}
               >

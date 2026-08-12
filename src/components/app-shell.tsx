@@ -16,7 +16,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { hasMinRole, NAV_ITEMS } from "@/lib/permissions";
 import type { AppRole } from "@/types/wedding";
@@ -46,11 +46,39 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [, startNavTransition] = useTransition();
 
   const items = useMemo(
     () => NAV_ITEMS.filter((item) => hasMinRole(role, item.minRole)),
     [role],
   );
+
+  useEffect(() => {
+    setPendingHref(null);
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    for (const item of items) {
+      router.prefetch(item.href);
+    }
+  }, [items, router]);
+
+  const activePath = pendingHref ?? pathname;
+
+  function goTo(href: string) {
+    if (pathname.startsWith(href) && (href !== "/" || pathname === "/")) {
+      setPendingHref(null);
+      setOpen(false);
+      return;
+    }
+    setPendingHref(href);
+    setOpen(false);
+    startNavTransition(() => {
+      router.push(href);
+    });
+  }
 
   async function signOut() {
     const supabase = createClient();
@@ -73,13 +101,28 @@ export function AppShell({
           <nav className="space-y-1">
             {items.map((item) => {
               const Icon = ICONS[item.href];
-              const active = pathname.startsWith(item.href);
+              const active = activePath.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
+                  onClick={(event) => {
+                    if (
+                      event.defaultPrevented ||
+                      event.button !== 0 ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    goTo(item.href);
+                  }}
                   className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-[background-color,color,transform] duration-150",
                     active
                       ? "bg-[var(--primary)] text-white shadow"
                       : "text-[var(--foreground)]/75 hover:bg-black/5",
@@ -92,7 +135,7 @@ export function AppShell({
             })}
           </nav>
           <div className="mt-8 space-y-2 border-t border-black/8 pt-4">
-            <Link href="/reception">
+            <Link href="/reception" prefetch>
               <Button variant="gold" className="w-full justify-start" size="sm">
                 <MonitorPlay className="h-4 w-4" />
                 Reception Mode
@@ -125,10 +168,24 @@ export function AppShell({
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setOpen(false)}
+                    prefetch
+                    onClick={(event) => {
+                      if (
+                        event.defaultPrevented ||
+                        event.button !== 0 ||
+                        event.metaKey ||
+                        event.ctrlKey ||
+                        event.shiftKey ||
+                        event.altKey
+                      ) {
+                        return;
+                      }
+                      event.preventDefault();
+                      goTo(item.href);
+                    }}
                     className={cn(
-                      "rounded-xl px-3 py-2 text-sm font-medium",
-                      pathname.startsWith(item.href)
+                      "rounded-xl px-3 py-2 text-sm font-medium transition-[background-color,color] duration-150",
+                      activePath.startsWith(item.href)
                         ? "bg-[var(--primary)] text-white"
                         : "bg-black/5",
                     )}
@@ -140,18 +197,33 @@ export function AppShell({
             </div>
           ) : null}
 
-          <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+          <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6 lg:p-8">{children}</main>
 
           <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 gap-1 border-t border-black/10 bg-white/95 p-2 backdrop-blur md:hidden">
             {items.slice(0, 4).map((item) => {
               const Icon = ICONS[item.href];
-              const active = pathname.startsWith(item.href);
+              const active = activePath.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
+                  onClick={(event) => {
+                    if (
+                      event.defaultPrevented ||
+                      event.button !== 0 ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    goTo(item.href);
+                  }}
                   className={cn(
-                    "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold",
+                    "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition-[background-color,color,transform] duration-150 active:scale-95",
                     active ? "bg-[var(--primary)] text-white" : "text-black/60",
                   )}
                 >

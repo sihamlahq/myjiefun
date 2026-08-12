@@ -152,24 +152,13 @@ export async function loadWeddingData(): Promise<WeddingData> {
       settings.error?.message ||
       null;
 
-    const settingsMap: Partial<WeddingSettingsMap> = {};
-    for (const row of (settings.data ?? []) as SettingsRow[]) {
-      if (row.key === "wedding") settingsMap.wedding = row.value as WeddingSettings;
-      if (row.key === "theme") settingsMap.theme = row.value as ThemeSettings;
-      if (row.key === "guestSettings") settingsMap.guestSettings = row.value as GuestSettings;
-      if (row.key === "tableSettings") settingsMap.tableSettings = row.value as TableSettings;
-      if (row.key === "attendanceSettings") {
-        settingsMap.attendanceSettings = row.value as AttendanceSettings;
-      }
-    }
-
     return {
       guests: (guests.data ?? []) as GuestWithRelations[],
       tables: (tables.data ?? []) as ReceptionTable[],
       seats: (seats.data ?? []) as Seat[],
       groups: (groups.data ?? []) as GuestGroup[],
       checkInEvents: (checkInEvents.data ?? []) as CheckInEventWithGuest[],
-      settings: settingsMap,
+      settings: mapSettings((settings.data ?? []) as SettingsRow[]),
       setupError,
     };
   } catch (error) {
@@ -178,6 +167,64 @@ export async function loadWeddingData(): Promise<WeddingData> {
       setupError: error instanceof Error ? error.message : "Unable to load wedding data.",
     };
   }
+}
+
+/** Faster path for check-in / seating — skips seats, groups list, events, settings. */
+export async function loadGuestsAndTables(): Promise<{
+  guests: GuestWithRelations[];
+  tables: ReceptionTable[];
+  setupError: string | null;
+}> {
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try {
+    supabase = await createClient();
+  } catch (error) {
+    return {
+      guests: [],
+      tables: [],
+      setupError: error instanceof Error ? error.message : "Supabase is not configured.",
+    };
+  }
+
+  try {
+    const [guests, tables] = await Promise.all([
+      supabase
+        .from("guests")
+        .select("*, guest_groups(*), reception_tables(*)")
+        .order("name_en", { ascending: true }),
+      supabase
+        .from("reception_tables")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("table_number", { ascending: true }),
+    ]);
+
+    return {
+      guests: (guests.data ?? []) as GuestWithRelations[],
+      tables: (tables.data ?? []) as ReceptionTable[],
+      setupError: guests.error?.message || tables.error?.message || null,
+    };
+  } catch (error) {
+    return {
+      guests: [],
+      tables: [],
+      setupError: error instanceof Error ? error.message : "Unable to load wedding data.",
+    };
+  }
+}
+
+function mapSettings(rows: SettingsRow[]): Partial<WeddingSettingsMap> {
+  const settingsMap: Partial<WeddingSettingsMap> = {};
+  for (const row of rows) {
+    if (row.key === "wedding") settingsMap.wedding = row.value as WeddingSettings;
+    if (row.key === "theme") settingsMap.theme = row.value as ThemeSettings;
+    if (row.key === "guestSettings") settingsMap.guestSettings = row.value as GuestSettings;
+    if (row.key === "tableSettings") settingsMap.tableSettings = row.value as TableSettings;
+    if (row.key === "attendanceSettings") {
+      settingsMap.attendanceSettings = row.value as AttendanceSettings;
+    }
+  }
+  return settingsMap;
 }
 
 export function withDefaultSettings(settings: Partial<WeddingSettingsMap>): WeddingSettingsMap {

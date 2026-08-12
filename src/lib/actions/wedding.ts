@@ -407,7 +407,7 @@ export async function checkInGuest(opts: {
       .select("*");
     if (error) throw new Error(error.message);
 
-    await supabase.from("check_in_events").insert(
+    const eventInsert = supabase.from("check_in_events").insert(
       (members ?? []).map((m) => ({
         guest_id: m.id,
         event_type: "group",
@@ -415,13 +415,14 @@ export async function checkInGuest(opts: {
         staff_id: user.id,
       })),
     );
-    await writeAudit(supabase, {
+    const audit = writeAudit(supabase, {
       action: "check_in_group",
       entity_type: "guest_group",
       entity_id: guest.group_id,
       staff_id: user.id,
       meta: { count: members?.length ?? 0 },
     });
+    await Promise.all([eventInsert, audit]);
   } else {
     const { data, error } = await supabase
       .from("guests")
@@ -435,28 +436,27 @@ export async function checkInGuest(opts: {
       .single();
     if (error) throw new Error(error.message);
 
-    await supabase.from("check_in_events").insert({
-      guest_id: guest.id,
-      event_type: mode === "partial" ? "partial" : "check_in",
-      party_count: partyCount,
-      staff_id: user.id,
-    });
-    await writeAudit(supabase, {
-      action: mode === "partial" ? "check_in_partial" : "check_in",
-      entity_type: "guest",
-      entity_id: guest.id,
-      staff_id: user.id,
-      before_data: guest,
-      after_data: data,
-      meta: { partyCount },
-    });
+    await Promise.all([
+      supabase.from("check_in_events").insert({
+        guest_id: guest.id,
+        event_type: mode === "partial" ? "partial" : "check_in",
+        party_count: partyCount,
+        staff_id: user.id,
+      }),
+      writeAudit(supabase, {
+        action: mode === "partial" ? "check_in_partial" : "check_in",
+        entity_type: "guest",
+        entity_id: guest.id,
+        staff_id: user.id,
+        before_data: guest,
+        after_data: data,
+        meta: { partyCount },
+      }),
+    ]);
   }
 
+  // Current page only — other routes refresh via realtime / next visit.
   revalidatePath("/check-in");
-  revalidatePath("/dashboard");
-  revalidatePath("/seating");
-  revalidatePath("/floor-plan");
-  revalidatePath("/guests");
 }
 
 export async function undoCheckIn(guestId: string) {
@@ -474,25 +474,24 @@ export async function undoCheckIn(guestId: string) {
     .single();
   if (error) throw new Error(error.message);
 
-  await supabase.from("check_in_events").insert({
-    guest_id: guestId,
-    event_type: "undo",
-    party_count: 0,
-    staff_id: user.id,
-  });
-  await writeAudit(supabase, {
-    action: "check_in_undo",
-    entity_type: "guest",
-    entity_id: guestId,
-    staff_id: user.id,
-    before_data: before,
-    after_data: data,
-  });
+  await Promise.all([
+    supabase.from("check_in_events").insert({
+      guest_id: guestId,
+      event_type: "undo",
+      party_count: 0,
+      staff_id: user.id,
+    }),
+    writeAudit(supabase, {
+      action: "check_in_undo",
+      entity_type: "guest",
+      entity_id: guestId,
+      staff_id: user.id,
+      before_data: before,
+      after_data: data,
+    }),
+  ]);
 
   revalidatePath("/check-in");
-  revalidatePath("/dashboard");
-  revalidatePath("/seating");
-  revalidatePath("/floor-plan");
 }
 
 export async function assignGuestToTable(opts: {
@@ -503,27 +502,29 @@ export async function assignGuestToTable(opts: {
   const { supabase, user } = await requireUser();
 
   if (opts.tableId) {
-    const { data: settings } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "attendanceSettings")
-      .maybeSingle();
+    const [{ data: settings }, { data: table }, { count }] = await Promise.all([
+      supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "attendanceSettings")
+        .maybeSingle(),
+      supabase
+        .from("reception_tables")
+        .select("id, capacity")
+        .eq("id", opts.tableId)
+        .single(),
+      supabase
+        .from("guests")
+        .select("id", { count: "exact", head: true })
+        .eq("table_id", opts.tableId)
+        .neq("id", opts.guestId),
+    ]);
+
+    if (!table) throw new Error("Table not found");
+
     const allowOver =
       (settings?.value as { allowOvercapacity?: boolean } | null)?.allowOvercapacity ??
       false;
-
-    const { data: table } = await supabase
-      .from("reception_tables")
-      .select("id, capacity")
-      .eq("id", opts.tableId)
-      .single();
-    if (!table) throw new Error("Table not found");
-
-    const { count } = await supabase
-      .from("guests")
-      .select("id", { count: "exact", head: true })
-      .eq("table_id", opts.tableId)
-      .neq("id", opts.guestId);
 
     if (!allowOver && (count ?? 0) >= table.capacity) {
       throw new Error("Table is at capacity. Enable overcapacity in Settings or add a seat.");
@@ -532,16 +533,18 @@ export async function assignGuestToTable(opts: {
 
   let seatId = opts.seatId ?? null;
   if (opts.tableId && !seatId) {
-    const { data: seats } = await supabase
-      .from("seats")
-      .select("id, seat_number")
-      .eq("table_id", opts.tableId)
-      .order("seat_number");
-    const { data: taken } = await supabase
-      .from("guests")
-      .select("seat_id")
-      .eq("table_id", opts.tableId)
-      .not("seat_id", "is", null);
+    const [{ data: seats }, { data: taken }] = await Promise.all([
+      supabase
+        .from("seats")
+        .select("id, seat_number")
+        .eq("table_id", opts.tableId)
+        .order("seat_number"),
+      supabase
+        .from("guests")
+        .select("seat_id")
+        .eq("table_id", opts.tableId)
+        .not("seat_id", "is", null),
+    ]);
     const takenSet = new Set((taken ?? []).map((t) => t.seat_id));
     const free = (seats ?? []).find((s) => !takenSet.has(s.id));
     seatId = free?.id ?? null;
@@ -569,9 +572,7 @@ export async function assignGuestToTable(opts: {
   });
 
   revalidatePath("/seating");
-  revalidatePath("/floor-plan");
-  revalidatePath("/guests");
-  revalidatePath("/dashboard");
+  revalidatePath("/check-in");
   return data as Guest;
 }
 
@@ -733,7 +734,6 @@ export async function addSeatToTable(tableId: string) {
   });
   revalidatePath("/tables");
   revalidatePath("/seating");
-  revalidatePath("/floor-plan");
   return seat;
 }
 

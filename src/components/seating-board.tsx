@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addSeatToTable, assignGuestToTable } from "@/lib/actions/wedding";
+import { suppressRealtimeRefresh } from "@/lib/client-refresh";
 import { cn } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
@@ -36,19 +37,26 @@ function useDesktopDrag() {
 }
 
 export function SeatingBoard({
-  guests,
+  guests: serverGuests,
   tables,
 }: {
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
 }) {
-  const [isPending, startTransition] = useTransition();
+  const [guests, setGuests] = useState(serverGuests);
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [seatPending, setSeatPending] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   const desktopDrag = useDesktopDrag();
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
     }),
   );
+
+  useEffect(() => {
+    setGuests(serverGuests);
+  }, [serverGuests]);
 
   const guestsByTable = useMemo(() => {
     const map = new Map<string, GuestWithRelations[]>();
@@ -82,12 +90,36 @@ export function SeatingBoard({
       return;
     }
 
+    const snapshot = guests;
+    const table = tableId ? (tables.find((item) => item.id === tableId) ?? null) : null;
+    setGuests((prev) =>
+      prev.map((guest) =>
+        guest.id === guestId
+          ? {
+              ...guest,
+              table_id: tableId,
+              seat_id: null,
+              reception_tables: table,
+            }
+          : guest,
+      ),
+    );
+    toast.success(tableId ? "Guest assigned to table." : "Guest moved to unassigned.");
+    suppressRealtimeRefresh(1600);
+    setBusyIds((prev) => new Set(prev).add(guestId));
+
     startTransition(async () => {
       try {
         await assignGuestToTable({ guestId, tableId });
-        toast.success(tableId ? "Guest assigned to table." : "Guest moved to unassigned.");
       } catch (error) {
+        setGuests(snapshot);
         toast.error(error instanceof Error ? error.message : "Unable to assign guest.");
+      } finally {
+        setBusyIds((prev) => {
+          const next = new Set(prev);
+          next.delete(guestId);
+          return next;
+        });
       }
     });
   }
@@ -104,12 +136,16 @@ export function SeatingBoard({
   }
 
   function addSeat(table: ReceptionTable) {
+    suppressRealtimeRefresh(1600);
+    setSeatPending(table.id);
     startTransition(async () => {
       try {
         await addSeatToTable(table.id);
         toast.success(`Added a seat to ${table.table_number}.`);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to add seat.");
+      } finally {
+        setSeatPending(null);
       }
     });
   }
@@ -127,7 +163,7 @@ export function SeatingBoard({
           guests={unassigned}
           tables={activeTables}
           guestsByTable={guestsByTable}
-          pending={isPending}
+          busyIds={busyIds}
           desktopDrag={desktopDrag}
           onAssign={(guestId, tableId) => assignTable(guestId, tableId, null)}
         />
@@ -137,7 +173,7 @@ export function SeatingBoard({
             <p className="hidden text-sm text-[var(--foreground)]/60 lg:block">
               Desktop: drag guests, or use the table menu on each card.
             </p>
-            <Link href="/guests" className="ml-auto">
+            <Link href="/guests" className="ml-auto" prefetch>
               <Button variant="outline">
                 <UserPlus className="h-4 w-4" /> Add guest
               </Button>
@@ -154,7 +190,8 @@ export function SeatingBoard({
                   tables={activeTables}
                   guestsByTable={guestsByTable}
                   onAddSeat={() => addSeat(table)}
-                  pending={isPending}
+                  seatPending={seatPending === table.id}
+                  busyIds={busyIds}
                   desktopDrag={desktopDrag}
                   onAssign={(guestId, tableId) =>
                     assignTable(guestId, tableId, table.id)
@@ -195,7 +232,7 @@ function TableSelect({
     <label className="mt-2 block">
       <span className="sr-only">{placeholder}</span>
       <select
-        className="h-10 w-full rounded-xl border border-black/10 bg-[var(--background)] px-2.5 text-sm font-semibold text-[var(--foreground)]"
+        className="h-10 w-full rounded-xl border border-black/10 bg-[var(--background)] px-2.5 text-sm font-semibold text-[var(--foreground)] disabled:opacity-60"
         defaultValue=""
         disabled={pending || !tables.length}
         onPointerDown={(event) => event.stopPropagation()}
@@ -234,14 +271,14 @@ function UnassignedDrop({
   guests,
   tables,
   guestsByTable,
-  pending,
+  busyIds,
   desktopDrag,
   onAssign,
 }: {
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
   guestsByTable: Map<string, GuestWithRelations[]>;
-  pending: boolean;
+  busyIds: Set<string>;
   desktopDrag: boolean;
   onAssign: (guestId: string, tableId: string) => void;
 }) {
@@ -263,7 +300,7 @@ function UnassignedDrop({
                 guest={guest}
                 tables={tables}
                 guestsByTable={guestsByTable}
-                pending={pending}
+                pending={busyIds.has(guest.id)}
                 desktopDrag={desktopDrag}
                 placeholder="Assign to table…"
                 onAssign={(guestId, tableId) => {
@@ -290,7 +327,8 @@ function TableDrop({
   tables,
   guestsByTable,
   onAddSeat,
-  pending,
+  seatPending,
+  busyIds,
   desktopDrag,
   onAssign,
 }: {
@@ -300,7 +338,8 @@ function TableDrop({
   tables: ReceptionTable[];
   guestsByTable: Map<string, GuestWithRelations[]>;
   onAddSeat: () => void;
-  pending: boolean;
+  seatPending: boolean;
+  busyIds: Set<string>;
   desktopDrag: boolean;
   onAssign: (guestId: string, tableId: string | null) => void;
 }) {
@@ -366,7 +405,7 @@ function TableDrop({
                   guest={guest}
                   tables={tables}
                   guestsByTable={guestsByTable}
-                  pending={pending}
+                  pending={busyIds.has(guest.id)}
                   desktopDrag={desktopDrag}
                   currentTableId={table.id}
                   placeholder="Move to table…"
@@ -379,7 +418,7 @@ function TableDrop({
               </p>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={onAddSeat} disabled={pending}>
+          <Button size="sm" variant="outline" onClick={onAddSeat} disabled={seatPending}>
             <Plus className="h-3.5 w-3.5" /> Add seat
           </Button>
         </div>
