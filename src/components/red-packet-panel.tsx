@@ -1,6 +1,6 @@
 "use client";
 
-import { Gift, KeyRound, Lock, Search, X } from "lucide-react";
+import { Gift, KeyRound, Lock, Pencil, Search, X } from "lucide-react";
 import {
   FormEvent,
   useEffect,
@@ -48,6 +48,7 @@ export function RedPacketPanel({
   const [nextPin, setNextPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -69,11 +70,37 @@ export function RedPacketPanel({
   useEffect(() => {
     const next: Record<string, string> = {};
     for (const guest of guests) {
+      // Don't clobber an in-progress edit draft from server refresh.
+      if (editingIds.has(guest.id)) continue;
       const amount = getRedPacketAmount(guest);
       next[guest.id] = amount == null ? "" : String(amount);
     }
-    setDrafts(next);
-  }, [guests]);
+    if (Object.keys(next).length) {
+      setDrafts((current) => ({ ...current, ...next }));
+    }
+  }, [editingIds, guests]);
+
+  function startEdit(guest: GuestWithRelations) {
+    const amount = getRedPacketAmount(guest);
+    setDrafts((current) => ({
+      ...current,
+      [guest.id]: amount == null ? "" : String(amount),
+    }));
+    setEditingIds((current) => new Set(current).add(guest.id));
+  }
+
+  function cancelEdit(guest: GuestWithRelations) {
+    const amount = getRedPacketAmount(guest);
+    setDrafts((current) => ({
+      ...current,
+      [guest.id]: amount == null ? "" : String(amount),
+    }));
+    setEditingIds((current) => {
+      const next = new Set(current);
+      next.delete(guest.id);
+      return next;
+    });
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -188,6 +215,11 @@ export function RedPacketPanel({
     toast.success(
       amount == null ? `${guest.name_en} amount cleared.` : `${guest.name_en}: ${formatMoney(amount)}`,
     );
+    setEditingIds((current) => {
+      const next = new Set(current);
+      next.delete(guest.id);
+      return next;
+    });
     suppressRealtimeRefresh(1600);
     setBusyId(guest.id);
     startTransition(async () => {
@@ -195,6 +227,7 @@ export function RedPacketPanel({
         await updateRedPacketAmount(guest.id, amount);
       } catch (error) {
         setGuests(snapshot);
+        setEditingIds((current) => new Set(current).add(guest.id));
         toast.error(error instanceof Error ? error.message : "Unable to save amount.");
       } finally {
         setBusyId(null);
@@ -348,7 +381,9 @@ export function RedPacketPanel({
             <ul className="space-y-2">
               {filtered.map((guest, index) => {
                 const busy = busyId === guest.id && isPending;
-                const marked = getRedPacketAmount(guest) != null;
+                const savedAmount = getRedPacketAmount(guest);
+                const marked = savedAmount != null;
+                const editing = editingIds.has(guest.id) || !marked;
                 const showMarkedDivider =
                   marked &&
                   (index === 0 || getRedPacketAmount(filtered[index - 1]) == null);
@@ -390,34 +425,63 @@ export function RedPacketPanel({
                             />
                           </p>
                         </div>
-                        <div className="flex w-full items-center gap-2 sm:w-auto">
-                          <Input
-                            inputMode="decimal"
-                            placeholder="Amount"
-                            className="h-11 w-full sm:w-32"
-                            value={drafts[guest.id] ?? ""}
-                            disabled={busy}
-                            onChange={(event) =>
-                              setDrafts((current) => ({
-                                ...current,
-                                [guest.id]: event.target.value.replace(/[^\d.]/g, ""),
-                              }))
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                event.preventDefault();
-                                saveAmount(guest);
+                        {editing ? (
+                          <div className="flex w-full items-center gap-2 sm:w-auto">
+                            <Input
+                              inputMode="decimal"
+                              placeholder="Amount"
+                              className="h-11 w-full sm:w-32"
+                              value={drafts[guest.id] ?? ""}
+                              disabled={busy}
+                              onChange={(event) =>
+                                setDrafts((current) => ({
+                                  ...current,
+                                  [guest.id]: event.target.value.replace(/[^\d.]/g, ""),
+                                }))
                               }
-                            }}
-                          />
-                          <Button
-                            className="h-11 shrink-0"
-                            disabled={busy}
-                            onClick={() => saveAmount(guest)}
-                          >
-                            Save
-                          </Button>
-                        </div>
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  saveAmount(guest);
+                                }
+                              }}
+                            />
+                            <Button
+                              className="h-11 shrink-0"
+                              disabled={busy}
+                              onClick={() => saveAmount(guest)}
+                            >
+                              Save
+                            </Button>
+                            {marked ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-11 shrink-0"
+                                disabled={busy}
+                                onClick={() => cancelEdit(guest)}
+                              >
+                                Cancel
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                            <p className="font-heading text-2xl font-semibold tabular-nums">
+                              {formatMoney(savedAmount!)}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-11 shrink-0"
+                              disabled={busy}
+                              onClick={() => startEdit(guest)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </li>
