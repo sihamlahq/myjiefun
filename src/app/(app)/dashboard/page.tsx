@@ -5,6 +5,12 @@ import { computeStats } from "@/lib/stats";
 import { formatPercent } from "@/lib/utils";
 import { loadWeddingData, withDefaultSettings } from "@/lib/wedding-data";
 
+function occupancyTone(rate: number) {
+  if (rate >= 1) return { bg: "bg-red-100/80", text: "text-red-800", label: "Full" };
+  if (rate >= 0.5) return { bg: "bg-orange-100/80", text: "text-orange-800", label: "Filling up" };
+  return { bg: "bg-emerald-100/80", text: "text-emerald-800", label: "Almost empty" };
+}
+
 export default async function DashboardPage() {
   const data = await loadWeddingData();
   const settings = withDefaultSettings(data.settings);
@@ -13,6 +19,7 @@ export default async function DashboardPage() {
   const attendanceRate = totalGuests ? stats.checkedIn / totalGuests : 0;
   const totalSeats = stats.occupiedSeats + stats.availableSeats;
   const occupancyRate = totalSeats ? stats.occupiedSeats / totalSeats : 0;
+  const occupancy = occupancyTone(occupancyRate);
   const recentArrivals = data.checkInEvents.filter((event) => event.event_type !== "undo").slice(0, 8);
 
   return (
@@ -43,7 +50,7 @@ export default async function DashboardPage() {
         <MetricCard label="VIPs" value={stats.vipGuests} detail={`${stats.unassignedGuests} total unassigned`} />
       </div>
 
-      <DashboardCharts stats={stats} guests={data.guests} />
+      <DashboardCharts stats={stats} guests={data.guests} tables={data.tables} />
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1fr_0.85fr]">
         <Card>
@@ -57,11 +64,12 @@ export default async function DashboardPage() {
                 {formatPercent(attendanceRate)}
               </p>
             </div>
-            <div className="rounded-2xl bg-[var(--muted)]/70 p-4">
+            <div className={`rounded-2xl p-4 ${occupancy.bg}`}>
               <p className="text-sm text-[var(--foreground)]/60">Occupancy</p>
-              <p className="font-heading mt-1 text-3xl font-semibold">
+              <p className={`font-heading mt-1 text-3xl font-semibold ${occupancy.text}`}>
                 {formatPercent(occupancyRate)}
               </p>
+              <p className={`mt-1 text-xs font-semibold ${occupancy.text}`}>{occupancy.label}</p>
             </div>
             <div className="rounded-2xl bg-[var(--muted)]/70 p-4">
               <p className="text-sm text-[var(--foreground)]/60">Confirmed, no table</p>
