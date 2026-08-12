@@ -243,6 +243,7 @@ export function ReceptionLiveBoard({
           table={selected.table as ReceptionTable}
           guests={selected.seated}
           onClose={() => setSelectedId(null)}
+          mode="simple"
         />
       ) : null}
     </>

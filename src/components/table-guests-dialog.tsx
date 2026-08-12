@@ -93,13 +93,16 @@ export function TableGuestsDialog({
   table,
   guests,
   onClose,
+  mode = "full",
 }: {
   table: TableLike;
   guests: GuestWithRelations[];
   onClose: () => void;
+  mode?: "full" | "simple";
 }) {
   const arrived = guests.filter((guest) => guest.attendance_status === "checked_in").length;
   const confirmed = guests.filter((guest) => guest.rsvp_status === "confirmed").length;
+  const simple = mode === "simple";
 
   return (
     <div
@@ -130,52 +133,69 @@ export function TableGuestsDialog({
         </div>
 
         <div className="flex flex-wrap gap-2 px-5 py-3">
-          <Badge className="capitalize">{table.table_type}</Badge>
           <Badge>
             {guests.length}/{table.capacity} seated
           </Badge>
           <Badge className="bg-emerald-100 text-emerald-900">{arrived} arrived</Badge>
-          <Badge className="bg-amber-100 text-amber-950">{confirmed} confirmed</Badge>
+          {!simple ? (
+            <>
+              <Badge className="capitalize">{table.table_type}</Badge>
+              <Badge className="bg-amber-100 text-amber-950">{confirmed} confirmed</Badge>
+            </>
+          ) : null}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
           {guests.length ? (
             <ol className="space-y-2">
-              {guests.map((guest, index) => (
-                <li
-                  key={guest.id}
-                  className="flex items-start gap-3 rounded-2xl border border-black/8 bg-white/85 px-3 py-3"
-                >
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--muted)] text-xs font-bold text-[var(--foreground)]/70">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold leading-tight">
-                      {guest.name_en}
-                      {guest.is_vip ? (
-                        <span className="ml-2 align-middle rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                          VIP
-                        </span>
+              {guests.map((guest, index) => {
+                const checkedIn = guest.attendance_status === "checked_in";
+                const detailLine = simple
+                  ? guest.name_zh?.trim() || "—"
+                  : [guest.name_zh, guest.phone, guest.guest_code].filter(Boolean).join(" · ") ||
+                    "—";
+                return (
+                  <li
+                    key={guest.id}
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl border px-3 py-3",
+                      checkedIn
+                        ? "border-emerald-200/80 bg-emerald-50/70"
+                        : "border-black/8 bg-white/85",
+                    )}
+                  >
+                    {!simple ? (
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--muted)] text-xs font-bold text-[var(--foreground)]/70">
+                        {index + 1}
+                      </span>
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold leading-tight">{guest.name_en || "—"}</p>
+                      <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/60">
+                        {detailLine}
+                      </p>
+                      {!simple ? (
+                        <p className="mt-1 text-xs font-medium capitalize text-[var(--foreground)]/65">
+                          RSVP {guest.rsvp_status}
+                          {guest.expected_count > 1 ? ` · party of ${guest.expected_count}` : ""}
+                          {guest.guest_groups?.name ? ` · ${guest.guest_groups.name}` : ""}
+                          {guest.is_vip ? " · VIP" : ""}
+                        </p>
                       ) : null}
-                    </p>
-                    <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
-                      {[guest.name_zh, guest.phone, guest.guest_code].filter(Boolean).join(" · ") ||
-                        "—"}
-                    </p>
-                    <p className="mt-1 text-xs font-medium capitalize text-[var(--foreground)]/65">
-                      RSVP {guest.rsvp_status}
-                      {guest.expected_count > 1 ? ` · party of ${guest.expected_count}` : ""}
-                      {guest.guest_groups?.name ? ` · ${guest.guest_groups.name}` : ""}
-                    </p>
-                  </div>
-                  {guest.attendance_status === "checked_in" ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      In
-                    </span>
-                  ) : null}
-                </li>
-              ))}
+                    </div>
+                    {checkedIn ? (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Checked in
+                      </span>
+                    ) : (
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-stone-200 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-stone-700">
+                        Waiting
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           ) : (
             <div className="rounded-2xl border border-dashed border-black/15 bg-white/60 px-4 py-10 text-center">
