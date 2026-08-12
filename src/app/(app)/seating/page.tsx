@@ -10,7 +10,7 @@ export default async function SeatingPage() {
       <PageHeader
         eyebrow="Seat every guest"
         title="Seating"
-        description="Drag guests between tables and the unassigned list. Changes save instantly through Supabase actions."
+        description="Assign unassigned guests with the table shortcut, or drag them onto table cards."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
       <SeatingBoard guests={data.guests} tables={data.tables} />

@@ -13,7 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/page-chrome";
 import { TableNumberButton } from "@/components/table-guests-dialog";
-import { tableSide, tableSideBadgeClass, tableSideCardClass, tableSideLabel, tableTypeLabel } from "@/lib/table-side";
+import {
+  tableSide,
+  tableSideBadgeClass,
+  tableSideCardClass,
+  tableSideLabel,
+  tableTypeLabel,
+} from "@/lib/table-side";
 
 const unassignedId = "drop:unassigned";
 
@@ -34,16 +40,20 @@ export function SeatingBoard({
     return map;
   }, [guests, tables]);
   const unassigned = guests.filter((guest) => !guest.table_id);
+  const activeTables = useMemo(
+    () =>
+      [...tables]
+        .filter((table) => table.status === "active")
+        .sort(
+          (a, b) =>
+            a.sort_order - b.sort_order || a.table_number.localeCompare(b.table_number),
+        ),
+    [tables],
+  );
 
-  function onDragEnd(event: DragEndEvent) {
-    const guestId = String(event.active.id).replace("guest:", "");
-    const guest = guests.find((item) => item.id === guestId);
-    const overId = event.over ? String(event.over.id) : "";
-    if (!guest || !overId) return;
-
-    const tableId = overId === unassignedId ? null : overId.replace("drop:table:", "");
-    if ((guest.table_id ?? null) === tableId) return;
-    if (guest.table_id && !confirm("Move this guest from their current table?")) return;
+  function assignTable(guestId: string, tableId: string | null, fromTableId?: string | null) {
+    if ((fromTableId ?? null) === tableId) return;
+    if (fromTableId && !confirm("Move this guest from their current table?")) return;
 
     startTransition(async () => {
       try {
@@ -53,6 +63,16 @@ export function SeatingBoard({
         toast.error(error instanceof Error ? error.message : "Unable to assign guest.");
       }
     });
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    const guestId = String(event.active.id).replace("guest:", "");
+    const guest = guests.find((item) => item.id === guestId);
+    const overId = event.over ? String(event.over.id) : "";
+    if (!guest || !overId) return;
+
+    const tableId = overId === unassignedId ? null : overId.replace("drop:table:", "");
+    assignTable(guestId, tableId, guest.table_id);
   }
 
   function addSeat(table: ReceptionTable) {
@@ -68,13 +88,21 @@ export function SeatingBoard({
 
   return (
     <DndContext onDragEnd={onDragEnd}>
-      <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <UnassignedDrop guests={unassigned} pending={isPending} />
+      <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+        <UnassignedDrop
+          guests={unassigned}
+          tables={activeTables}
+          guestsByTable={guestsByTable}
+          pending={isPending}
+          onAssign={(guestId, tableId) => assignTable(guestId, tableId, null)}
+        />
 
         <div className="space-y-4">
           <div className="flex flex-wrap justify-end gap-2">
             <Link href="/guests">
-              <Button variant="outline"><UserPlus className="h-4 w-4" /> Add guest</Button>
+              <Button variant="outline">
+                <UserPlus className="h-4 w-4" /> Add guest
+              </Button>
             </Link>
           </div>
           {tables.length ? (
@@ -91,7 +119,10 @@ export function SeatingBoard({
               ))}
             </div>
           ) : (
-            <EmptyState title="No tables to seat" description="Create tables first, then drag guests into their table cards." />
+            <EmptyState
+              title="No tables to seat"
+              description="Create tables first, then drag guests into their table cards."
+            />
           )}
         </div>
       </div>
@@ -101,25 +132,136 @@ export function SeatingBoard({
 
 function UnassignedDrop({
   guests,
+  tables,
+  guestsByTable,
   pending,
+  onAssign,
 }: {
   guests: GuestWithRelations[];
+  tables: ReceptionTable[];
+  guestsByTable: Map<string, GuestWithRelations[]>;
   pending: boolean;
+  onAssign: (guestId: string, tableId: string) => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: unassignedId });
   return (
     <Card className={cn("h-fit xl:sticky xl:top-6", isOver && "ring-2 ring-[var(--accent)]")}>
       <CardHeader>
         <CardTitle>Unassigned guests</CardTitle>
+        <p className="text-sm text-[var(--foreground)]/60">
+          Pick a table from the list, or drag onto a table card.
+        </p>
       </CardHeader>
       <CardContent>
         <div ref={setNodeRef} className="min-h-40 space-y-2">
-          {guests.length ? guests.map((guest) => <GuestChip key={guest.id} guest={guest} pending={pending} />) : (
-            <EmptyState title="All assigned" description="Drag guests here to remove a table assignment." />
+          {guests.length ? (
+            guests.map((guest) => (
+              <UnassignedGuestChip
+                key={guest.id}
+                guest={guest}
+                tables={tables}
+                guestsByTable={guestsByTable}
+                pending={pending}
+                onAssign={onAssign}
+              />
+            ))
+          ) : (
+            <EmptyState
+              title="All assigned"
+              description="Drag guests here to remove a table assignment."
+            />
           )}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function UnassignedGuestChip({
+  guest,
+  tables,
+  guestsByTable,
+  pending,
+  onAssign,
+}: {
+  guest: GuestWithRelations;
+  tables: ReceptionTable[];
+  guestsByTable: Map<string, GuestWithRelations[]>;
+  pending: boolean;
+  onAssign: (guestId: string, tableId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `guest:${guest.id}`,
+    disabled: pending,
+  });
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-xl border border-black/8 bg-white/85 px-3 py-2.5 text-sm shadow-sm",
+        isDragging && "opacity-60 shadow-xl",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          className="min-w-0 flex-1 cursor-grab touch-none text-left"
+          {...listeners}
+          {...attributes}
+        >
+          <p className="font-semibold leading-tight">{guest.name_en}</p>
+          <p className="mt-0.5 text-xs text-[var(--foreground)]/55">
+            {[guest.name_zh, guest.guest_groups?.name, `party ${guest.expected_count}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {guest.is_vip ? <Badge className="bg-[var(--accent)]">VIP</Badge> : null}
+          {guest.attendance_status === "checked_in" ? (
+            <CheckCircle2 className="h-4 w-4 text-green-700" />
+          ) : null}
+        </div>
+      </div>
+
+      <label className="mt-2 block">
+        <span className="sr-only">Assign {guest.name_en} to table</span>
+        <select
+          className="h-9 w-full rounded-lg border border-black/10 bg-[var(--background)] px-2 text-xs font-semibold text-[var(--foreground)]"
+          defaultValue=""
+          disabled={pending || !tables.length}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            const tableId = event.target.value;
+            if (!tableId) return;
+            onAssign(guest.id, tableId);
+            event.target.value = "";
+          }}
+        >
+          <option value="" disabled>
+            {tables.length ? "Assign to table…" : "No active tables"}
+          </option>
+          {tables.map((table) => {
+            const seated = guestsByTable.get(table.id)?.length ?? 0;
+            const side = tableSide(table);
+            const fullness = seated >= table.capacity ? "full" : `${seated}/${table.capacity}`;
+            return (
+              <option key={table.id} value={table.id}>
+                {table.table_number}
+                {side ? ` · ${side === "groom" ? "男方" : "女方"}` : ""}
+                {` · ${fullness}`}
+              </option>
+            );
+          })}
+        </select>
+      </label>
+    </div>
   );
 }
 
@@ -176,7 +318,9 @@ function TableDrop({
         <div ref={setNodeRef} className="min-h-44 space-y-3">
           <div>
             <div className="mb-1 flex justify-between text-xs text-[var(--foreground)]/60">
-              <span>{guests.length}/{table.capacity}</span>
+              <span>
+                {guests.length}/{table.capacity}
+              </span>
               <span>{table.status}</span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-[var(--muted)]">
@@ -187,7 +331,9 @@ function TableDrop({
             </div>
           </div>
           <div className="space-y-2">
-            {guests.map((guest) => <GuestChip key={guest.id} guest={guest} pending={pending} />)}
+            {guests.map((guest) => (
+              <GuestChip key={guest.id} guest={guest} pending={pending} />
+            ))}
           </div>
           <Button size="sm" variant="outline" onClick={onAddSeat} disabled={pending}>
             <Plus className="h-3.5 w-3.5" /> Add seat
@@ -232,7 +378,9 @@ function GuestChip({
       </div>
       <div className="flex items-center gap-1">
         {guest.is_vip ? <Badge className="bg-[var(--accent)]">VIP</Badge> : null}
-        {guest.attendance_status === "checked_in" ? <CheckCircle2 className="h-4 w-4 text-green-700" /> : null}
+        {guest.attendance_status === "checked_in" ? (
+          <CheckCircle2 className="h-4 w-4 text-green-700" />
+        ) : null}
       </div>
     </div>
   );
