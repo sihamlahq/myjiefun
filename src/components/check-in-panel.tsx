@@ -199,7 +199,6 @@ export function CheckInPanel({
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--primary)]/60" />
           <Input
-            autoFocus
             className="checkin-search h-14 rounded-2xl border-black/10 bg-white pl-12 pr-12 text-lg shadow-sm sm:text-xl"
             value={query}
             onChange={(event) => {
