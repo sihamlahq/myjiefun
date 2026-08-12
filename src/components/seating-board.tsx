@@ -2,7 +2,7 @@
 
 import { DndContext, type DragEndEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { CheckCircle2, GripVertical, Plus, UserPlus } from "lucide-react";
+import { CheckCircle2, GripVertical, Plus, Search, UserPlus, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/page-chrome";
 import { TableNumberButton } from "@/components/table-guests-dialog";
 import {
@@ -396,18 +397,6 @@ function TableDrop({
   });
   const occupancy = table.capacity ? guests.length / table.capacity : 0;
   const over = guests.length > table.capacity;
-  const addableGuests = useMemo(() => {
-    const unassigned = allGuests
-      .filter((guest) => !guest.table_id)
-      .sort((a, b) => a.name_en.localeCompare(b.name_en));
-    const elsewhere = allGuests
-      .filter((guest) => guest.table_id && guest.table_id !== table.id)
-      .sort((a, b) => a.name_en.localeCompare(b.name_en));
-    return { unassigned, elsewhere };
-  }, [allGuests, table.id]);
-  const addDisabled =
-    seatPending ||
-    (addableGuests.unassigned.length === 0 && addableGuests.elsewhere.length === 0);
 
   return (
     <Card
@@ -478,51 +467,13 @@ function TableDrop({
             )}
           </div>
 
-          <label className="block space-y-1.5">
-            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/55">
-              <UserPlus className="h-3.5 w-3.5" />
-              Add guest to this table
-            </span>
-            <select
-              className="h-11 w-full rounded-xl border border-black/10 bg-white px-2.5 text-sm font-semibold text-[var(--foreground)] disabled:opacity-60"
-              defaultValue=""
-              disabled={addDisabled}
-              onChange={(event) => {
-                const guestId = event.target.value;
-                if (!guestId) return;
-                onAddGuest(guestId);
-                event.target.value = "";
-              }}
-            >
-              <option value="" disabled>
-                {addDisabled ? "No guests available" : "Choose a guest…"}
-              </option>
-              {addableGuests.unassigned.length ? (
-                <optgroup label="Unassigned">
-                  {addableGuests.unassigned.map((guest) => (
-                    <option key={guest.id} value={guest.id} disabled={busyIds.has(guest.id)}>
-                      {guest.name_en}
-                      {guest.name_zh ? ` · ${guest.name_zh}` : ""}
-                      {guest.is_vip ? " · VIP" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-              {addableGuests.elsewhere.length ? (
-                <optgroup label="Seated elsewhere">
-                  {addableGuests.elsewhere.map((guest) => (
-                    <option key={guest.id} value={guest.id} disabled={busyIds.has(guest.id)}>
-                      {guest.name_en}
-                      {guest.name_zh ? ` · ${guest.name_zh}` : ""}
-                      {guest.reception_tables?.table_number
-                        ? ` · now ${guest.reception_tables.table_number}`
-                        : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-            </select>
-          </label>
+          <AddGuestPicker
+            tableId={table.id}
+            allGuests={allGuests}
+            busyIds={busyIds}
+            disabled={seatPending}
+            onAddGuest={onAddGuest}
+          />
 
           <Button size="sm" variant="outline" onClick={onAddSeat} disabled={seatPending}>
             <Plus className="h-3.5 w-3.5" /> Add seat
@@ -530,6 +481,167 @@ function TableDrop({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function AddGuestPicker({
+  tableId,
+  allGuests,
+  busyIds,
+  disabled,
+  onAddGuest,
+}: {
+  tableId: string;
+  allGuests: GuestWithRelations[];
+  busyIds: Set<string>;
+  disabled: boolean;
+  onAddGuest: (guestId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const addableGuests = useMemo(() => {
+    const unassigned = allGuests
+      .filter((guest) => !guest.table_id)
+      .sort((a, b) => a.name_en.localeCompare(b.name_en));
+    const elsewhere = allGuests
+      .filter((guest) => guest.table_id && guest.table_id !== tableId)
+      .sort((a, b) => a.name_en.localeCompare(b.name_en));
+    return { unassigned, elsewhere };
+  }, [allGuests, tableId]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const match = (guest: GuestWithRelations) => {
+      if (!q) return true;
+      return [guest.name_en, guest.name_zh, guest.nickname, guest.phone, guest.guest_code]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(q));
+    };
+    return {
+      unassigned: addableGuests.unassigned.filter(match).slice(0, 20),
+      elsewhere: addableGuests.elsewhere.filter(match).slice(0, 20),
+    };
+  }, [addableGuests, query]);
+
+  const totalAvailable =
+    addableGuests.unassigned.length + addableGuests.elsewhere.length;
+  const totalShown = filtered.unassigned.length + filtered.elsewhere.length;
+  const addDisabled = disabled || totalAvailable === 0;
+
+  function pickGuest(guestId: string) {
+    onAddGuest(guestId);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/55">
+        <UserPlus className="h-3.5 w-3.5" />
+        Add guest to this table
+      </span>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
+        <Input
+          value={query}
+          disabled={addDisabled}
+          placeholder={addDisabled ? "No guests available" : "Search guest name…"}
+          className="h-11 pl-9 pr-10"
+          aria-label="Search guest to add"
+          onFocus={() => setOpen(true)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+        />
+        {query ? (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/5"
+            onClick={() => {
+              setQuery("");
+              setOpen(true);
+            }}
+            aria-label="Clear guest search"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </div>
+
+      {open && !addDisabled ? (
+        <div className="max-h-56 overflow-y-auto rounded-2xl border border-black/10 bg-white shadow-sm touch-scroll">
+          {totalShown ? (
+            <div className="py-1">
+              {filtered.unassigned.length ? (
+                <div>
+                  <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/45">
+                    Unassigned
+                  </p>
+                  {filtered.unassigned.map((guest) => (
+                    <button
+                      key={guest.id}
+                      type="button"
+                      disabled={busyIds.has(guest.id)}
+                      className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-black/5 disabled:opacity-50"
+                      onClick={() => pickGuest(guest.id)}
+                    >
+                      <span className="font-semibold leading-tight">
+                        {guest.name_en}
+                        {guest.is_vip ? " · VIP" : ""}
+                      </span>
+                      <span className="text-xs text-[var(--foreground)]/55">
+                        {[guest.name_zh, guest.phone].filter(Boolean).join(" · ") || guest.guest_code}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {filtered.elsewhere.length ? (
+                <div>
+                  <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/45">
+                    Seated elsewhere
+                  </p>
+                  {filtered.elsewhere.map((guest) => (
+                    <button
+                      key={guest.id}
+                      type="button"
+                      disabled={busyIds.has(guest.id)}
+                      className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-black/5 disabled:opacity-50"
+                      onClick={() => pickGuest(guest.id)}
+                    >
+                      <span className="font-semibold leading-tight">{guest.name_en}</span>
+                      <span className="text-xs text-[var(--foreground)]/55">
+                        {[
+                          guest.name_zh,
+                          guest.reception_tables?.table_number
+                            ? `now ${guest.reception_tables.table_number}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="px-3 py-4 text-center text-sm text-[var(--foreground)]/55">
+              No matching guests
+            </p>
+          )}
+          <button
+            type="button"
+            className="w-full border-t border-black/8 px-3 py-2 text-center text-xs font-semibold text-[var(--foreground)]/55 hover:bg-black/5"
+            onClick={() => setOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
