@@ -9,14 +9,19 @@ export function csvEscape(value: unknown) {
 }
 
 export function rowsToCsv(headers: string[], rows: unknown[][]) {
-  return [headers, ...rows]
-    .map((row) => row.map((cell) => csvEscape(cell)).join(","))
-    .join("\n");
+  // UTF-8 BOM so Excel opens Chinese characters correctly.
+  return (
+    "\uFEFF" +
+    [headers, ...rows]
+      .map((row) => row.map((cell) => csvEscape(cell)).join(","))
+      .join("\n")
+  );
 }
 
 /** Columns used for guest CSV/Excel upload / download template. */
 export const GUEST_UPLOAD_HEADERS = [
   "name",
+  "name_zh",
   "rsvp_status",
   "expected_count",
   "relationship",
@@ -59,6 +64,7 @@ function templateSampleRows(options?: GuestTemplateOptions) {
   return [
     [
       "Alex Tan",
+      "陈晓",
       rsvpStatuses.includes("confirmed") ? "confirmed" : rsvpStatuses[0],
       "2",
       relationships[0] ?? "",
@@ -66,6 +72,7 @@ function templateSampleRows(options?: GuestTemplateOptions) {
     ],
     [
       "Jordan Lim",
+      "林俊",
       rsvpStatuses.includes("pending") ? "pending" : rsvpStatuses[0],
       "1",
       relationships[1] ?? relationships[0] ?? "",
@@ -78,6 +85,7 @@ export function guestsToCsv(guests: GuestWithRelations[]) {
   const headers = [...GUEST_UPLOAD_HEADERS];
   const rows = guests.map((guest) => [
     guest.name_en,
+    guest.name_zh,
     guest.rsvp_status,
     guest.expected_count,
     guest.relationship,
@@ -98,7 +106,7 @@ function escapeXmlAttr(value: string) {
     .replaceAll(">", "&gt;");
 }
 
-/** Inject Excel list dropdowns for relationship (D) and category (E). */
+/** Inject Excel list dropdowns for relationship (E) and category (F). */
 function addGuestTemplateDropdowns(
   xlsxData: ArrayBuffer | Uint8Array | number[],
   categoryCount: number,
@@ -115,9 +123,9 @@ function addGuestTemplateDropdowns(
   const sheetXml = strFromU8(files[sheetPath]);
   const categoryEnd = Math.max(categoryCount + 1, 2);
   const relationshipEnd = Math.max(relationshipCount + 1, 2);
-  const validations = `<dataValidations count="2"><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="D2:D2000"><formula1>${escapeXmlAttr(
+  const validations = `<dataValidations count="2"><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="E2:E2000"><formula1>${escapeXmlAttr(
     `Lists!$B$2:$B$${relationshipEnd}`,
-  )}</formula1></dataValidation><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="E2:E2000"><formula1>${escapeXmlAttr(
+  )}</formula1></dataValidation><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="F2:F2000"><formula1>${escapeXmlAttr(
     `Lists!$A$2:$A$${categoryEnd}`,
   )}</formula1></dataValidation></dataValidations>`;
 
@@ -144,6 +152,7 @@ export function guestUploadTemplateXlsx(options?: GuestTemplateOptions): ArrayBu
   ]);
   guestsSheet["!cols"] = [
     { wch: 22 },
+    { wch: 14 },
     { wch: 14 },
     { wch: 14 },
     { wch: 18 },

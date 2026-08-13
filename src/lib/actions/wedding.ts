@@ -200,6 +200,7 @@ export async function importGuests(rows: GuestImportRow[]) {
     try {
       const payload = {
         name_en: name,
+        name_zh: (raw.name_zh || raw.chinese_name || raw.name_chinese || "").trim(),
         rsvp_status: normalizeRsvp(raw.rsvp_status || raw.rsvp),
         expected_count: Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1,
         relationship: raw.relationship ?? "",
@@ -225,7 +226,6 @@ export async function importGuests(rows: GuestImportRow[]) {
         const { error } = await supabase.from("guests").insert({
           ...payload,
           guest_code: guestCode,
-          name_zh: "",
           nickname: "",
           phone: "",
           email: "",

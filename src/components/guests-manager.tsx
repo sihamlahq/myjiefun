@@ -40,6 +40,34 @@ import { GuestTableLink } from "@/components/table-guests-dialog";
 
 const PAGE_SIZE = 15;
 
+function hasCjk(text: string) {
+  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(text);
+}
+
+function guestMatchesQuery(guest: GuestWithRelations, query: string) {
+  const q = query.trim();
+  if (!q) return true;
+  const fields = [
+    guest.name_en,
+    guest.name_zh,
+    guest.nickname,
+    guest.phone,
+    guest.email,
+    guest.category,
+    guest.guest_code,
+    guest.reception_tables?.table_number,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value));
+
+  if (hasCjk(q)) {
+    return fields.some((field) => field.includes(q));
+  }
+
+  const lower = q.toLowerCase();
+  return fields.some((field) => field.toLowerCase().includes(lower));
+}
+
 type GuestDraft = Pick<
   Guest,
   | "name_en"
@@ -197,7 +225,7 @@ export function GuestsManager({
   }, [recordMenuOpen]);
 
   const fuse = useMemo(() => {
-    if (!deferredQuery.trim()) return null;
+    if (!deferredQuery.trim() || hasCjk(deferredQuery)) return null;
     return new Fuse(guests, {
       keys: [
         "name_en",
@@ -214,9 +242,21 @@ export function GuestsManager({
   }, [deferredQuery, guests]);
 
   const filtered = useMemo(() => {
-    const searched = fuse
-      ? fuse.search(deferredQuery.trim()).map((result) => result.item)
-      : guests;
+    const query = deferredQuery.trim();
+    let searched = guests;
+    if (query) {
+      const exactMatches = guests.filter((guest) => guestMatchesQuery(guest, query));
+      if (fuse && !hasCjk(query)) {
+        const fuzzyIds = new Set(fuse.search(query).map((result) => result.item.id));
+        const seen = new Set(exactMatches.map((guest) => guest.id));
+        searched = [
+          ...exactMatches,
+          ...guests.filter((guest) => fuzzyIds.has(guest.id) && !seen.has(guest.id)),
+        ];
+      } else {
+        searched = exactMatches;
+      }
+    }
     return searched.filter((guest) => {
       if (rsvp !== "all" && guest.rsvp_status !== rsvp) return false;
       if (attendance !== "all" && guest.attendance_status !== attendance) return false;
@@ -477,7 +517,7 @@ export function GuestsManager({
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search name or phone…"
+              placeholder="Search English / Chinese name or phone…"
               className="pl-9"
             />
           </div>
@@ -652,6 +692,11 @@ export function GuestsManager({
                           <div className="flex items-start justify-between gap-2">
                             <p className="min-w-0 truncate text-lg font-semibold leading-tight">
                               {guest.name_en}
+                              {guest.name_zh?.trim() ? (
+                                <span className="ml-2 font-medium text-[var(--foreground)]/75">
+                                  {guest.name_zh.trim()}
+                                </span>
+                              ) : null}
                               {guest.is_vip ? (
                                 <span className="ml-2 align-middle rounded bg-[var(--accent)]/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
                                   VIP
@@ -755,8 +800,22 @@ export function GuestsManager({
               <Button type="button" variant="ghost" onClick={() => setDraft(null)}>Close</Button>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="English name"><Input required value={draft.name_en} onChange={(event) => updateDraft("name_en", event.target.value)} /></Field>
-              <Field label="Chinese name"><Input value={draft.name_zh} onChange={(event) => updateDraft("name_zh", event.target.value)} /></Field>
+              <Field label="Name (English or Chinese)">
+                <Input
+                  required
+                  value={draft.name_en}
+                  onChange={(event) => updateDraft("name_en", event.target.value)}
+                  placeholder="Alex Tan / 陈晓"
+                />
+              </Field>
+              <Field label="Chinese name">
+                <Input
+                  value={draft.name_zh}
+                  onChange={(event) => updateDraft("name_zh", event.target.value)}
+                  placeholder="中文姓名"
+                  lang="zh-Hans"
+                />
+              </Field>
               <Field label="Nickname"><Input value={draft.nickname} onChange={(event) => updateDraft("nickname", event.target.value)} /></Field>
               <Field label="Phone"><Input value={draft.phone} onChange={(event) => updateDraft("phone", event.target.value)} /></Field>
               <Field label="Email"><Input type="email" value={draft.email} onChange={(event) => updateDraft("email", event.target.value)} /></Field>

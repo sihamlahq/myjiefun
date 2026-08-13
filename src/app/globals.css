@@ -10,8 +10,8 @@
   --muted: #efe8dc;
   --danger: #9b2c2c;
   --radius: 0.75rem;
-  --font-heading: "Cormorant Garamond", Georgia, serif;
-  --font-body: "Source Sans 3", system-ui, sans-serif;
+  --font-heading: "Cormorant Garamond", "Noto Serif SC", "Songti SC", "PingFang SC", Georgia, serif;
+  --font-body: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
