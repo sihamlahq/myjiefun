@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { repairMojibakeText } from "@/lib/text-encoding";
 import type {
   AttendanceStatus,
   Guest,
@@ -44,9 +45,9 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
   const { supabase, user } = await requireUser();
   const expectedCount = Number(input.expected_count);
   const row: Record<string, unknown> = {
-    name_en: input.name_en.trim(),
-    name_zh: input.name_zh ?? "",
-    nickname: input.nickname ?? "",
+    name_en: repairMojibakeText(input.name_en.trim()),
+    name_zh: repairMojibakeText(input.name_zh ?? ""),
+    nickname: repairMojibakeText(input.nickname ?? ""),
     phone: input.phone ?? "",
     email: input.email ?? "",
     group_id: input.group_id || null,
@@ -111,6 +112,59 @@ export async function upsertGuest(input: Partial<Guest> & { name_en: string }) {
   });
   revalidatePath("/guests");
   return data as Guest;
+}
+
+/** Repair Chinese names that were stored with the wrong encoding (mojibake). */
+export async function repairGuestChineseNames() {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("guests")
+    .select("id, name_en, name_zh, nickname");
+  if (error) throw new Error(error.message);
+
+  let fixed = 0;
+  const stillBroken: string[] = [];
+
+  for (const guest of data ?? []) {
+    const name_en = repairMojibakeText(guest.name_en ?? "");
+    const name_zh = repairMojibakeText(guest.name_zh ?? "");
+    const nickname = repairMojibakeText(guest.nickname ?? "");
+    const changed =
+      name_en !== (guest.name_en ?? "") ||
+      name_zh !== (guest.name_zh ?? "") ||
+      nickname !== (guest.nickname ?? "");
+
+    if (
+      (name_en.includes("\uFFFD") || name_zh.includes("\uFFFD") || nickname.includes("\uFFFD")) &&
+      !changed
+    ) {
+      stillBroken.push(name_en || name_zh || guest.id);
+    }
+
+    if (!changed) continue;
+
+    const { error: updateError } = await supabase
+      .from("guests")
+      .update({ name_en, name_zh, nickname })
+      .eq("id", guest.id);
+    if (updateError) throw new Error(updateError.message);
+    fixed += 1;
+  }
+
+  if (fixed) {
+    await writeAudit(supabase, {
+      action: "guest_chinese_name_repair",
+      entity_type: "guest",
+      staff_id: user.id,
+      meta: { fixed, stillBroken: stillBroken.length },
+    });
+    revalidatePath("/guests");
+    revalidatePath("/check-in");
+    revalidatePath("/seating");
+    revalidatePath("/red-packet");
+  }
+
+  return { fixed, stillBroken: stillBroken.length };
 }
 
 const RSVP_VALUES = new Set(["pending", "confirmed", "declined", "maybe"]);
@@ -199,8 +253,10 @@ export async function importGuests(rows: GuestImportRow[]) {
 
     try {
       const payload = {
-        name_en: name,
-        name_zh: (raw.name_zh || raw.chinese_name || raw.name_chinese || "").trim(),
+        name_en: repairMojibakeText(name),
+        name_zh: repairMojibakeText(
+          (raw.name_zh || raw.chinese_name || raw.name_chinese || "").trim(),
+        ),
         rsvp_status: normalizeRsvp(raw.rsvp_status || raw.rsvp),
         expected_count: Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1,
         relationship: raw.relationship ?? "",

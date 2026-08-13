@@ -1,5 +1,6 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import * as XLSX from "xlsx";
+import { decodeImportBytes, repairMojibakeText } from "@/lib/text-encoding";
 import type { GuestWithRelations } from "@/types/wedding";
 
 export function csvEscape(value: unknown) {
@@ -264,8 +265,15 @@ export function sheetMatrixToObjects(matrix: unknown[][]) {
     .filter((row) => Object.values(row).some((value) => value !== ""));
 }
 
-export function excelArrayBufferToObjects(buffer: ArrayBuffer) {
-  const book = XLSX.read(buffer, { type: "array", cellDates: true });
+export function excelArrayBufferToObjects(buffer: ArrayBuffer, fileName = "") {
+  const lower = fileName.toLowerCase();
+  const isLegacyExcel = lower.endsWith(".xls") && !lower.endsWith(".xlsx") && !lower.endsWith(".xlsm");
+  const book = XLSX.read(buffer, {
+    type: "array",
+    cellDates: true,
+    // Chinese .xls files are often code page 936 (GBK).
+    ...(isLegacyExcel ? { codepage: 936 } : {}),
+  });
   // Prefer Guests sheet when template includes Lists
   const sheetName =
     book.SheetNames.find((name) => name.toLowerCase() === "guests") ?? book.SheetNames[0];
@@ -277,7 +285,13 @@ export function excelArrayBufferToObjects(buffer: ArrayBuffer) {
     blankrows: false,
     raw: false,
   }) as unknown[][];
-  return sheetMatrixToObjects(matrix);
+  return sheetMatrixToObjects(matrix).map((row) => {
+    const next: Record<string, string> = {};
+    for (const [key, value] of Object.entries(row)) {
+      next[key] = repairMojibakeText(value);
+    }
+    return next;
+  });
 }
 
 export async function fileToGuestImportRows(file: File) {
@@ -292,9 +306,16 @@ export async function fileToGuestImportRows(file: File) {
 
   if (isExcel) {
     const buffer = await file.arrayBuffer();
-    return excelArrayBufferToObjects(buffer);
+    return excelArrayBufferToObjects(buffer, file.name);
   }
 
-  const text = await file.text();
-  return csvToObjects(text);
+  const buffer = await file.arrayBuffer();
+  const text = decodeImportBytes(buffer);
+  return csvToObjects(text).map((row) => {
+    const next: Record<string, string> = {};
+    for (const [key, value] of Object.entries(row)) {
+      next[key] = repairMojibakeText(value);
+    }
+    return next;
+  });
 }

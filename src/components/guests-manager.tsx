@@ -14,9 +14,10 @@ import {
   useTransition,
 } from "react";
 import { toast } from "sonner";
-import { deleteGuest, importGuests, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
+import { deleteGuest, importGuests, repairGuestChineseNames, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
 import { suppressRealtimeRefresh } from "@/lib/client-refresh";
 import { getRedPacketAmount } from "@/lib/red-packet";
+import { repairGuestNameFields, repairMojibakeText } from "@/lib/text-encoding";
 import {
   fileToGuestImportRows,
   guestUploadTemplateCsv,
@@ -179,7 +180,7 @@ export function GuestsManager({
   dietaryCategories?: string[];
 }) {
   const router = useRouter();
-  const [guests, setGuests] = useState(serverGuests);
+  const [guests, setGuests] = useState(() => serverGuests.map((guest) => repairGuestNameFields(guest)));
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [rsvp, setRsvp] = useState("all");
@@ -199,7 +200,7 @@ export function GuestsManager({
   const recordMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setGuests(serverGuests);
+    setGuests(serverGuests.map((guest) => repairGuestNameFields(guest)));
   }, [serverGuests]);
 
   useEffect(() => {
@@ -344,6 +345,9 @@ export function GuestsManager({
       try {
         const saved = await upsertGuest({
           ...draft,
+          name_en: repairMojibakeText(draft.name_en),
+          name_zh: repairMojibakeText(draft.name_zh),
+          nickname: repairMojibakeText(draft.nickname),
           guest_code: draft.guest_code.trim() || undefined,
           group_id: draft.group_id || null,
           table_id: nextTableId,
@@ -474,6 +478,41 @@ export function GuestsManager({
     });
   }
 
+  const brokenChineseCount = useMemo(
+    () =>
+      guests.filter(
+        (guest) =>
+          guest.name_en?.includes("\uFFFD") ||
+          guest.name_zh?.includes("\uFFFD") ||
+          guest.nickname?.includes("\uFFFD") ||
+          (/[À-ÿ]/.test(guest.name_zh || guest.name_en || "") &&
+            !hasCjk(guest.name_zh || "") &&
+            !hasCjk(guest.name_en || "")),
+      ).length,
+    [guests],
+  );
+
+  function fixChineseNames() {
+    startTransition(async () => {
+      try {
+        const result = await repairGuestChineseNames();
+        if (result.fixed) {
+          toast.success(`Restored Chinese text for ${result.fixed} guest(s).`);
+        } else {
+          toast.message("No repairable Chinese names found.");
+        }
+        if (result.stillBroken) {
+          toast.error(
+            `${result.stillBroken} name(s) still show � — re-import those guests with an Excel (.xlsx) file.`,
+          );
+        }
+        router.refresh();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to repair Chinese names.");
+      }
+    });
+  }
+
   function exportCsv() {
     const rows = selectedGuests.length ? selectedGuests : filtered;
     download(`myjiefun-guests-${new Date().toISOString().slice(0, 10)}.csv`, guestsToCsv(rows));
@@ -553,6 +592,18 @@ export function GuestsManager({
           <p className="font-heading text-2xl font-semibold text-emerald-950">{confirmedCount}</p>
         </div>
       </div>
+
+      {brokenChineseCount > 0 ? (
+        <div className="flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            {brokenChineseCount} guest name(s) look like broken Chinese encoding (�). Prefer importing with{" "}
+            <span className="font-semibold">Excel (.xlsx)</span>.
+          </p>
+          <Button type="button" size="sm" variant="outline" disabled={isPending} onClick={fixChineseNames}>
+            Fix Chinese names
+          </Button>
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(120px,auto))]">
@@ -680,6 +731,18 @@ export function GuestsManager({
                   }}
                 >
                   <Download className="h-4 w-4" /> Export CSV
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-medium hover:bg-black/5 disabled:opacity-50"
+                  disabled={isPending}
+                  onClick={() => {
+                    setRecordMenuOpen(false);
+                    fixChineseNames();
+                  }}
+                >
+                  Fix Chinese names
                 </button>
               </div>
             ) : null}
