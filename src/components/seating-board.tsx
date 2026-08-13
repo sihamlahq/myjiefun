@@ -160,7 +160,7 @@ export function SeatingBoard({
         </p>
       </div>
 
-      <div className="mt-4 grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
         <UnassignedDrop
           guests={unassigned}
           tables={activeTables}
@@ -182,7 +182,7 @@ export function SeatingBoard({
             </Link>
           </div>
           {tables.length ? (
-            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {tables.map((table) => (
                 <TableDrop
                   key={table.id}
