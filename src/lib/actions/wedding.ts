@@ -751,6 +751,36 @@ export async function updateTablePosition(id: string, pos_x: number, pos_y: numb
   revalidatePath("/floor-plan");
 }
 
+export async function updateTablePositions(
+  positions: { id: string; pos_x: number; pos_y: number }[],
+) {
+  const { supabase } = await requireUser();
+  if (!Array.isArray(positions) || positions.length === 0) {
+    return { updated: 0 };
+  }
+  if (positions.length > 500) {
+    throw new Error("Too many table positions to save at once.");
+  }
+
+  const results = await Promise.all(
+    positions.map(async ({ id, pos_x, pos_y }) => {
+      const x = Math.max(0, Math.round(pos_x));
+      const y = Math.max(0, Math.round(pos_y));
+      const { error } = await supabase
+        .from("reception_tables")
+        .update({ pos_x: x, pos_y: y })
+        .eq("id", id);
+      if (error) throw new Error(error.message);
+      return id;
+    }),
+  );
+
+  revalidatePath("/floor-plan");
+  revalidatePath("/tables");
+  revalidatePath("/seating");
+  return { updated: results.length };
+}
+
 export async function updateRedPacketAmount(guestId: string, amount: number | null) {
   const { supabase, user } = await requireUser();
   if (amount != null && (!Number.isFinite(amount) || amount < 0)) {

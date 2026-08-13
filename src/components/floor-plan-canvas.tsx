@@ -1,7 +1,13 @@
 "use client";
 
-import { DndContext, type DragEndEvent, useDraggable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
+import {
+  DndContext,
+  PointerSensor,
+  type DragEndEvent,
+  useDraggable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import {
   CheckCircle2,
   MapPin,
@@ -10,10 +16,11 @@ import {
   RotateCcw,
   List,
   LayoutGrid,
+  Save,
 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { updateTablePosition } from "@/lib/actions/wedding";
+import { updateTablePositions } from "@/lib/actions/wedding";
 import { cn } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
@@ -23,6 +30,22 @@ import { TableNumberButton } from "@/components/table-guests-dialog";
 import { tableSide, tableSideMarkerClass, tableTypeLabel } from "@/lib/table-side";
 
 const TABLE_SIZE = 112;
+
+type PositionMap = Record<string, { x: number; y: number }>;
+
+function positionsFromTables(tables: ReceptionTable[]): PositionMap {
+  return Object.fromEntries(tables.map((table) => [table.id, { x: table.pos_x, y: table.pos_y }]));
+}
+
+function positionsEqual(a: PositionMap, b: PositionMap) {
+  const ids = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const id of ids) {
+    if ((a[id]?.x ?? 0) !== (b[id]?.x ?? 0) || (a[id]?.y ?? 0) !== (b[id]?.y ?? 0)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export function FloorPlanCanvas({
   tables,
@@ -36,8 +59,28 @@ export function FloorPlanCanvas({
   );
   const [zoom, setZoom] = useState(1);
   const [mobileView, setMobileView] = useState<"map" | "list">("map");
-  const [editLayout, setEditLayout] = useState(false);
+  const [editLayout, setEditLayout] = useState(true);
+  const [positions, setPositions] = useState<PositionMap>(() => positionsFromTables(tables));
+  const [savedPositions, setSavedPositions] = useState<PositionMap>(() =>
+    positionsFromTables(tables),
+  );
   const [isPending, startTransition] = useTransition();
+  const dirty = !positionsEqual(positions, savedPositions);
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 },
+    }),
+  );
+
+  useEffect(() => {
+    const next = positionsFromTables(tables);
+    if (dirtyRef.current) return;
+    setPositions(next);
+    setSavedPositions(next);
+  }, [tables]);
 
   const guestsByTable = useMemo(() => {
     const map = new Map<string, GuestWithRelations[]>();
@@ -51,26 +94,62 @@ export function FloorPlanCanvas({
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? null;
 
   const canvasSize = useMemo(() => {
-    const maxX = tables.reduce((max, table) => Math.max(max, table.pos_x + TABLE_SIZE), 320);
-    const maxY = tables.reduce((max, table) => Math.max(max, table.pos_y + TABLE_SIZE), 320);
+    const maxX = tables.reduce((max, table) => {
+      const x = positions[table.id]?.x ?? table.pos_x;
+      return Math.max(max, x + TABLE_SIZE);
+    }, 320);
+    const maxY = tables.reduce((max, table) => {
+      const y = positions[table.id]?.y ?? table.pos_y;
+      return Math.max(max, y + TABLE_SIZE);
+    }, 320);
     return {
       width: Math.max(360, Math.ceil(maxX + 48)),
       height: Math.max(420, Math.ceil(maxY + 48)),
     };
-  }, [tables]);
+  }, [positions, tables]);
 
   function onDragEnd(event: DragEndEvent) {
     if (!editLayout) return;
     const table = tables.find((item) => `table:${item.id}` === event.active.id);
     if (!table) return;
-    const nextX = Math.max(0, Math.round(table.pos_x + event.delta.x / zoom));
-    const nextY = Math.max(0, Math.round(table.pos_y + event.delta.y / zoom));
+    if (event.delta.x === 0 && event.delta.y === 0) return;
+
+    const current = positions[table.id] ?? { x: table.pos_x, y: table.pos_y };
+    const nextX = Math.max(0, Math.round(current.x + event.delta.x / zoom));
+    const nextY = Math.max(0, Math.round(current.y + event.delta.y / zoom));
+    setPositions((prev) => ({
+      ...prev,
+      [table.id]: { x: nextX, y: nextY },
+    }));
+  }
+
+  function discardLayout() {
+    setPositions(savedPositions);
+    toast.message("Layout changes discarded.");
+  }
+
+  function saveLayout() {
+    const changes = tables
+      .map((table) => {
+        const next = positions[table.id] ?? { x: table.pos_x, y: table.pos_y };
+        const saved = savedPositions[table.id] ?? { x: table.pos_x, y: table.pos_y };
+        if (next.x === saved.x && next.y === saved.y) return null;
+        return { id: table.id, pos_x: next.x, pos_y: next.y };
+      })
+      .filter((item): item is { id: string; pos_x: number; pos_y: number } => item != null);
+
+    if (!changes.length) {
+      toast.message("No layout changes to save.");
+      return;
+    }
+
     startTransition(async () => {
       try {
-        await updateTablePosition(table.id, nextX, nextY);
-        toast.success(`${table.table_number} position saved.`);
+        await updateTablePositions(changes);
+        setSavedPositions(positions);
+        toast.success(`Saved ${changes.length} table position${changes.length === 1 ? "" : "s"}.`);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Unable to save position.");
+        toast.error(error instanceof Error ? error.message : "Unable to save layout.");
       }
     });
   }
@@ -156,19 +235,48 @@ export function FloorPlanCanvas({
           variant={editLayout ? "gold" : "outline"}
           onClick={() => setEditLayout((value) => !value)}
         >
-          {editLayout ? "Editing layout" : "Move tables"}
+          {editLayout ? "Moving tables" : "Move tables"}
         </Button>
+
+        {editLayout || dirty ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!dirty || isPending}
+              onClick={discardLayout}
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!dirty || isPending}
+              onClick={saveLayout}
+            >
+              <Save className="h-4 w-4" />
+              {isPending ? "Saving…" : "Save layout"}
+            </Button>
+          </>
+        ) : null}
       </div>
 
       {editLayout ? (
         <p className="rounded-xl bg-[var(--muted)]/80 px-3 py-2 text-sm text-[var(--foreground)]/70">
-          Layout edit is on. Drag tables to reposition. Turn this off on phones when you only need to check occupancy.
+          Drag tables to rearrange. Changes stay on this screen until you press{" "}
+          <span className="font-semibold">Save layout</span>.
+          {dirty ? " Unsaved changes." : ""}
+        </p>
+      ) : dirty ? (
+        <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          You have unsaved table positions. Save layout before leaving this page.
         </p>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className={cn(mobileView === "list" && "hidden md:block")}>
-          <DndContext onDragEnd={onDragEnd}>
+          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <div className="relative overflow-auto rounded-3xl border border-[var(--primary)]/15 bg-[linear-gradient(135deg,rgba(255,255,255,.78),rgba(239,232,220,.72))] shadow-inner touch-pan-x touch-pan-y overscroll-contain">
               <div className="sticky left-0 top-0 z-10 flex justify-center p-3">
                 <div className="rounded-full border border-[var(--accent)]/30 bg-white/90 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--primary)] shadow-sm sm:text-sm">
@@ -193,22 +301,28 @@ export function FloorPlanCanvas({
                   }}
                 >
                   <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(139,115,85,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(139,115,85,.12)_1px,transparent_1px)] [background-size:48px_48px]" />
-                  {tables.map((table) => (
-                    <DraggableTable
-                      key={table.id}
-                      table={table}
-                      guests={guestsByTable.get(table.id) ?? []}
-                      selected={table.id === selectedTableId}
-                      onSelect={() => {
-                        setSelectedTableId(table.id);
-                        if (window.matchMedia("(max-width: 767px)").matches) {
-                          setMobileView("list");
-                        }
-                      }}
-                      disabled={isPending || !editLayout}
-                      draggable={editLayout}
-                    />
-                  ))}
+                  {tables.map((table) => {
+                    const pos = positions[table.id] ?? { x: table.pos_x, y: table.pos_y };
+                    return (
+                      <DraggableTable
+                        key={table.id}
+                        table={table}
+                        posX={pos.x}
+                        posY={pos.y}
+                        zoom={zoom}
+                        guests={guestsByTable.get(table.id) ?? []}
+                        selected={table.id === selectedTableId}
+                        onSelect={() => {
+                          setSelectedTableId(table.id);
+                          if (window.matchMedia("(max-width: 767px)").matches) {
+                            setMobileView("list");
+                          }
+                        }}
+                        disabled={!editLayout}
+                        draggable={editLayout}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -261,7 +375,6 @@ export function FloorPlanCanvas({
         </div>
       </div>
 
-      {/* Mobile bottom sheet when a table is selected while viewing the map */}
       {selectedTable && mobileView === "map" ? (
         <div className="mobile-sheet-above-nav fixed inset-x-0 z-40 px-3 md:hidden">
           <Card className="max-h-[min(42vh,calc(100dvh-var(--mobile-nav-offset)-1rem))] overflow-auto border-[var(--accent)]/40 shadow-2xl touch-scroll">
@@ -331,6 +444,9 @@ function TableDetails({
 
 function DraggableTable({
   table,
+  posX,
+  posY,
+  zoom,
   guests,
   selected,
   onSelect,
@@ -338,6 +454,9 @@ function DraggableTable({
   draggable,
 }: {
   table: ReceptionTable;
+  posX: number;
+  posY: number;
+  zoom: number;
   guests: GuestWithRelations[];
   selected: boolean;
   onSelect: () => void;
@@ -350,12 +469,16 @@ function DraggableTable({
   });
   const state = occupancyState(table, guests);
   const style = {
-    left: table.pos_x,
-    top: table.pos_y,
+    left: posX,
+    top: posY,
     width: TABLE_SIZE,
     height: TABLE_SIZE,
-    transform: CSS.Translate.toString(transform),
+    // Pointer deltas are in screen px; positions live in pre-scale canvas coords.
+    transform: transform
+      ? `translate3d(${transform.x / zoom}px, ${transform.y / zoom}px, 0)`
+      : undefined,
     touchAction: draggable ? "none" : "manipulation",
+    willChange: isDragging ? "transform" : undefined,
   };
 
   return (
@@ -367,10 +490,11 @@ function DraggableTable({
       {...(draggable ? listeners : {})}
       {...(draggable ? attributes : {})}
       className={cn(
-        "absolute grid place-items-center rounded-full border-4 text-center shadow-lg transition",
+        "absolute grid place-items-center rounded-full border-4 text-center shadow-lg",
         colorForState(state),
         selected && "ring-4 ring-[var(--accent)]/45",
-        isDragging && "z-20 scale-105 opacity-80",
+        isDragging ? "z-20 scale-105 cursor-grabbing opacity-90 shadow-2xl" : "cursor-grab",
+        draggable && "transition-shadow",
       )}
     >
       <span>
