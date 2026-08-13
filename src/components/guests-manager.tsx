@@ -332,19 +332,63 @@ export function GuestsManager({
 
     const existingGuest = draft.id ? guests.find((item) => item.id === draft.id) : null;
     customFields = restoreRedPacketInCustomFields(customFields, existingGuest);
+    const expectedCount = Number(draft.expected_count);
+    const partySize =
+      Number.isFinite(expectedCount) && expectedCount >= 0 ? expectedCount : 1;
+    const nextTableId = draft.table_id || null;
+    const nextTable = nextTableId
+      ? tables.find((item) => item.id === nextTableId) ?? existingGuest?.reception_tables ?? null
+      : null;
 
     startTransition(async () => {
       try {
-        await upsertGuest({
+        const saved = await upsertGuest({
           ...draft,
           guest_code: draft.guest_code.trim() || undefined,
           group_id: draft.group_id || null,
-          table_id: draft.table_id || null,
+          table_id: nextTableId,
           custom_fields: customFields,
-          expected_count: Number(draft.expected_count) || 1,
+          expected_count: partySize,
         });
+
+        setGuests((prev) => {
+          if (draft.id) {
+            return prev.map((item) =>
+              item.id === draft.id
+                ? {
+                    ...item,
+                    ...draft,
+                    id: draft.id,
+                    expected_count: partySize,
+                    table_id: nextTableId,
+                    group_id: draft.group_id || null,
+                    custom_fields: customFields,
+                    reception_tables: nextTable,
+                  }
+                : item,
+            );
+          }
+
+          const created = {
+            ...(existingGuest ?? ({} as GuestWithRelations)),
+            ...saved,
+            ...draft,
+            id: saved.id,
+            expected_count: partySize,
+            table_id: nextTableId,
+            group_id: draft.group_id || null,
+            custom_fields: customFields,
+            reception_tables: nextTable,
+            guest_groups: null,
+          } as GuestWithRelations;
+
+          return [created, ...prev];
+        });
+
         setDraft(null);
         toast.success("Guest saved.");
+        suppressRealtimeRefresh(1600);
+        router.refresh();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to save guest.");
       }
@@ -819,7 +863,19 @@ export function GuestsManager({
               <Field label="Nickname"><Input value={draft.nickname} onChange={(event) => updateDraft("nickname", event.target.value)} /></Field>
               <Field label="Phone"><Input value={draft.phone} onChange={(event) => updateDraft("phone", event.target.value)} /></Field>
               <Field label="Email"><Input type="email" value={draft.email} onChange={(event) => updateDraft("email", event.target.value)} /></Field>
-              <Field label="Expected count"><Input type="number" min={0} value={draft.expected_count} onChange={(event) => updateDraft("expected_count", Number(event.target.value))} /></Field>
+              <Field label="Party">
+                <Input
+                  type="number"
+                  min={0}
+                  value={draft.expected_count}
+                  onChange={(event) =>
+                    updateDraft(
+                      "expected_count",
+                      event.target.value === "" ? 0 : Number(event.target.value),
+                    )
+                  }
+                />
+              </Field>
               <Field label="RSVP"><Select value={draft.rsvp_status} onChange={(value) => updateDraft("rsvp_status", value as RsvpStatus)} options={rsvpOptions} /></Field>
               <Field label="Attendance"><Select value={draft.attendance_status} onChange={(value) => updateDraft("attendance_status", value as AttendanceStatus)} options={attendanceOptions} /></Field>
               <Field label="Table">
