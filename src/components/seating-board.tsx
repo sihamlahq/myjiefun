@@ -529,18 +529,18 @@ function AddGuestPicker({
   }
 
   return (
-    <div className="space-y-1.5">
-      <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/55">
-        <UserPlus className="h-3.5 w-3.5" />
-        Add guest to this table
+    <div className="space-y-1">
+      <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--foreground)]/55">
+        <UserPlus className="h-3 w-3" />
+        Add guest
       </span>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-black/40" />
         <Input
           value={query}
           disabled={addDisabled}
-          placeholder={addDisabled ? "No guests available" : "Search guest name…"}
-          className="h-11 pl-9 pr-10"
+          placeholder={addDisabled ? "No guests available" : "Search guest…"}
+          className="h-9 pl-8 pr-9 text-xs"
           aria-label="Search guest to add"
           onFocus={() => setOpen(true)}
           onChange={(event) => {
@@ -551,20 +551,20 @@ function AddGuestPicker({
         {query ? (
           <button
             type="button"
-            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/5"
+            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/5"
             onClick={() => {
               setQuery("");
               setOpen(true);
             }}
             aria-label="Clear guest search"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-3 w-3" />
           </button>
         ) : null}
       </div>
 
       {open && !addDisabled ? (
-        <div className="max-h-56 overflow-y-auto rounded-2xl border border-black/10 bg-white shadow-sm touch-scroll">
+        <div className="max-h-40 overflow-y-auto rounded-xl border border-black/10 bg-white shadow-sm touch-scroll">
           {totalShown ? (
             <div className="py-1">
               {filtered.unassigned.length ? (
