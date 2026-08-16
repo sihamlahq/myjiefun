@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { sumParty } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
@@ -100,8 +101,9 @@ export function TableGuestsDialog({
   onClose: () => void;
   mode?: "full" | "simple";
 }) {
-  const arrived = guests.filter((guest) => guest.attendance_status === "checked_in").length;
-  const confirmed = guests.filter((guest) => guest.rsvp_status === "confirmed").length;
+  const arrived = sumParty(guests, (guest) => guest.attendance_status === "checked_in");
+  const confirmed = sumParty(guests, (guest) => guest.rsvp_status === "confirmed");
+  const seatedCount = sumParty(guests);
   const simple = mode === "simple";
 
   return (
@@ -134,7 +136,7 @@ export function TableGuestsDialog({
 
         <div className="flex flex-wrap gap-2 px-5 py-3">
           <Badge>
-            {guests.length}/{table.capacity} seated
+            {seatedCount}/{table.capacity} seated
           </Badge>
           <Badge className="bg-emerald-100 text-emerald-900">{arrived} arrived</Badge>
           {!simple ? (

@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/page-chrome";
 import { cn, formatPercent } from "@/lib/utils";
+import { sumParty } from "@/lib/stats";
 import type { DashboardStats, GuestWithRelations, ReceptionTable } from "@/types/wedding";
 
 const COLORS = ["#8B7355", "#C9A66B", "#D4AF37", "#B98E5A", "#69513A"];
@@ -50,7 +51,7 @@ export function DashboardCharts({
   guests: GuestWithRelations[];
   tables: ReceptionTable[];
 }) {
-  const totalGuests = guests.length;
+  const totalGuests = stats.totalInvited || sumParty(guests);
   const attendanceRate = totalGuests ? stats.checkedIn / totalGuests : 0;
   const totalSeats = stats.occupiedSeats + stats.availableSeats;
   const occupancyRate = totalSeats ? stats.occupiedSeats / totalSeats : 0;
@@ -60,7 +61,7 @@ export function DashboardCharts({
       .filter((table) => table.status === "active")
       .sort((a, b) => a.sort_order - b.sort_order || a.table_number.localeCompare(b.table_number))
       .map((table) => {
-        const seated = guests.filter((guest) => guest.table_id === table.id).length;
+        const seated = sumParty(guests, (guest) => guest.table_id === table.id);
         const level = occupancyLevel(seated, table.capacity);
         return {
           id: table.id,
@@ -83,13 +84,16 @@ export function DashboardCharts({
 
   const rsvpData = ["confirmed", "pending", "maybe", "declined"].map((status) => ({
     name: status,
-    value: guests.filter((guest) => guest.rsvp_status === status).length,
+    value: sumParty(guests, (guest) => guest.rsvp_status === status),
   }));
 
   const attendanceData = [
     { name: "Arrived", value: stats.checkedIn },
     { name: "Waiting", value: stats.notArrived },
-    { name: "No-shows", value: guests.filter((g) => g.attendance_status === "no_show").length },
+    {
+      name: "No-shows",
+      value: sumParty(guests, (g) => g.attendance_status === "no_show"),
+    },
   ];
 
   if (!totalGuests && !stats.totalTables) {

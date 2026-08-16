@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addSeatToTable, assignGuestToTable } from "@/lib/actions/wedding";
 import { suppressRealtimeRefresh } from "@/lib/client-refresh";
+import { sumParty } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
@@ -304,7 +305,7 @@ function UnassignedDrop({
         <CardTitle>Unassigned guests</CardTitle>
         <p className="text-sm text-[var(--foreground)]/60">
           {guests.length
-            ? `${guests.length} left · scroll to see all`
+            ? `${sumParty(guests)} people · ${guests.length} records · scroll to see all`
             : "Choose a table number below each name."}
         </p>
       </CardHeader>
@@ -369,8 +370,9 @@ function TableDrop({
     id: `drop:table:${table.id}`,
     disabled: !desktopDrag,
   });
-  const occupancy = table.capacity ? guests.length / table.capacity : 0;
-  const over = guests.length > table.capacity;
+  const occupancy = table.capacity ? sumParty(guests) / table.capacity : 0;
+  const over = sumParty(guests) > table.capacity;
+  const headcount = sumParty(guests);
 
   return (
     <Card
@@ -408,7 +410,7 @@ function TableDrop({
           <div>
             <div className="mb-1 flex justify-between text-xs text-[var(--foreground)]/60">
               <span>
-                {guests.length}/{table.capacity}
+                {headcount}/{table.capacity}
               </span>
               <span>{table.status}</span>
             </div>

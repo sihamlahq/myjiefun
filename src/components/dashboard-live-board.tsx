@@ -128,7 +128,7 @@ export function DashboardLiveBoard({
   }, [fetchSnapshot]);
 
   const stats = useMemo(() => computeStats(guests, tables), [guests, tables]);
-  const totalGuests = guests.length;
+  const totalGuests = stats.totalInvited;
   const attendanceRate = totalGuests ? stats.checkedIn / totalGuests : 0;
   const totalSeats = stats.occupiedSeats + stats.availableSeats;
   const occupancyRate = totalSeats ? stats.occupiedSeats / totalSeats : 0;
@@ -158,7 +158,7 @@ export function DashboardLiveBoard({
       </div>
 
       <div className="stat-grid my-6">
-        <MetricCard label="Invited" value={stats.totalInvited} detail="All guests on the list" />
+        <MetricCard label="Invited" value={stats.totalInvited} detail="Headcount by party size" />
         <MetricCard label="Confirmed" value={stats.confirmed} detail={`${stats.pendingRsvp} pending`} />
         <MetricCard
           label="Need seating"

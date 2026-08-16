@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { rowsToCsv } from "@/lib/csv";
+import { sumParty } from "@/lib/stats";
 import type { CheckInEventWithGuest } from "@/lib/wedding-data";
 import type { GuestGroup, GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
@@ -177,7 +178,7 @@ function buildRows(
 ): ReportRow[] {
   if (tab === "occupancy") {
     return tables.map((table) => {
-      const assigned = guests.filter((guest) => guest.table_id === table.id).length;
+      const assigned = sumParty(guests, (guest) => guest.table_id === table.id);
       return {
         table: table.table_number,
         name: table.name,
@@ -193,7 +194,8 @@ function buildRows(
   if (tab === "rsvp") {
     return ["confirmed", "pending", "maybe", "declined"].map((status) => ({
       status,
-      guests: guests.filter((guest) => guest.rsvp_status === status).length,
+      guests: sumParty(guests, (guest) => guest.rsvp_status === status),
+      records: guests.filter((guest) => guest.rsvp_status === status).length,
     }));
   }
 
@@ -202,10 +204,11 @@ function buildRows(
       const members = guests.filter((guest) => guest.group_id === group.id);
       return {
         group: group.name,
-        expected: group.expected_count ?? members.reduce((sum, guest) => sum + guest.expected_count, 0),
-        guests: members.length,
-        checked_in: members.filter((guest) => guest.attendance_status === "checked_in").length,
-        unassigned: members.filter((guest) => !guest.table_id).length,
+        expected: group.expected_count ?? sumParty(members),
+        guests: sumParty(members),
+        records: members.length,
+        checked_in: sumParty(members, (guest) => guest.attendance_status === "checked_in"),
+        unassigned: sumParty(members, (guest) => !guest.table_id),
       };
     });
   }

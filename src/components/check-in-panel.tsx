@@ -22,6 +22,7 @@ import {
   undoCheckIn,
 } from "@/lib/actions/wedding";
 import { suppressRealtimeRefresh } from "@/lib/client-refresh";
+import { sumParty } from "@/lib/stats";
 import type { GuestWithRelations, ReceptionTable } from "@/types/wedding";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -69,12 +70,13 @@ export function CheckInPanel({
   );
 
   const counts = useMemo(() => {
-    const arrived = guests.filter((g) => g.attendance_status === "checked_in").length;
+    const arrived = sumParty(guests, (g) => g.attendance_status === "checked_in");
+    const total = sumParty(guests);
     return {
-      total: guests.length,
+      total,
       arrived,
-      waiting: guests.length - arrived,
-      vip: guests.filter((g) => g.is_vip && g.attendance_status !== "checked_in").length,
+      waiting: Math.max(total - arrived, 0),
+      vip: sumParty(guests, (g) => g.is_vip && g.attendance_status !== "checked_in"),
     };
   }, [guests]);
 

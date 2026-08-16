@@ -1,6 +1,7 @@
 import { PageHeader, SetupCard } from "@/components/page-chrome";
 import { SettingsForm } from "@/components/settings-form";
 import { SettingsLogBook } from "@/components/settings-log-book";
+import { sumParty } from "@/lib/stats";
 import { loadAuditLogs, loadWeddingData, withDefaultSettings } from "@/lib/wedding-data";
 
 export default async function SettingsPage() {
@@ -16,7 +17,7 @@ export default async function SettingsPage() {
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
       <div className="space-y-5">
-        <SettingsForm settings={settings} guestCount={data.guests.length} />
+        <SettingsForm settings={settings} guestCount={sumParty(data.guests)} />
         {audit.setupError ? (
           <SetupCard message={audit.setupError} />
         ) : (

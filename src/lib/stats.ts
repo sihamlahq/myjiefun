@@ -1,5 +1,22 @@
 import type { DashboardStats, Guest, ReceptionTable } from "@/types/wedding";
 
+/** Headcount for one guest record (party size). */
+export function partyOf(guest: { expected_count?: number | null }) {
+  const count = Number(guest.expected_count);
+  return Number.isFinite(count) && count >= 0 ? count : 1;
+}
+
+/** Sum party sizes, optionally filtered. */
+export function sumParty<T extends { expected_count?: number | null }>(
+  guests: T[],
+  predicate?: (guest: T) => boolean,
+) {
+  return guests.reduce((sum, guest) => {
+    if (predicate && !predicate(guest)) return sum;
+    return sum + partyOf(guest);
+  }, 0);
+}
+
 export function computeStats(
   guests: Pick<
     Guest,
@@ -13,23 +30,24 @@ export function computeStats(
 ): DashboardStats {
   const activeTables = tables.filter((t) => t.status === "active");
   const totalCapacity = activeTables.reduce((sum, t) => sum + t.capacity, 0);
-  const assigned = guests.filter((g) => g.table_id).length;
   const isArrived = (status: Guest["attendance_status"]) =>
     status === "checked_in" || status === "walk_in";
+  const occupiedSeats = sumParty(guests, (g) => Boolean(g.table_id));
 
   return {
-    totalInvited: guests.length,
-    confirmed: guests.filter((g) => g.rsvp_status === "confirmed").length,
-    pendingRsvp: guests.filter((g) => g.rsvp_status === "pending").length,
-    checkedIn: guests.filter((g) => isArrived(g.attendance_status)).length,
-    notArrived: guests.filter((g) => g.attendance_status === "not_arrived").length,
+    totalInvited: sumParty(guests),
+    confirmed: sumParty(guests, (g) => g.rsvp_status === "confirmed"),
+    pendingRsvp: sumParty(guests, (g) => g.rsvp_status === "pending"),
+    checkedIn: sumParty(guests, (g) => isArrived(g.attendance_status)),
+    notArrived: sumParty(guests, (g) => g.attendance_status === "not_arrived"),
     totalTables: activeTables.length,
-    occupiedSeats: assigned,
-    availableSeats: Math.max(totalCapacity - assigned, 0),
-    unassignedGuests: guests.filter((g) => !g.table_id).length,
-    unassignedConfirmed: guests.filter(
+    occupiedSeats,
+    availableSeats: Math.max(totalCapacity - occupiedSeats, 0),
+    unassignedGuests: sumParty(guests, (g) => !g.table_id),
+    unassignedConfirmed: sumParty(
+      guests,
       (g) => g.rsvp_status === "confirmed" && !g.table_id,
-    ).length,
-    vipGuests: guests.filter((g) => g.is_vip).length,
+    ),
+    vipGuests: sumParty(guests, (g) => g.is_vip),
   };
 }

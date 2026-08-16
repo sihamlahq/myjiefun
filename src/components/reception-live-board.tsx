@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { computeStats } from "@/lib/stats";
+import { computeStats, sumParty } from "@/lib/stats";
 import { cn, formatPercent } from "@/lib/utils";
 import type { GuestWithRelations, ReceptionTable, WeddingSettings } from "@/types/wedding";
 import { TableGuestsDialog } from "@/components/table-guests-dialog";
@@ -268,11 +268,14 @@ export function ReceptionLiveBoard({
   }, [guests, tables]);
 
   const selected = summaries.find((item) => item.table.id === selectedId) ?? null;
-  const ready = summaries.filter(({ seated, table }) => seated.length >= table.capacity).length;
-  const partial = summaries.filter(
-    ({ seated, table }) => seated.length > 0 && seated.length < table.capacity,
+  const ready = summaries.filter(
+    ({ seated, table }) => sumParty(seated) >= table.capacity,
   ).length;
-  const totalGuests = guests.length;
+  const partial = summaries.filter(({ seated, table }) => {
+    const headcount = sumParty(seated);
+    return headcount > 0 && headcount < table.capacity;
+  }).length;
+  const totalGuests = stats.totalInvited;
   const attendanceRate = totalGuests ? stats.checkedIn / totalGuests : 0;
 
   return (
@@ -327,9 +330,10 @@ export function ReceptionLiveBoard({
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {summaries.map(({ table, seated }) => {
-            const full = seated.length >= table.capacity;
-            const hasGuests = seated.length > 0 && !full;
-            const arrived = seated.filter((g) => g.attendance_status === "checked_in").length;
+            const headcount = sumParty(seated);
+            const full = headcount >= table.capacity;
+            const hasGuests = headcount > 0 && !full;
+            const arrived = sumParty(seated, (g) => g.attendance_status === "checked_in");
             const flashing = flashTableId === table.id;
             const sideClass = tableSideCardClass(table);
             const side = tableSide(table);
@@ -358,7 +362,7 @@ export function ReceptionLiveBoard({
                   {side ? tableSideLabel(side) : table.name}
                 </p>
                 <p className="mt-3 text-sm font-semibold tabular-nums">
-                  {seated.length}/{table.capacity}
+                  {headcount}/{table.capacity}
                   <span className="ml-1 font-normal opacity-60">
                     · {arrived} in
                   </span>

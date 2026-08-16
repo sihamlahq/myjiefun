@@ -28,6 +28,7 @@ import { Badge, Card, CardContent, CardHeader, CardTitle } from "@/components/ui
 import { EmptyState } from "@/components/page-chrome";
 import { TableNumberButton } from "@/components/table-guests-dialog";
 import { tableSide, tableSideMarkerClass, tableTypeLabel } from "@/lib/table-side";
+import { sumParty } from "@/lib/stats";
 
 const TABLE_SIZE = 112;
 
@@ -356,7 +357,7 @@ export function FloorPlanCanvas({
                       {table.table_number}
                     </p>
                     <p className="mt-1 text-xs font-semibold">
-                      {tableGuests.length}/{table.capacity}
+                      {sumParty(tableGuests)}/{table.capacity}
                     </p>
                   </button>
                 );
@@ -419,7 +420,7 @@ function TableDetails({
         <Badge>{tableTypeLabel(table.table_type)}</Badge>
         <Badge>{table.status}</Badge>
         <Badge>
-          {guests.length}/{table.capacity}
+          {sumParty(guests)}/{table.capacity}
         </Badge>
       </div>
       <ul className="space-y-2">
@@ -502,7 +503,7 @@ function DraggableTable({
           {table.table_number}
         </span>
         <span className="block text-[11px] font-semibold sm:text-xs">
-          {guests.length}/{table.capacity}
+          {sumParty(guests)}/{table.capacity}
         </span>
       </span>
     </button>
@@ -514,9 +515,10 @@ function occupancyState(table: ReceptionTable, guests: GuestWithRelations[]) {
   if (tableSide(table) === "bride") return "bride_side";
   if (table.table_type === "vip") return "vip";
   if (table.status === "reserved" || table.table_type === "reserved") return "reserved";
-  if (guests.length === 0) return "empty";
-  if (guests.length > table.capacity) return "over";
-  if (guests.length === table.capacity) return "full";
+  const headcount = sumParty(guests);
+  if (headcount === 0) return "empty";
+  if (headcount > table.capacity) return "over";
+  if (headcount === table.capacity) return "full";
   return "partial";
 }
 

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { deleteGuest, importGuests, repairGuestChineseNames, updateRsvp, updateRsvpBulk, upsertGuest } from "@/lib/actions/wedding";
 import { suppressRealtimeRefresh } from "@/lib/client-refresh";
 import { getRedPacketAmount } from "@/lib/red-packet";
+import { sumParty } from "@/lib/stats";
 import { repairGuestNameFields, repairMojibakeText } from "@/lib/text-encoding";
 import {
   fileToGuestImportRows,
@@ -280,8 +281,8 @@ export function GuestsManager({
   const hasMore = filtered.length > visibleCount;
 
   const selectedGuests = filtered.filter((guest) => selected.has(guest.id));
-  const pendingCount = guests.filter((guest) => guest.rsvp_status === "pending").length;
-  const confirmedCount = guests.filter((guest) => guest.rsvp_status === "confirmed").length;
+  const pendingCount = sumParty(guests, (guest) => guest.rsvp_status === "pending");
+  const confirmedCount = sumParty(guests, (guest) => guest.rsvp_status === "confirmed");
 
   function openGuest(guest?: GuestWithRelations) {
     if (!guest) {
@@ -653,7 +654,8 @@ export function GuestsManager({
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p className="text-sm text-[var(--foreground)]/65">
           Showing {Math.min(visibleCount, filtered.length)} of {filtered.length}
-          {filtered.length !== guests.length ? ` · ${guests.length} total` : ""}
+          {filtered.length !== guests.length ? ` · ${guests.length} records` : ""}
+          {` · ${sumParty(filtered)} people`}
           {selected.size ? ` · ${selected.size} selected` : ""}
         </p>
         <div className="flex flex-wrap items-center gap-2">
