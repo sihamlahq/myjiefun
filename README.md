@@ -1,5 +1,7 @@
 # Myjiefun Wedding Guest & Seating Manager
 
+> **Repo split:** Canonical home is moving to [`sihamlahq/myjiefun`](https://github.com/sihamlahq/myjiefun). See [`docs/myjiefun-split.md`](../docs/myjiefun-split.md) in `v0-sihamla` for the push/Vercel steps.
+
 Premium realtime wedding operations app for **Myjiefun**: guest directory, RSVP,
 mobile check-in, table planning, ballroom floor plan, reports, settings, and TV
 reception mode.
