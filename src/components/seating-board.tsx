@@ -228,6 +228,7 @@ function TableSelect({
   pending,
   currentTableId,
   placeholder,
+  compact = false,
   onAssign,
 }: {
   guest: GuestWithRelations;
@@ -236,13 +237,17 @@ function TableSelect({
   pending: boolean;
   currentTableId?: string | null;
   placeholder: string;
+  compact?: boolean;
   onAssign: (guestId: string, tableId: string | null) => void;
 }) {
   return (
-    <label className="mt-2 block">
+    <label className={cn(compact ? "mt-1 block" : "mt-2 block")}>
       <span className="sr-only">{placeholder}</span>
       <select
-        className="h-10 w-full rounded-xl border border-black/10 bg-[var(--background)] px-2.5 text-sm font-semibold text-[var(--foreground)] disabled:opacity-60"
+        className={cn(
+          "w-full rounded-xl border border-black/10 bg-[var(--background)] px-2.5 font-semibold text-[var(--foreground)] disabled:opacity-60",
+          compact ? "h-9 text-xs" : "h-10 text-sm",
+        )}
         defaultValue=""
         disabled={pending || !tables.length}
         onPointerDown={(event) => event.stopPropagation()}
@@ -377,26 +382,32 @@ function TableDrop({
   return (
     <Card
       className={cn(
+        "flex max-h-[min(28rem,70dvh)] flex-col overflow-hidden",
         isOver && "ring-2 ring-[var(--accent)]",
         over && "border-red-300",
         tableSideCardClass(table),
       )}
     >
-      <CardHeader>
+      <CardHeader className="shrink-0 space-y-2 px-4 py-3 pb-2">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="leading-none">
               <TableNumberButton
                 table={table}
                 guests={allGuests}
-                className="font-heading text-2xl no-underline hover:underline"
+                className="font-heading text-xl no-underline hover:underline"
               />
             </CardTitle>
-            <p className="text-sm text-[var(--foreground)]/60">{table.name}</p>
+            <p
+              className="mt-1 truncate text-sm text-[var(--foreground)]/60"
+              title={table.name}
+            >
+              {table.name}
+            </p>
           </div>
           <Badge
             className={cn(
-              "capitalize",
+              "shrink-0 capitalize",
               table.table_type === "vip" && "bg-[var(--accent)]",
               tableSideBadgeClass(table),
             )}
@@ -404,45 +415,50 @@ function TableDrop({
             {tableSide(table) ? tableSideLabel(tableSide(table)) : tableTypeLabel(table.table_type)}
           </Badge>
         </div>
+        <div>
+          <div className="mb-1 flex justify-between text-xs text-[var(--foreground)]/60">
+            <span>
+              {headcount}/{table.capacity}
+              {guests.length ? ` · ${guests.length} names` : ""}
+            </span>
+            <span>{table.status}</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-[var(--muted)]">
+            <div
+              className={cn("h-full rounded-full", over ? "bg-red-600" : "bg-[var(--accent)]")}
+              style={{ width: `${Math.min(occupancy * 100, 100)}%` }}
+            />
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <div ref={setNodeRef} className="min-h-32 space-y-3">
-          <div>
-            <div className="mb-1 flex justify-between text-xs text-[var(--foreground)]/60">
-              <span>
-                {headcount}/{table.capacity}
-              </span>
-              <span>{table.status}</span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-[var(--muted)]">
-              <div
-                className={cn("h-full rounded-full", over ? "bg-red-600" : "bg-[var(--accent)]")}
-                style={{ width: `${Math.min(occupancy * 100, 100)}%` }}
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-2 px-4 pb-3 pt-0">
+        <div
+          ref={setNodeRef}
+          className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain touch-scroll pr-0.5"
+        >
+          {guests.length ? (
+            guests.map((guest) => (
+              <GuestCard
+                key={guest.id}
+                guest={guest}
+                tables={tables}
+                guestsByTable={guestsByTable}
+                pending={busyIds.has(guest.id)}
+                desktopDrag={desktopDrag}
+                currentTableId={table.id}
+                placeholder="Move to table…"
+                compact
+                onAssign={onAssign}
               />
-            </div>
-          </div>
-          <div className="space-y-2">
-            {guests.length ? (
-              guests.map((guest) => (
-                <GuestCard
-                  key={guest.id}
-                  guest={guest}
-                  tables={tables}
-                  guestsByTable={guestsByTable}
-                  pending={busyIds.has(guest.id)}
-                  desktopDrag={desktopDrag}
-                  currentTableId={table.id}
-                  placeholder="Move to table…"
-                  onAssign={onAssign}
-                />
-              ))
-            ) : (
-              <p className="rounded-xl border border-dashed border-black/10 px-3 py-4 text-center text-sm text-[var(--foreground)]/55">
-                No guests yet — pick someone below.
-              </p>
-            )}
-          </div>
+            ))
+          ) : (
+            <p className="rounded-xl border border-dashed border-black/10 px-3 py-3 text-center text-sm text-[var(--foreground)]/55">
+              No guests yet — pick someone below.
+            </p>
+          )}
+        </div>
 
+        <div className="shrink-0 space-y-2 border-t border-black/6 pt-2">
           <AddGuestPicker
             tableId={table.id}
             allGuests={allGuests}
@@ -629,6 +645,7 @@ function GuestCard({
   desktopDrag,
   currentTableId = null,
   placeholder,
+  compact = false,
   onAssign,
 }: {
   guest: GuestWithRelations;
@@ -638,6 +655,7 @@ function GuestCard({
   desktopDrag: boolean;
   currentTableId?: string | null;
   placeholder: string;
+  compact?: boolean;
   onAssign: (guestId: string, tableId: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -647,13 +665,17 @@ function GuestCard({
   const style = {
     transform: CSS.Translate.toString(transform),
   };
+  const meta = [guest.name_zh, guest.guest_groups?.name, `party ${guest.expected_count}`]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "rounded-xl border border-black/8 bg-white/90 px-3 py-2.5 text-sm shadow-sm",
+        "rounded-xl border border-black/8 bg-white/90 text-sm shadow-sm",
+        compact ? "px-2.5 py-1.5" : "px-3 py-2.5",
         isDragging && "opacity-60 shadow-xl",
       )}
     >
@@ -672,12 +694,14 @@ function GuestCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="font-semibold leading-tight">{guest.name_en}</p>
-              <p className="mt-0.5 text-xs text-[var(--foreground)]/55">
-                {[guest.name_zh, guest.guest_groups?.name, `party ${guest.expected_count}`]
-                  .filter(Boolean)
-                  .join(" · ")}
+              <p className="truncate font-semibold leading-tight" title={guest.name_en}>
+                {guest.name_en}
               </p>
+              {meta ? (
+                <p className="mt-0.5 truncate text-xs text-[var(--foreground)]/55" title={meta}>
+                  {meta}
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-1">
               {guest.is_vip ? <Badge className="bg-[var(--accent)]">VIP</Badge> : null}
@@ -694,6 +718,7 @@ function GuestCard({
             pending={pending}
             currentTableId={currentTableId}
             placeholder={placeholder}
+            compact={compact}
             onAssign={onAssign}
           />
         </div>
