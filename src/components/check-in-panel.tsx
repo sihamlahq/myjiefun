@@ -64,7 +64,6 @@ export function CheckInPanel({
           "name_en",
           "name_zh",
           "phone",
-          "guest_code",
           "guest_groups.name",
           "reception_tables.table_number",
         ],
@@ -312,7 +311,7 @@ export function CheckInPanel({
                             ) : null}
                           </p>
                           <p className="mt-0.5 truncate text-sm text-[var(--foreground)]/55">
-                            {[guest.name_zh, guest.phone].filter(Boolean).join(" · ") || guest.guest_code}
+                            {[guest.name_zh, guest.phone].filter(Boolean).join(" · ") || "—"}
                           </p>
                         </div>
                         {arrived ? (
