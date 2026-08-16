@@ -123,17 +123,21 @@ npm run lint
 ## Deployment
 
 **Domain:** [https://tablewedding.com](https://tablewedding.com)  
-**Vercel project:** `prj_0v0fe1nhjA8Eqf6hIB6ospcoLQWK`
+**GitHub repo:** [`sihamlahq/myjiefun`](https://github.com/sihamlahq/myjiefun)  
+**Vercel project:** `prj_0v0fe1nhjA8Eqf6hIB6ospcoLQWK` (must **not** be the `v0-sihamla` project)
+
+> Do **not** deploy this app from `sihamlahq/v0-sihamla`. That Vercel project is Sihamla shop only. See `docs/VERCEL-SEPARATION.md` in the monorepo for the one-time reconnect steps.
 
 1. In Vercel project settings:
    - Git repo: `sihamlahq/myjiefun`
    - Root Directory: `.` (repo root — standalone app)
+   - Production branch: `main`
    - Env vars:
      - `NEXT_PUBLIC_SITE_URL=https://tablewedding.com`
      - `NEXT_PUBLIC_SUPABASE_URL=https://rnjsqobnzzgnjmdejeui.supabase.co`
      - `NEXT_PUBLIC_SUPABASE_ANON_KEY=...`
      - `SUPABASE_SERVICE_ROLE_KEY=...` (optional on Vercel; required for seed)
-2. Deploy the project.
+2. Deploy **`main`** from `sihamlahq/myjiefun`.
 3. Vercel → **Domains** → add:
    - `tablewedding.com`
    - `www.tablewedding.com`
