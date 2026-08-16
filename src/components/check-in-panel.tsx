@@ -46,6 +46,11 @@ export function CheckInPanel({
   const [partialOpen, setPartialOpen] = useState(false);
   const [partialCount, setPartialCount] = useState(1);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [pendingCheckIn, setPendingCheckIn] = useState<{
+    guest: GuestWithRelations;
+    mode: "check_in" | "group" | "partial";
+    partyCount?: number;
+  } | null>(null);
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -102,6 +107,15 @@ export function CheckInPanel({
     setPartialOpen(false);
     if (selected) setPartialCount(selected.expected_count || 1);
   }, [selected]);
+
+  useEffect(() => {
+    if (!pendingCheckIn) return;
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") setPendingCheckIn(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pendingCheckIn]);
 
   function markBusy(guestId: string, busy: boolean) {
     setBusyIds((prev) => {
@@ -175,11 +189,31 @@ export function CheckInPanel({
     );
   }
 
+  function requestCheckIn(
+    guest: GuestWithRelations,
+    mode: "check_in" | "group" | "partial" = "check_in",
+    partyCount?: number,
+  ) {
+    if (busyIds.has(guest.id)) return;
+    setPendingCheckIn({
+      guest,
+      mode,
+      partyCount: partyCount ?? (guest.expected_count || 1),
+    });
+  }
+
+  function confirmPendingCheckIn() {
+    if (!pendingCheckIn) return;
+    const { guest, mode, partyCount } = pendingCheckIn;
+    setPendingCheckIn(null);
+    checkIn(guest, mode, partyCount);
+  }
+
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
     const firstWaiting = results.find((g) => g.attendance_status !== "checked_in");
-    if (firstWaiting) checkIn(firstWaiting);
+    if (firstWaiting) requestCheckIn(firstWaiting);
   }
 
   const tabs: { id: FilterTab; label: string; count: number }[] = [
@@ -337,7 +371,7 @@ export function CheckInPanel({
                         size="lg"
                         className="h-12 min-w-[6.5rem] px-4 text-base"
                         disabled={busy}
-                        onClick={() => checkIn(guest)}
+                        onClick={() => requestCheckIn(guest)}
                       >
                         Check in
                       </Button>
@@ -432,7 +466,7 @@ export function CheckInPanel({
                   className="w-full"
                   size="xl"
                   disabled={busyIds.has(selected.id)}
-                  onClick={() => checkIn(selected)}
+                  onClick={() => requestCheckIn(selected)}
                 >
                   <CheckCircle2 className="h-5 w-5" /> Check in now
                 </Button>
@@ -442,7 +476,7 @@ export function CheckInPanel({
                     className="w-full"
                     size="lg"
                     disabled={busyIds.has(selected.id)}
-                    onClick={() => checkIn(selected, "group")}
+                    onClick={() => requestCheckIn(selected, "group")}
                   >
                     <Users className="h-4 w-4" /> Check in whole group
                   </Button>
@@ -487,7 +521,7 @@ export function CheckInPanel({
                       <Button
                         className="h-11 flex-1"
                         disabled={busyIds.has(selected.id)}
-                        onClick={() => checkIn(selected, "partial", partialCount)}
+                        onClick={() => requestCheckIn(selected, "partial", partialCount)}
                       >
                         Confirm
                       </Button>
@@ -537,6 +571,98 @@ export function CheckInPanel({
           </div>
         </div>
       ) : null}
+
+      {pendingCheckIn ? (
+        <CheckInConfirmDialog
+          guest={pendingCheckIn.guest}
+          mode={pendingCheckIn.mode}
+          partyCount={pendingCheckIn.partyCount ?? (pendingCheckIn.guest.expected_count || 1)}
+          onCancel={() => setPendingCheckIn(null)}
+          onConfirm={confirmPendingCheckIn}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CheckInConfirmDialog({
+  guest,
+  mode,
+  partyCount,
+  onCancel,
+  onConfirm,
+}: {
+  guest: GuestWithRelations;
+  mode: "check_in" | "group" | "partial";
+  partyCount: number;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const tableLabel = guest.reception_tables
+    ? `${guest.reception_tables.table_number}${
+        guest.reception_tables.name ? ` · ${guest.reception_tables.name}` : ""
+      }`
+    : "No table";
+  const title =
+    mode === "group"
+      ? "Check in whole group?"
+      : mode === "partial"
+        ? `Check in ${partyCount} guest${partyCount === 1 ? "" : "s"}?`
+        : "Confirm check-in?";
+  const detail =
+    mode === "group"
+      ? `Mark everyone in ${guest.guest_groups?.name || "this group"} as arrived, starting with ${guest.name_en}.`
+      : mode === "partial"
+        ? `Record ${partyCount} of ${guest.expected_count || 1} for ${guest.name_en}.`
+        : `Mark ${guest.name_en} as arrived.`;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-4 sm:items-center"
+      role="presentation"
+      onClick={onCancel}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="checkin-confirm-title"
+        aria-describedby="checkin-confirm-desc"
+        className="w-full max-w-md rounded-3xl border border-black/10 bg-white p-5 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--accent)]/80 text-[var(--foreground)]">
+            <CheckCircle2 className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 id="checkin-confirm-title" className="font-heading text-xl font-semibold leading-tight">
+              {title}
+            </h2>
+            <p id="checkin-confirm-desc" className="mt-1 text-sm text-[var(--foreground)]/65">
+              {detail}
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-2xl bg-[var(--muted)]/80 px-3 py-3 text-sm">
+          <p className="truncate font-semibold">{guest.name_en}</p>
+          <p className="mt-0.5 truncate text-[var(--foreground)]/60">
+            {[guest.name_zh, tableLabel, partyCount > 1 ? `party ${partyCount}` : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="button" variant="outline" size="lg" className="w-full" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" size="lg" className="w-full" onClick={onConfirm} autoFocus>
+            <CheckCircle2 className="h-4 w-4" />
+            Check in
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
