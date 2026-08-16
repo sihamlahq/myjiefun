@@ -126,7 +126,8 @@ npm run lint
 **Vercel project:** `prj_0v0fe1nhjA8Eqf6hIB6ospcoLQWK`
 
 1. In Vercel project settings:
-   - Root Directory: `myjiefun-website` (while repo is still `v0-sihamla`)
+   - Git repo: `sihamlahq/myjiefun`
+   - Root Directory: `.` (repo root — standalone app)
    - Env vars:
      - `NEXT_PUBLIC_SITE_URL=https://tablewedding.com`
      - `NEXT_PUBLIC_SUPABASE_URL=https://rnjsqobnzzgnjmdejeui.supabase.co`
