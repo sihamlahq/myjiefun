@@ -241,12 +241,12 @@ function TableSelect({
   onAssign: (guestId: string, tableId: string | null) => void;
 }) {
   return (
-    <label className={cn(compact ? "mt-1 block" : "mt-2 block")}>
+    <label className={cn("block shrink-0", compact ? "w-[7.5rem]" : "w-[8.5rem]")}>
       <span className="sr-only">{placeholder}</span>
       <select
         className={cn(
-          "w-full rounded-xl border border-black/10 bg-[var(--background)] px-2.5 font-semibold text-[var(--foreground)] disabled:opacity-60",
-          compact ? "h-9 text-xs" : "h-10 text-sm",
+          "w-full rounded-lg border border-black/10 bg-[var(--background)] px-1.5 font-semibold text-[var(--foreground)] disabled:opacity-60",
+          compact ? "h-7 text-[11px]" : "h-8 text-xs",
         )}
         defaultValue=""
         disabled={pending || !tables.length}
@@ -260,7 +260,7 @@ function TableSelect({
         }}
       >
         <option value="" disabled>
-          {tables.length ? placeholder : "No active tables"}
+          {tables.length ? placeholder : "No tables"}
         </option>
         {currentTableId ? <option value="__unassigned__">Unassigned</option> : null}
         {tables.map((table) => {
@@ -328,7 +328,8 @@ function UnassignedDrop({
                 guestsByTable={guestsByTable}
                 pending={busyIds.has(guest.id)}
                 desktopDrag={desktopDrag}
-                placeholder="Assign to table…"
+                placeholder="Assign…"
+                compact
                 onAssign={(guestId, tableId) => {
                   if (tableId) onAssign(guestId, tableId);
                 }}
@@ -337,7 +338,7 @@ function UnassignedDrop({
           ) : (
             <EmptyState
               title="All assigned"
-              description="Use Move to table on a seated guest to free a seat."
+              description="Use Move on a seated guest to free a seat."
             />
           )}
         </div>
@@ -382,24 +383,24 @@ function TableDrop({
   return (
     <Card
       className={cn(
-        "flex max-h-[min(28rem,70dvh)] flex-col overflow-hidden",
+        "flex max-h-[min(22rem,62dvh)] flex-col overflow-hidden",
         isOver && "ring-2 ring-[var(--accent)]",
         over && "border-red-300",
         tableSideCardClass(table),
       )}
     >
-      <CardHeader className="shrink-0 space-y-2 px-4 py-3 pb-2">
-        <div className="flex items-start justify-between gap-3">
+      <CardHeader className="shrink-0 space-y-1.5 px-3 py-2.5 pb-1.5">
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <CardTitle className="leading-none">
               <TableNumberButton
                 table={table}
                 guests={allGuests}
-                className="font-heading text-xl no-underline hover:underline"
+                className="font-heading text-lg no-underline hover:underline"
               />
             </CardTitle>
             <p
-              className="mt-1 truncate text-sm text-[var(--foreground)]/60"
+              className="mt-0.5 truncate text-xs text-[var(--foreground)]/60"
               title={table.name}
             >
               {table.name}
@@ -407,7 +408,7 @@ function TableDrop({
           </div>
           <Badge
             className={cn(
-              "shrink-0 capitalize",
+              "shrink-0 px-2 py-0.5 text-[10px] capitalize",
               table.table_type === "vip" && "bg-[var(--accent)]",
               tableSideBadgeClass(table),
             )}
@@ -416,14 +417,14 @@ function TableDrop({
           </Badge>
         </div>
         <div>
-          <div className="mb-1 flex justify-between text-xs text-[var(--foreground)]/60">
+          <div className="mb-0.5 flex justify-between text-[10px] text-[var(--foreground)]/60">
             <span>
               {headcount}/{table.capacity}
-              {guests.length ? ` · ${guests.length} names` : ""}
+              {guests.length ? ` · ${guests.length}` : ""}
             </span>
             <span>{table.status}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-[var(--muted)]">
+          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--muted)]">
             <div
               className={cn("h-full rounded-full", over ? "bg-red-600" : "bg-[var(--accent)]")}
               style={{ width: `${Math.min(occupancy * 100, 100)}%` }}
@@ -431,10 +432,10 @@ function TableDrop({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-2 px-4 pb-3 pt-0">
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-1.5 px-3 pb-2.5 pt-0">
         <div
           ref={setNodeRef}
-          className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain touch-scroll pr-0.5"
+          className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain touch-scroll pr-0.5"
         >
           {guests.length ? (
             guests.map((guest) => (
@@ -446,19 +447,19 @@ function TableDrop({
                 pending={busyIds.has(guest.id)}
                 desktopDrag={desktopDrag}
                 currentTableId={table.id}
-                placeholder="Move to table…"
+                placeholder="Move…"
                 compact
                 onAssign={onAssign}
               />
             ))
           ) : (
-            <p className="rounded-xl border border-dashed border-black/10 px-3 py-3 text-center text-sm text-[var(--foreground)]/55">
+            <p className="rounded-lg border border-dashed border-black/10 px-2 py-2 text-center text-xs text-[var(--foreground)]/55">
               No guests yet — pick someone below.
             </p>
           )}
         </div>
 
-        <div className="shrink-0 space-y-2 border-t border-black/6 pt-2">
+        <div className="shrink-0 space-y-1.5 border-t border-black/6 pt-1.5">
           <AddGuestPicker
             tableId={table.id}
             allGuests={allGuests}
@@ -467,7 +468,7 @@ function TableDrop({
             onAddGuest={onAddGuest}
           />
 
-          <Button size="sm" variant="outline" onClick={onAddSeat} disabled={seatPending}>
+          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onAddSeat} disabled={seatPending}>
             <Plus className="h-3.5 w-3.5" /> Add seat
           </Button>
         </div>
@@ -665,63 +666,80 @@ function GuestCard({
   const style = {
     transform: CSS.Translate.toString(transform),
   };
-  const meta = [guest.name_zh, guest.guest_groups?.name, `party ${guest.expected_count}`]
-    .filter(Boolean)
-    .join(" · ");
+  const secondary = compact
+    ? [guest.name_zh, guest.expected_count > 1 ? `×${guest.expected_count}` : null]
+        .filter(Boolean)
+        .join(" · ")
+    : [guest.name_zh, guest.guest_groups?.name, `party ${guest.expected_count}`]
+        .filter(Boolean)
+        .join(" · ");
+  const shortPlaceholder = compact
+    ? placeholder.toLowerCase().includes("move")
+      ? "Move…"
+      : "Assign…"
+    : placeholder;
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "rounded-xl border border-black/8 bg-white/90 text-sm shadow-sm",
-        compact ? "px-2.5 py-1.5" : "px-3 py-2.5",
+        "rounded-lg border border-black/8 bg-white/90 text-sm shadow-sm",
+        compact ? "px-2 py-1" : "px-2.5 py-1.5",
         isDragging && "opacity-60 shadow-xl",
       )}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-1.5">
         {desktopDrag ? (
           <button
             type="button"
-            className="mt-0.5 hidden cursor-grab touch-none text-[var(--foreground)]/35 lg:block"
+            className="hidden shrink-0 cursor-grab touch-none text-[var(--foreground)]/35 lg:block"
             aria-label={`Drag ${guest.name_en}`}
             {...listeners}
             {...attributes}
           >
-            <GripVertical className="h-4 w-4" />
+            <GripVertical className="h-3.5 w-3.5" />
           </button>
         ) : null}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate font-semibold leading-tight" title={guest.name_en}>
-                {guest.name_en}
-              </p>
-              {meta ? (
-                <p className="mt-0.5 truncate text-xs text-[var(--foreground)]/55" title={meta}>
-                  {meta}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              {guest.is_vip ? <Badge className="bg-[var(--accent)]">VIP</Badge> : null}
-              {guest.attendance_status === "checked_in" ? (
-                <CheckCircle2 className="h-4 w-4 text-green-700" />
-              ) : null}
-            </div>
-          </div>
 
-          <TableSelect
-            guest={guest}
-            tables={tables}
-            guestsByTable={guestsByTable}
-            pending={pending}
-            currentTableId={currentTableId}
-            placeholder={placeholder}
-            compact={compact}
-            onAssign={onAssign}
-          />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1">
+            <p
+              className={cn(
+                "min-w-0 truncate font-semibold leading-tight",
+                compact ? "text-xs" : "text-sm",
+              )}
+              title={guest.name_en}
+            >
+              {guest.name_en}
+            </p>
+            {guest.is_vip ? (
+              <Badge className="h-5 shrink-0 bg-[var(--accent)] px-1.5 text-[10px]">VIP</Badge>
+            ) : null}
+            {guest.attendance_status === "checked_in" ? (
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-700" />
+            ) : null}
+          </div>
+          {secondary ? (
+            <p
+              className="truncate text-[10px] leading-tight text-[var(--foreground)]/50"
+              title={secondary}
+            >
+              {secondary}
+            </p>
+          ) : null}
         </div>
+
+        <TableSelect
+          guest={guest}
+          tables={tables}
+          guestsByTable={guestsByTable}
+          pending={pending}
+          currentTableId={currentTableId}
+          placeholder={shortPlaceholder}
+          compact={compact}
+          onAssign={onAssign}
+        />
       </div>
     </div>
   );
