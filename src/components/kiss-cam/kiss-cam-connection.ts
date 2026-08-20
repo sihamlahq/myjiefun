@@ -177,7 +177,7 @@ export class KissCamConnection {
     }
   }
 
-  /** Prefer steady 30fps with enough bitrate for a clear 720p/1080p LED feed. */
+  /** Prefer steady 30fps with higher bitrate for a clear 1080p LED feed. */
   private async tuneVideoSender(sender: RTCRtpSender) {
     try {
       await this.preferEfficientCodecs(sender);
@@ -187,15 +187,16 @@ export class KissCamConnection {
         params.encodings = [{}];
       }
       const settings = sender.track?.getSettings?.() ?? {};
-      const w = typeof settings.width === "number" ? settings.width : 1280;
-      const h = typeof settings.height === "number" ? settings.height : 720;
+      const w = typeof settings.width === "number" ? settings.width : 1920;
+      const h = typeof settings.height === "number" ? settings.height : 1080;
       const pixels = w * h;
+      // Higher ceilings so faces stay sharp on LED walls when Wi‑Fi allows.
       const maxBitrate =
         pixels >= 1920 * 1080
-          ? 4_500_000
+          ? 7_500_000
           : pixels >= 1280 * 720
-            ? 3_000_000
-            : 2_000_000;
+            ? 5_000_000
+            : 3_000_000;
 
       for (const encoding of params.encodings) {
         encoding.maxBitrate = maxBitrate;

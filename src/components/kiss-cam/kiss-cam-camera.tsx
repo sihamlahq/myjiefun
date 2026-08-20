@@ -74,7 +74,7 @@ function labelMatchesFacing(label: string, facing: Facing) {
   return /back|rear|environment|world|main/.test(l);
 }
 
-/** Capture a smooth, clear stream for WebRTC — 720p–1080p, not 4K. */
+/** Capture a higher, smooth stream for WebRTC — prefer 1080p @ 30fps (not 4K). */
 async function openCamera(facing: Facing): Promise<MediaStream> {
   let preferredDeviceId: string | undefined;
   try {
@@ -87,10 +87,10 @@ async function openCamera(facing: Facing): Promise<MediaStream> {
   }
 
   const baseVideo = {
-    // Cap at 1080p: 4K overloads phone encode + Wi‑Fi and feels laggy on LED.
-    width: { ideal: 1280, max: 1920 },
-    height: { ideal: 720, max: 1080 },
-    frameRate: { ideal: 30, max: 30 },
+    // Prefer full HD for a clearer LED image; still hard-cap at 1080p.
+    width: { ideal: 1920, min: 1280, max: 1920 },
+    height: { ideal: 1080, min: 720, max: 1080 },
+    frameRate: { ideal: 30, min: 24, max: 30 },
   } as const;
 
   const attempts: MediaStreamConstraints[] = [];
@@ -111,6 +111,15 @@ async function openCamera(facing: Facing): Promise<MediaStream> {
       video: {
         facingMode: { exact: facing },
         ...baseVideo,
+      },
+    },
+    {
+      audio: false,
+      video: {
+        facingMode: { ideal: facing },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30, min: 24 },
       },
     },
     {
@@ -146,7 +155,7 @@ async function tuneCaptureTrack(stream: MediaStream) {
   const track = stream.getVideoTracks()[0];
   if (!track) return;
   try {
-    // Motion hint keeps framerate steadier than "detail" on constrained Wi‑Fi.
+    // Motion hint keeps framerate steadier than "detail" on venue Wi‑Fi.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (track as any).contentHint = "motion";
   } catch {
@@ -155,12 +164,20 @@ async function tuneCaptureTrack(stream: MediaStream) {
 
   try {
     await track.applyConstraints({
-      width: { ideal: 1280, max: 1920 },
-      height: { ideal: 720, max: 1080 },
-      frameRate: { ideal: 30, max: 30 },
+      width: { ideal: 1920, max: 1920 },
+      height: { ideal: 1080, max: 1080 },
+      frameRate: { ideal: 30, min: 24, max: 30 },
     });
   } catch {
-    // Keep whatever the device already gave us.
+    try {
+      await track.applyConstraints({
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        frameRate: { ideal: 30, max: 30 },
+      });
+    } catch {
+      // Keep whatever the device already gave us.
+    }
   }
 }
 

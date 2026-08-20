@@ -12,8 +12,8 @@ type KissCamCanvasCompositorProps = {
 
 /**
  * Draws the live camera into a cinematic frame.
- * Optimized for smooth LED playback: no per-frame CSS filters/shadows,
- * capped DPR, larger frame, and a desynchronized 2D context.
+ * Tuned for a sharper, smoother LED image: steady 30fps draw, higher DPR,
+ * larger frame, and high-quality smoothing without heavy per-frame filters.
  */
 export function KissCamCanvasCompositor({
   video,
@@ -41,7 +41,7 @@ export function KissCamCanvasCompositor({
     if (!ctx) return;
 
     let lastDraw = 0;
-    const minFrameMs = 1000 / 30; // Cap compositor at 30fps — matches capture.
+    const minFrameMs = 1000 / 30; // Match capture — steady 30fps on LED.
 
     const draw = (now: number) => {
       rafRef.current = requestAnimationFrame(draw);
@@ -52,8 +52,8 @@ export function KissCamCanvasCompositor({
       const parent = canvas.parentElement;
       const cssW = parent?.clientWidth || 640;
       const cssH = parent?.clientHeight || 360;
-      // Cap DPR — 3x on LED walls was burning GPU for little visible gain.
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // Allow sharper pixels on high-DPI LED / laptop screens.
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
       const bufW = Math.max(1, Math.round(cssW * dpr));
       const bufH = Math.max(1, Math.round(cssH * dpr));
 
@@ -73,38 +73,37 @@ export function KissCamCanvasCompositor({
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, cssW, cssH);
-      // Medium smoothing is sharper/faster than "high" for video upscales.
       ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "medium";
+      ctx.imageSmoothingQuality = "high";
 
       const w = cssW;
       const h = cssH;
 
       const targetOpacity = video && video.readyState >= 2 ? 1 : 0;
-      opacityRef.current += (targetOpacity - opacityRef.current) * (fadeIn ? 0.08 : 0.25);
+      opacityRef.current += (targetOpacity - opacityRef.current) * (fadeIn ? 0.1 : 0.28);
 
       if (opacityRef.current < 0.01 || !video || video.readyState < 2) {
         return;
       }
 
-      // Larger frame so faces read clearer on LED.
-      let fw = w * 0.58;
-      let fh = h * 0.68;
+      // Larger frame so faces read clearer / higher on the LED.
+      let fw = w * 0.66;
+      let fh = h * 0.74;
       let fx = (w - fw) / 2;
-      let fy = h * 0.1;
-      let radius = 20;
+      let fy = h * 0.08;
+      let radius = 22;
 
       if (layout === "portrait") {
-        fw = w * 0.38;
-        fh = h * 0.7;
+        fw = w * 0.42;
+        fh = h * 0.74;
+        fx = (w - fw) / 2;
+        fy = h * 0.08;
+        radius = 26;
+      } else if (layout === "rounded") {
+        fw = w * 0.58;
+        fh = h * 0.68;
         fx = (w - fw) / 2;
         fy = h * 0.1;
-        radius = 24;
-      } else if (layout === "rounded") {
-        fw = w * 0.52;
-        fh = h * 0.62;
-        fx = (w - fw) / 2;
-        fy = h * 0.12;
         radius = Math.min(fw, fh) / 2;
       } else if (layout === "full") {
         fw = w;
@@ -121,8 +120,8 @@ export function KissCamCanvasCompositor({
       roundRectPath(ctx, fx, fy, fw, fh, radius);
       ctx.clip();
 
-      const vw = video.videoWidth || 1280;
-      const vh = video.videoHeight || 720;
+      const vw = video.videoWidth || 1920;
+      const vh = video.videoHeight || 1080;
       const scale = Math.max(fw / vw, fh / vh);
       const dw = vw * scale;
       const dh = vh * scale;
@@ -132,11 +131,9 @@ export function KissCamCanvasCompositor({
       // No ctx.filter — CSS filters on canvas re-rasterize every frame and soften detail.
       ctx.drawImage(video, dx, dy, dw, dh);
 
-      // Very light contrast wash only (cheap fill, no blur).
-      ctx.fillStyle = "rgba(255, 245, 248, 0.04)";
-      ctx.fillRect(fx, fy, fw, fh);
-      ctx.fillStyle = "rgba(40, 20, 30, 0.08)";
-      ctx.fillRect(fx, fy + fh * 0.72, fw, fh * 0.28);
+      // Very light vignette only — avoid washes that soften the feed.
+      ctx.fillStyle = "rgba(40, 20, 30, 0.05)";
+      ctx.fillRect(fx, fy + fh * 0.78, fw, fh * 0.22);
 
       ctx.restore();
 
