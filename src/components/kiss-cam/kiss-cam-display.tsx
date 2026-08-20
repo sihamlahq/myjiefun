@@ -9,6 +9,7 @@ import {
   KissCamHearts,
 } from "@/components/kiss-cam/kiss-cam-atmosphere";
 import { KissCamCanvasCompositor } from "@/components/kiss-cam/kiss-cam-canvas-compositor";
+import { KissCamKissEmoji } from "@/components/kiss-cam/kiss-cam-kiss-emoji";
 import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 
@@ -45,7 +46,10 @@ export function KissCamDisplay({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [fadeIn, setFadeIn] = useState(true);
+  const [autoLove, setAutoLove] = useState(false);
+  const [autoLoveId, setAutoLoveId] = useState(0);
   const hadStream = useRef(false);
+  const lastPhaseRef = useRef(phase);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -62,8 +66,28 @@ export function KissCamDisplay({
     }
   }, [remoteStream]);
 
+  // After the lip-kiss beat, fire a big LOVE burst on celebration.
+  useEffect(() => {
+    if (phase === "celebration" && lastPhaseRef.current !== "celebration") {
+      setAutoLove(true);
+      setAutoLoveId((n) => n + 1);
+    }
+    if (phase === "idle" || phase === "approach" || phase === "countdown" || phase === "kiss") {
+      setAutoLove(false);
+    }
+    lastPhaseRef.current = phase;
+  }, [phase]);
+
+  // Let the LOVE word play through early final, then clear.
+  useEffect(() => {
+    if (phase !== "final" || !autoLove) return;
+    const t = window.setTimeout(() => setAutoLove(false), 2200);
+    return () => window.clearTimeout(t);
+  }, [phase, autoLove]);
+
   const finalFrame = phase === "final" || phase === "celebration";
   const cameraLive = cameraEnabled && Boolean(remoteStream);
+  const showBigLove = loveBurst || autoLove;
 
   return (
     <div
@@ -102,23 +126,26 @@ export function KissCamDisplay({
         </>
       ) : null}
 
-      <KissCamHearts active={celebrate || loveBurst} />
-      <KissCamConfetti active={celebrate || loveBurst} />
-      <KissCamLoveBurst active={loveBurst} size="stage" />
+      <KissCamHearts active={celebrate || showBigLove} />
+      <KissCamConfetti active={celebrate || showBigLove} />
+      <KissCamLoveBurst active={showBigLove} burstId={autoLoveId} size="stage" word="LOVE" />
 
       {phase === "countdown" && countdownValue != null ? (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <span
-            key={countdownValue}
-            className="kiss-cam-countdown font-heading text-[min(28vw,220px)] font-semibold leading-none text-[#5a2f38]/90 drop-shadow-[0_8px_30px_rgba(90,40,50,.25)]"
-          >
-            {countdownValue}
-          </span>
+          <div key={countdownValue} className="kiss-cam-countdown-wrap relative flex items-center justify-center">
+            <span className="kiss-cam-countdown-ring" aria-hidden />
+            <span className="kiss-cam-countdown font-heading text-[min(30vw,240px)] font-semibold leading-none text-[#5a2f38]/92 drop-shadow-[0_10px_36px_rgba(90,40,50,.28)]">
+              {countdownValue}
+            </span>
+          </div>
         </div>
       ) : null}
 
       {phase === "kiss" ? (
-        <div className="pointer-events-none absolute inset-0 z-10 kiss-cam-kiss-glow" aria-hidden />
+        <>
+          <div className="pointer-events-none absolute inset-0 z-10 kiss-cam-kiss-glow" aria-hidden />
+          <KissCamKissEmoji />
+        </>
       ) : null}
 
       {finalFrame ? (

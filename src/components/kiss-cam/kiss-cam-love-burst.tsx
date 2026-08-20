@@ -9,6 +9,8 @@ type KissCamLoveBurstProps = {
   burstId?: number;
   /** Larger burst for the LED wall. */
   size?: "phone" | "stage";
+  /** Center word — celebration uses a big LOVE. */
+  word?: string;
   className?: string;
 };
 
@@ -28,10 +30,11 @@ export function KissCamLoveBurst({
   active,
   burstId = 0,
   size = "phone",
+  word = "Love",
   className = "",
 }: KissCamLoveBurstProps) {
-  const heartCount = size === "stage" ? 18 : 8;
-  const sparkCount = size === "stage" ? 28 : 10;
+  const heartCount = size === "stage" ? 22 : 8;
+  const sparkCount = size === "stage" ? 34 : 10;
 
   const hearts = useMemo(
     () =>
@@ -124,10 +127,12 @@ export function KissCamLoveBurst({
 
       <p
         className={`kiss-cam-love-word font-kiss absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[#fff5f7] ${
-          size === "stage" ? "text-[clamp(3rem,8vw,6rem)]" : "text-3xl"
+          size === "stage"
+            ? "text-[clamp(4.5rem,14vw,9.5rem)] tracking-[0.06em]"
+            : "text-3xl"
         }`}
       >
-        Love
+        {word}
       </p>
     </div>
   );

@@ -58,17 +58,21 @@ export const defaultKissCamState: KissCamState = {
   countdownValue: null,
 };
 
-/** Timeline milestones in ms (base duration ≈ 16s + hold). */
+/** One beat per countdown digit (3 → 2 → 1). Keep in sync with CSS. */
+export const COUNTDOWN_BEAT_MS = 1000;
+
+/** Timeline milestones in ms (base duration ≈ 24s with countdown). */
 export const KISS_CAM_TIMELINE = {
   appearEnd: 2000,
   approachEnd: 5000,
   holdHandsEnd: 6500,
   romanticPauseEnd: 8000,
   moveCloserEnd: 10000,
-  countdownEnd: 11000,
-  kissEnd: 12500,
-  celebrationEnd: 16000,
-  finalHold: 20000,
+  /** 3s smooth 3-2-1 (1s each). */
+  countdownEnd: 10000 + COUNTDOWN_BEAT_MS * 3,
+  kissDuration: 2400,
+  celebrationDuration: 4500,
+  finalHold: 24000,
 } as const;
 
 export function phaseAtElapsed(elapsedMs: number, countdownEnabled: boolean): {
@@ -81,20 +85,25 @@ export function phaseAtElapsed(elapsedMs: number, countdownEnabled: boolean): {
   if (t < KISS_CAM_TIMELINE.holdHandsEnd) return { phase: "holdHands", countdownValue: null };
   if (t < KISS_CAM_TIMELINE.romanticPauseEnd) return { phase: "romanticPause", countdownValue: null };
   if (t < KISS_CAM_TIMELINE.moveCloserEnd) return { phase: "moveCloser", countdownValue: null };
+
   if (countdownEnabled && t < KISS_CAM_TIMELINE.countdownEnd) {
     const into = t - KISS_CAM_TIMELINE.moveCloserEnd;
-    const value = into < 333 ? 3 : into < 666 ? 2 : 1;
+    const beat = COUNTDOWN_BEAT_MS;
+    const value = into < beat ? 3 : into < beat * 2 ? 2 : 1;
     return { phase: "countdown", countdownValue: value };
   }
+
   const kissStart = countdownEnabled ? KISS_CAM_TIMELINE.countdownEnd : KISS_CAM_TIMELINE.moveCloserEnd;
-  const kissEnd = kissStart + 1500;
-  const celebEnd = kissEnd + 3500;
+  const kissEnd = kissStart + KISS_CAM_TIMELINE.kissDuration;
+  const celebEnd = kissEnd + KISS_CAM_TIMELINE.celebrationDuration;
   if (t < kissEnd) return { phase: "kiss", countdownValue: null };
   if (t < celebEnd) return { phase: "celebration", countdownValue: null };
   return { phase: "final", countdownValue: null };
 }
 
 export function totalDurationMs(countdownEnabled: boolean, scale = 1) {
-  const base = countdownEnabled ? KISS_CAM_TIMELINE.finalHold : KISS_CAM_TIMELINE.finalHold - 1000;
+  const base = countdownEnabled
+    ? KISS_CAM_TIMELINE.finalHold
+    : KISS_CAM_TIMELINE.finalHold - COUNTDOWN_BEAT_MS * 3;
   return Math.round(base * scale);
 }
