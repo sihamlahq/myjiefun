@@ -220,9 +220,26 @@ h3,
 }
 
 /* —— Kiss Cam —— */
-.kiss-cam-figure {
-  transition: left 1.15s cubic-bezier(0.4, 0, 0.2, 1), transform 1.15s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform, left;
+.kiss-cam-stage {
+  /* default stage */
+}
+
+#kiss-cam-root:fullscreen,
+#kiss-cam-root:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  background: #e8f2f8 !important;
+  overflow: hidden !important;
+}
+
+#kiss-cam-root:fullscreen .kiss-cam-stage,
+#kiss-cam-root:-webkit-full-screen .kiss-cam-stage {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
 }
 
 .kiss-cam-arm-left,

@@ -245,11 +245,17 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const showChrome = !state.fullscreen;
 
   return (
-    <div id="kiss-cam-root" className="min-h-screen bg-[#2a221c] text-[var(--foreground)]">
+    <div
+      id="kiss-cam-root"
+      className={cn(
+        "min-h-screen bg-[#2a221c] text-[var(--foreground)]",
+        state.fullscreen && "fixed inset-0 z-[100] h-dvh min-h-0 w-screen overflow-hidden bg-[#e8f2f8]",
+      )}
+    >
       <div
         className={cn(
           "mx-auto flex max-w-[1600px] flex-col gap-4 p-3 sm:p-5",
-          state.fullscreen && "h-screen max-w-none p-0",
+          state.fullscreen && "m-0 h-full max-h-none w-full max-w-none p-0",
         )}
       >
         {showChrome ? (
@@ -276,11 +282,16 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           </header>
         ) : null}
 
-        <div className={cn("grid gap-4 lg:grid-cols-[1fr_300px]", state.fullscreen && "h-full grid-cols-1")}>
+        <div
+          className={cn(
+            "grid gap-4 lg:grid-cols-[1fr_300px]",
+            state.fullscreen && "h-full min-h-0 grid-cols-1 gap-0",
+          )}
+        >
           <div
             className={cn(
               "overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,.45)]",
-              state.fullscreen && "flex h-full items-center justify-center rounded-none border-0",
+              state.fullscreen && "h-full min-h-0 rounded-none border-0 shadow-none",
             )}
           >
             <KissCamDisplay
@@ -293,7 +304,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
               remoteStream={remoteStream}
               celebrate={celebrate}
               showCharacters
-              className={state.fullscreen ? "max-h-screen w-auto max-w-full" : ""}
+              fillViewport={state.fullscreen}
+              className={state.fullscreen ? "h-full w-full" : ""}
             />
           </div>
 

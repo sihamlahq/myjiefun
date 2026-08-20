@@ -21,6 +21,8 @@ type KissCamDisplayProps = {
   remoteStream: MediaStream | null;
   celebrate: boolean;
   showCharacters: boolean;
+  /** Fill the parent completely (true fullscreen) — no 16:9 letterboxing. */
+  fillViewport?: boolean;
   className?: string;
 };
 
@@ -34,6 +36,7 @@ export function KissCamDisplay({
   remoteStream,
   celebrate,
   showCharacters,
+  fillViewport = false,
   className = "",
 }: KissCamDisplayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -60,8 +63,12 @@ export function KissCamDisplay({
 
   return (
     <div
-      className={`kiss-cam-stage relative aspect-video w-full overflow-hidden bg-[#e8f2f8] ${className}`}
-      style={{ aspectRatio: "16 / 9" }}
+      className={
+        fillViewport
+          ? `kiss-cam-stage relative h-full w-full overflow-hidden bg-[#e8f2f8] ${className}`
+          : `kiss-cam-stage relative aspect-video w-full overflow-hidden bg-[#e8f2f8] ${className}`
+      }
+      style={fillViewport ? undefined : { aspectRatio: "16 / 9" }}
     >
       <KissCamBackground active />
 
