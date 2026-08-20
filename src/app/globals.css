@@ -210,7 +210,10 @@ h3,
   .kiss-cam-confetti,
   .kiss-cam-bokeh,
   .kiss-cam-countdown,
-  .kiss-cam-figure {
+  .kiss-cam-figure,
+  .kiss-cam-held-balloon,
+  .kiss-cam-breathe,
+  .kiss-cam-held-hands {
     animation: none !important;
     transition: none !important;
   }
@@ -218,8 +221,63 @@ h3,
 
 /* —— Kiss Cam —— */
 .kiss-cam-figure {
-  transition: left 1.1s cubic-bezier(0.4, 0, 0.2, 1), transform 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: left 1.15s cubic-bezier(0.4, 0, 0.2, 1), transform 1.15s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, left;
+}
+
+.kiss-cam-arm-left,
+.kiss-cam-arm-right,
+.kiss-cam-head,
+.kiss-cam-body,
+.kiss-cam-hand-left,
+.kiss-cam-hand-right {
+  transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kiss-cam-held-balloon {
+  animation: kiss-cam-balloon-sway 3.6s ease-in-out infinite;
+  transform-box: fill-box;
+}
+
+@keyframes kiss-cam-balloon-sway {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+.kiss-cam-held-hands {
+  animation: kiss-cam-hands-in 0.55s cubic-bezier(0.22, 1.1, 0.36, 1) both;
+}
+
+@keyframes kiss-cam-hands-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+.kiss-cam-breathe {
+  animation: kiss-cam-breathe 3.8s ease-in-out infinite;
+  transform-origin: center top;
+  transform-box: fill-box;
+}
+
+@keyframes kiss-cam-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
 }
 
 .kiss-cam-bokeh {
@@ -365,7 +423,7 @@ h3,
 }
 
 .kiss-cam-kiss-glow {
-  background: radial-gradient(circle at 50% 45%, rgba(255, 230, 210, 0.45), transparent 55%);
+  background: radial-gradient(circle at 50% 45%, rgba(255, 230, 235, 0.5), rgba(200, 225, 240, 0.15) 45%, transparent 60%);
   animation: kiss-cam-glow 1.4s ease-out;
 }
 

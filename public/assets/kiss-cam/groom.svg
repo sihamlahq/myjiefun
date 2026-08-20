@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 460" fill="none">
+  <!-- TableWedding Kiss Cam  Groom (replaceable static reference)
+       Live animation uses modular React SVG groups in kiss-cam-characters.tsx.
+       Style: simple 2D wedding-invitation illustration. -->
+  <ellipse cx="120" cy="444" rx="48" ry="9" fill="rgba(70,60,50,.12)"/>
+  <path d="M92 268 L86 420 L112 420 L118 268Z" fill="#1c1c1e" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M122 268 L128 420 L154 420 L148 268Z" fill="#111114" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M78 130 C78 112 96 98 120 98 C144 98 162 112 162 130 L172 270 L68 270Z" fill="#1c1c1e" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M108 112 L120 168 L132 112Z" fill="#f7f4ef" stroke="#4a4038" stroke-width="1.6"/>
+  <path d="M112 112 L120 128 L128 112Z" fill="#111114"/>
+  <circle cx="120" cy="148" r="2.8" fill="#c9a66b" stroke="#4a4038" stroke-width="1"/>
+  <path d="M78 138 Q52 190 62 250" fill="none" stroke="#1c1c1e" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="62" cy="258" r="11" fill="#f3c9ad" stroke="#4a4038" stroke-width="2.2"/>
+  <path d="M162 138 Q198 185 188 248" fill="none" stroke="#111114" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="188" cy="256" r="11" fill="#f3c9ad" stroke="#4a4038" stroke-width="2.2"/>
+  <circle cx="120" cy="70" r="42" fill="#f3c9ad" stroke="#4a4038" stroke-width="2.2"/>
+  <path d="M82 62 C88 28 120 22 152 36 C158 52 150 58 142 54 C130 42 100 44 86 58Z" fill="#2a2420" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
+  <circle cx="109" cy="72" r="2.4" fill="#4a4038"/>
+  <circle cx="131" cy="72" r="2.4" fill="#4a4038"/>
+  <path d="M112 86 Q120 94 128 86" fill="none" stroke="#c47a82" stroke-width="2.1" stroke-linecap="round"/>
+  <line x1="54" y1="158" x2="54" y2="230" stroke="#9a8b82" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M54 148 C76 128 82 102 54 112 C26 102 32 128 54 148Z" fill="#f4b6c4" stroke="#4a4038" stroke-width="1.9"/>
+</svg>

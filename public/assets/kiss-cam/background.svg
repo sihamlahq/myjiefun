@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" fill="none">
+  <!-- Soft light-blue pastel wedding background  replaceable reference -->
+  <rect width="1920" height="1080" fill="#e8f2f8"/>
+  <ellipse cx="960" cy="160" rx="720" ry="280" fill="#ffffff" opacity="0.85"/>
+  <ellipse cx="280" cy="860" rx="420" ry="260" fill="#bedcef" opacity="0.45"/>
+  <ellipse cx="1680" cy="720" rx="380" ry="240" fill="#f4b6c4" opacity="0.18"/>
+  <ellipse cx="960" cy="980" rx="600" ry="200" fill="#d4e8f2" opacity="0.5"/>
+</svg>

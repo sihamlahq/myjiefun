@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BrideFigure, GroomFigure } from "@/components/kiss-cam/kiss-cam-characters";
+import { BrideFigure, GroomFigure, HeldHandsAccent } from "@/components/kiss-cam/kiss-cam-characters";
 import {
   KissCamBackground,
   KissCamBalloons,
@@ -56,16 +56,14 @@ export function KissCamDisplay({
     }
   }, [remoteStream]);
 
-  const animActive = phase !== "idle" || celebrate;
-  const balloons = phase !== "idle" || celebrate;
   const finalFrame = phase === "final" || phase === "celebration";
 
   return (
     <div
-      className={`kiss-cam-stage relative aspect-video w-full overflow-hidden bg-[#f4ebe0] ${className}`}
+      className={`kiss-cam-stage relative aspect-video w-full overflow-hidden bg-[#e8f2f8] ${className}`}
       style={{ aspectRatio: "16 / 9" }}
     >
-      <KissCamBackground active={animActive || true} />
+      <KissCamBackground active />
 
       <video
         ref={videoRef}
@@ -83,12 +81,13 @@ export function KissCamDisplay({
         fadeIn={fadeIn}
       />
 
-      <KissCamBalloons active={balloons} celebrate={celebrate} />
+      <KissCamBalloons active celebrate={celebrate} />
 
       {showCharacters ? (
         <>
           <GroomFigure phase={phase} className="z-[3]" />
           <BrideFigure phase={phase} className="z-[4]" />
+          <HeldHandsAccent phase={phase} />
         </>
       ) : null}
 
@@ -115,14 +114,14 @@ export function KissCamDisplay({
           <p className="font-heading text-[clamp(1.75rem,4.5vw,3.75rem)] font-semibold tracking-wide text-[#3a2a22]">
             {coupleNames}
           </p>
-          <p className="mt-2 text-[clamp(0.75rem,1.6vw,1.15rem)] font-semibold uppercase tracking-[0.35em] text-[#8b5a4a]/80">
+          <p className="mt-2 text-[clamp(0.75rem,1.6vw,1.15rem)] font-semibold uppercase tracking-[0.35em] text-[#6a7a88]/85">
             {tagline}
           </p>
         </div>
       ) : phase === "idle" && !remoteStream ? (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-[#8b5a4a]/70">Kiss Cam</p>
-          <p className="font-heading mt-3 text-4xl text-[#3a2a22]/85 sm:text-5xl">{coupleNames}</p>
+        <div className="pointer-events-none absolute inset-x-0 top-[8%] z-10 flex flex-col items-center px-6 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-[#6a7a88]/75">Kiss Cam</p>
+          <p className="font-heading mt-2 text-3xl text-[#3a2a22]/85 sm:text-4xl">{coupleNames}</p>
         </div>
       ) : null}
     </div>

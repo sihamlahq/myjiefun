@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 120" fill="none">
+  <!-- Pink / pearl heart balloon  replaceable -->
+  <line x1="40" y1="58" x2="40" y2="115" stroke="#9a8b82" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M40 52 C62 32 68 6 40 16 C12 6 18 32 40 52Z" fill="#f4b6c4" stroke="#4a4038" stroke-width="2"/>
+  <ellipse cx="32" cy="28" rx="5" ry="7" fill="rgba(255,255,255,0.45)"/>
+</svg>
