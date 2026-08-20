@@ -12,8 +12,8 @@ type KissCamCanvasCompositorProps = {
 
 /**
  * Draws the live camera into a cinematic frame.
- * Tuned for a sharper, smoother LED image: steady 30fps draw, higher DPR,
- * larger frame, and high-quality smoothing without heavy per-frame filters.
+ * Follows the phone capture rate (60fps when flagship 1080p60 is live, else 30)
+ * with sharp high-DPR scaling for LED walls.
  */
 export function KissCamCanvasCompositor({
   video,
@@ -41,18 +41,32 @@ export function KissCamCanvasCompositor({
     if (!ctx) return;
 
     let lastDraw = 0;
-    const minFrameMs = 1000 / 30; // Match capture — steady 30fps on LED.
+
+    const targetFpsFromVideo = () => {
+      try {
+        const stream = video?.srcObject;
+        if (stream instanceof MediaStream) {
+          const track = stream.getVideoTracks()[0];
+          const fps = track?.getSettings?.().frameRate;
+          if (typeof fps === "number" && fps >= 45) return 60;
+        }
+      } catch {
+        // ignore
+      }
+      return 30;
+    };
 
     const draw = (now: number) => {
       rafRef.current = requestAnimationFrame(draw);
       if (document.hidden) return;
+      const minFrameMs = 1000 / targetFpsFromVideo();
       if (now - lastDraw < minFrameMs - 1) return;
       lastDraw = now;
 
       const parent = canvas.parentElement;
       const cssW = parent?.clientWidth || 640;
       const cssH = parent?.clientHeight || 360;
-      // Allow sharper pixels on high-DPI LED / laptop screens.
+      // Sharp on retina / LED laptop screens without overdoing GPU cost.
       const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
       const bufW = Math.max(1, Math.round(cssW * dpr));
       const bufH = Math.max(1, Math.round(cssH * dpr));
@@ -80,7 +94,7 @@ export function KissCamCanvasCompositor({
       const h = cssH;
 
       const targetOpacity = video && video.readyState >= 2 ? 1 : 0;
-      opacityRef.current += (targetOpacity - opacityRef.current) * (fadeIn ? 0.1 : 0.28);
+      opacityRef.current += (targetOpacity - opacityRef.current) * (fadeIn ? 0.12 : 0.3);
 
       if (opacityRef.current < 0.01 || !video || video.readyState < 2) {
         return;

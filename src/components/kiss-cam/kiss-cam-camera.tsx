@@ -74,7 +74,11 @@ function labelMatchesFacing(label: string, facing: Facing) {
   return /back|rear|environment|world|main/.test(l);
 }
 
-/** Capture a higher, smooth stream for WebRTC — prefer 1080p @ 30fps (not 4K). */
+/**
+ * Flagship phone profile (iPhone 11+ / Galaxy S23 Ultra class):
+ * prefer 1080p60 — the smooth “normal” video mode these devices handle well.
+ * Fall back to 1080p30, then 720p30. Never 4K over WebRTC.
+ */
 async function openCamera(facing: Facing): Promise<MediaStream> {
   let preferredDeviceId: string | undefined;
   try {
@@ -86,49 +90,48 @@ async function openCamera(facing: Facing): Promise<MediaStream> {
     // ignore
   }
 
-  const baseVideo = {
-    // Prefer full HD for a clearer LED image; still hard-cap at 1080p.
-    width: { ideal: 1920, min: 1280, max: 1920 },
-    height: { ideal: 1080, min: 720, max: 1080 },
+  const hd60 = {
+    width: { ideal: 1920, max: 1920 },
+    height: { ideal: 1080, max: 1080 },
+    frameRate: { ideal: 60, min: 30, max: 60 },
+  } as const;
+
+  const hd30 = {
+    width: { ideal: 1920, max: 1920 },
+    height: { ideal: 1080, max: 1080 },
     frameRate: { ideal: 30, min: 24, max: 30 },
   } as const;
 
   const attempts: MediaStreamConstraints[] = [];
 
-  if (preferredDeviceId) {
+  const pushFacing = (video: MediaTrackConstraints) => {
+    if (preferredDeviceId) {
+      attempts.push({
+        audio: false,
+        video: { deviceId: { exact: preferredDeviceId }, ...video },
+      });
+    }
     attempts.push({
       audio: false,
-      video: {
-        deviceId: { exact: preferredDeviceId },
-        ...baseVideo,
-      },
+      video: { facingMode: { exact: facing }, ...video },
     });
-  }
+    attempts.push({
+      audio: false,
+      video: { facingMode: { ideal: facing }, ...video },
+    });
+  };
 
+  // Try smoothest first, then solid quality fallbacks.
+  pushFacing(hd60);
+  pushFacing(hd30);
   attempts.push(
-    {
-      audio: false,
-      video: {
-        facingMode: { exact: facing },
-        ...baseVideo,
-      },
-    },
-    {
-      audio: false,
-      video: {
-        facingMode: { ideal: facing },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30, min: 24 },
-      },
-    },
     {
       audio: false,
       video: {
         facingMode: { ideal: facing },
         width: { ideal: 1280 },
         height: { ideal: 720 },
-        frameRate: { ideal: 30 },
+        frameRate: { ideal: 30, min: 24 },
       },
     },
     {
@@ -155,28 +158,38 @@ async function tuneCaptureTrack(stream: MediaStream) {
   const track = stream.getVideoTracks()[0];
   if (!track) return;
   try {
-    // Motion hint keeps framerate steadier than "detail" on venue Wi‑Fi.
+    // Motion = steadier frame pacing on LED (better than "detail" for live share).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (track as any).contentHint = "motion";
   } catch {
     // ignore
   }
 
-  try {
-    await track.applyConstraints({
+  // Nudge toward flagship 1080p60 when the device allows it.
+  const upgrades: MediaTrackConstraints[] = [
+    {
+      width: { ideal: 1920, max: 1920 },
+      height: { ideal: 1080, max: 1080 },
+      frameRate: { ideal: 60, max: 60 },
+    },
+    {
       width: { ideal: 1920, max: 1920 },
       height: { ideal: 1080, max: 1080 },
       frameRate: { ideal: 30, min: 24, max: 30 },
-    });
-  } catch {
+    },
+    {
+      width: { ideal: 1280, max: 1920 },
+      height: { ideal: 720, max: 1080 },
+      frameRate: { ideal: 30, max: 30 },
+    },
+  ];
+
+  for (const constraints of upgrades) {
     try {
-      await track.applyConstraints({
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        frameRate: { ideal: 30, max: 30 },
-      });
+      await track.applyConstraints(constraints);
+      return;
     } catch {
-      // Keep whatever the device already gave us.
+      // try next
     }
   }
 }

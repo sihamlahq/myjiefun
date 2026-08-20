@@ -177,7 +177,7 @@ export class KissCamConnection {
     }
   }
 
-  /** Prefer steady 30fps with higher bitrate for a clear 1080p LED feed. */
+  /** Match flagship capture: 1080p60 when available, else 1080p30 — keep it smooth. */
   private async tuneVideoSender(sender: RTCRtpSender) {
     try {
       await this.preferEfficientCodecs(sender);
@@ -189,18 +189,27 @@ export class KissCamConnection {
       const settings = sender.track?.getSettings?.() ?? {};
       const w = typeof settings.width === "number" ? settings.width : 1920;
       const h = typeof settings.height === "number" ? settings.height : 1080;
+      const fps =
+        typeof settings.frameRate === "number" && settings.frameRate > 0
+          ? settings.frameRate
+          : 30;
+      const smoothFps = fps >= 45 ? 60 : 30;
       const pixels = w * h;
-      // Higher ceilings so faces stay sharp on LED walls when Wi‑Fi allows.
+      // Bitrate ceilings sized for modern phone HW encode (iPhone 11+ / S23 Ultra+).
       const maxBitrate =
         pixels >= 1920 * 1080
-          ? 7_500_000
+          ? smoothFps >= 60
+            ? 10_000_000
+            : 7_500_000
           : pixels >= 1280 * 720
-            ? 5_000_000
-            : 3_000_000;
+            ? smoothFps >= 60
+              ? 6_500_000
+              : 5_000_000
+            : 3_500_000;
 
       for (const encoding of params.encodings) {
         encoding.maxBitrate = maxBitrate;
-        encoding.maxFramerate = 30;
+        encoding.maxFramerate = smoothFps;
         encoding.scaleResolutionDownBy = 1;
         Object.assign(encoding, { priority: "high", networkPriority: "high" });
       }
@@ -216,7 +225,7 @@ export class KissCamConnection {
     try {
       const capabilities = RTCRtpSender.getCapabilities?.("video");
       if (!capabilities?.codecs?.length) return;
-      // Prefer hardware-friendly H264, then VP8 (smooth), then VP9.
+      // H.264 first — hardware encode on iPhone + Samsung; then VP8 for smooth fallback.
       const rank = (mime: string) => {
         const m = mime.toLowerCase();
         if (m.includes("h264")) return 0;
@@ -406,11 +415,11 @@ export class KissCamConnection {
 
       let score = 70;
       if (bitrateKbps != null) {
-        if (bitrateKbps > 3500) score = 98;
-        else if (bitrateKbps > 2200) score = 92;
-        else if (bitrateKbps > 1200) score = 80;
-        else if (bitrateKbps > 600) score = 65;
-        else if (bitrateKbps > 250) score = 50;
+        if (bitrateKbps > 5000) score = 98;
+        else if (bitrateKbps > 3200) score = 93;
+        else if (bitrateKbps > 2000) score = 85;
+        else if (bitrateKbps > 1000) score = 70;
+        else if (bitrateKbps > 400) score = 55;
         else score = 30;
       }
       if (packetLoss != null) {
