@@ -808,7 +808,7 @@ export function KissCamCameraClient() {
             e.preventDefault();
             void pauseCameraForLoading(true);
           }}
-          disabled={!sessionId || switching || status === "connecting" || loadingScreen}
+          disabled={!cameraOn || switching || status === "connecting" || loadingScreen}
           aria-pressed={loadingScreen}
         >
           {loadingScreen ? "Paused — tap Start Camera" : "Loading Screen"}
