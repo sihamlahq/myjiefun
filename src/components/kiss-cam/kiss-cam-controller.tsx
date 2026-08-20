@@ -36,6 +36,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const creatingSession = useRef(false);
   const startAnimationRef = useRef<(mode: "running" | "preview") => void>(() => undefined);
   const resetAnimationRef = useRef<() => void>(() => undefined);
+  const cameraStateRef = useRef(state.cameraState);
+  cameraStateRef.current = state.cameraState;
 
   const tagline =
     weddingTitle && weddingTitle.trim() && weddingTitle !== coupleNames
@@ -303,7 +305,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                 expiresAt={state.sessionExpiresAt}
                 onExpired={() => {
                   // Keep a live camera session; only rotate pairing QR when waiting.
-                  if (state.cameraState === "connected" || state.cameraState === "connecting") {
+                  const cam = cameraStateRef.current;
+                  if (cam === "connected" || cam === "connecting" || cam === "reconnecting") {
                     setState((s) => ({
                       ...s,
                       sessionExpiresAt: Date.now() + SESSION_TTL_MS,
