@@ -475,8 +475,12 @@ export function KissCamCameraClient() {
 
       stopTracksOnly();
       await releaseWakeLock();
-      setStatus("waiting");
-      setQuality(null);
+      // Keep status as connected while the peer session is still alive —
+      // only the camera track is paused for the loading screen.
+      if (!conn?.alive) {
+        setStatus("waiting");
+        setQuality(null);
+      }
       loadingBusyRef.current = false;
     },
     [cameraOn, primaryAction, releaseWakeLock, stopTracksOnly],
