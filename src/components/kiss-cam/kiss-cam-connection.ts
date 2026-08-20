@@ -129,6 +129,41 @@ export class KissCamConnection {
     }
   }
 
+  /**
+   * Swap only the outbound video track (camera flip) without tearing down
+   * the peer connection. Avoids a full renegotiation when possible.
+   */
+  async replaceVideoTrack(track: MediaStreamTrack | null) {
+    if (!this.pc) return;
+    if (track) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (track as any).contentHint = "detail";
+      } catch {
+        // ignore
+      }
+      this.localStream = new MediaStream([track]);
+    } else {
+      this.localStream = null;
+    }
+
+    const videoSender =
+      this.pc.getSenders().find((s) => s.track?.kind === "video") ??
+      this.pc.getSenders().find((s) => s.track == null);
+
+    if (videoSender) {
+      await videoSender.replaceTrack(track);
+      if (track) await this.tuneVideoSender(videoSender);
+      return;
+    }
+
+    if (track) {
+      const newSender = this.pc.addTrack(track, this.localStream ?? new MediaStream([track]));
+      await this.tuneVideoSender(newSender);
+      if (this.role === "camera") await this.createAndSendOffer();
+    }
+  }
+
   /** Push HD bitrate / resolution prefs on the outbound video sender. */
   private async tuneVideoSender(sender: RTCRtpSender) {
     try {
@@ -136,8 +171,22 @@ export class KissCamConnection {
       if (!params.encodings || params.encodings.length === 0) {
         params.encodings = [{}];
       }
+      const settings = sender.track?.getSettings?.() ?? {};
+      const w = typeof settings.width === "number" ? settings.width : 1280;
+      const h = typeof settings.height === "number" ? settings.height : 720;
+      const pixels = w * h;
+      // Scale bitrate with native camera resolution.
+      const maxBitrate =
+        pixels >= 3840 * 2160
+          ? 12_000_000
+          : pixels >= 1920 * 1080
+            ? 6_000_000
+            : pixels >= 1280 * 720
+              ? 3_500_000
+              : 2_000_000;
+
       for (const encoding of params.encodings) {
-        encoding.maxBitrate = 4_000_000; // ~4 Mbps for 1080p
+        encoding.maxBitrate = maxBitrate;
         encoding.maxFramerate = 30;
         encoding.scaleResolutionDownBy = 1;
         Object.assign(encoding, { priority: "high", networkPriority: "high" });

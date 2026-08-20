@@ -16,6 +16,112 @@ type UiStatus =
   | "reconnecting"
   | "error";
 
+type Facing = "environment" | "user";
+
+function labelMatchesFacing(label: string, facing: Facing) {
+  const l = label.toLowerCase();
+  if (facing === "user") {
+    return /front|user|face|selfie/.test(l);
+  }
+  return /back|rear|environment|world|main/.test(l);
+}
+
+/** Prefer the phone's native / max camera resolution when the device allows it. */
+async function openCamera(facing: Facing): Promise<MediaStream> {
+  let preferredDeviceId: string | undefined;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter((d) => d.kind === "videoinput");
+    const match = cams.find((d) => d.label && labelMatchesFacing(d.label, facing));
+    // If labels are blank (pre-permission), fall through to facingMode.
+    preferredDeviceId = match?.deviceId;
+  } catch {
+    // ignore
+  }
+
+  const attempts: MediaStreamConstraints[] = [];
+
+  if (preferredDeviceId) {
+    attempts.push({
+      audio: false,
+      video: {
+        deviceId: { exact: preferredDeviceId },
+        width: { ideal: 4096 },
+        height: { ideal: 2160 },
+        frameRate: { ideal: 30 },
+      },
+    });
+  }
+
+  attempts.push(
+    {
+      audio: false,
+      video: {
+        facingMode: { exact: facing },
+        width: { ideal: 4096 },
+        height: { ideal: 2160 },
+        frameRate: { ideal: 30 },
+      },
+    },
+    {
+      audio: false,
+      video: {
+        facingMode: { ideal: facing },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 },
+      },
+    },
+    {
+      audio: false,
+      video: { facingMode: { ideal: facing } },
+    },
+    { audio: false, video: true },
+  );
+
+  let lastError: unknown;
+  for (const constraints of attempts) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      await boostToNativeResolution(stream);
+      return stream;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+async function boostToNativeResolution(stream: MediaStream) {
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (track as any).contentHint = "detail";
+  } catch {
+    // ignore
+  }
+
+  const caps = typeof track.getCapabilities === "function" ? track.getCapabilities() : null;
+  if (!caps) return;
+
+  const widthMax = caps.width && "max" in caps.width ? caps.width.max : undefined;
+  const heightMax = caps.height && "max" in caps.height ? caps.height.max : undefined;
+  const fpsMax = caps.frameRate && "max" in caps.frameRate ? caps.frameRate.max : undefined;
+
+  if (!widthMax && !heightMax) return;
+
+  try {
+    await track.applyConstraints({
+      ...(widthMax ? { width: { ideal: widthMax } } : {}),
+      ...(heightMax ? { height: { ideal: heightMax } } : {}),
+      ...(fpsMax ? { frameRate: { ideal: Math.min(30, fpsMax) } } : { frameRate: { ideal: 30 } }),
+    });
+  } catch {
+    // Keep whatever resolution the device already gave us.
+  }
+}
+
 export function KissCamCameraClient() {
   const params = useSearchParams();
   const sessionParam = params.get("session");
@@ -25,13 +131,17 @@ export function KissCamCameraClient() {
   const [status, setStatus] = useState<UiStatus>("waiting");
   const [message, setMessage] = useState<string | null>(null);
   const [quality, setQuality] = useState<ConnectionQuality | null>(null);
-  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [facingMode, setFacingMode] = useState<Facing>("environment");
   const [codeInput, setCodeInput] = useState(codeParam);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const connRef = useRef<KissCamConnection | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const facingRef = useRef<Facing>("environment");
+  const switchingRef = useRef(false);
 
   const isSecure =
     typeof window === "undefined" ||
@@ -94,70 +204,39 @@ export function KissCamCameraClient() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [requestWakeLock]);
 
+  const bindPreview = useCallback(async (stream: MediaStream) => {
+    streamRef.current = stream;
+    setCameraOn(true);
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      // iOS often needs a fresh play() after srcObject swap.
+      videoRef.current.load?.();
+      await videoRef.current.play().catch(() => undefined);
+    }
+  }, []);
+
+  const stopTracksOnly = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => {
+      try {
+        t.stop();
+      } catch {
+        // ignore
+      }
+    });
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraOn(false);
+  }, []);
+
   const stopCamera = useCallback(async () => {
     await connRef.current?.dispose();
     connRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
+    stopTracksOnly();
     await releaseWakeLock();
     setStatus("waiting");
     setQuality(null);
-  }, [releaseWakeLock]);
-
-  const getStream = useCallback(async (facing: "environment" | "user") => {
-    const attempts: MediaStreamConstraints[] = [
-      {
-        audio: false,
-        video: {
-          facingMode: { ideal: facing },
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          frameRate: { ideal: 30, max: 30 },
-          aspectRatio: { ideal: 16 / 9 },
-        },
-      },
-      {
-        audio: false,
-        video: {
-          facingMode: { ideal: facing },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30, max: 30 },
-        },
-      },
-      {
-        audio: false,
-        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
-      },
-      { audio: false, video: true },
-    ];
-
-    let lastError: unknown;
-    for (const constraints of attempts) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        const track = stream.getVideoTracks()[0];
-        if (track) {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (track as any).contentHint = "detail";
-            await track.applyConstraints({
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
-              frameRate: { ideal: 30 },
-            });
-          } catch {
-            // Device may not support 1080p — keep whatever we got.
-          }
-        }
-        return stream;
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    throw lastError;
-  }, []);
+    setMessage(null);
+  }, [releaseWakeLock, stopTracksOnly]);
 
   const startCamera = useCallback(async () => {
     setMessage(null);
@@ -184,12 +263,8 @@ export function KissCamCameraClient() {
 
     try {
       await stopCamera();
-      const stream = await getStream(facingMode);
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
-      }
+      const stream = await openCamera(facingRef.current);
+      await bindPreview(stream);
       await requestWakeLock();
 
       const supabase = createClient();
@@ -228,28 +303,49 @@ export function KissCamCameraClient() {
         setMessage("Camera unavailable. Please check your phone camera.");
       }
       setStatus("error");
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+      stopTracksOnly();
     }
-  }, [facingMode, getStream, isSecure, requestWakeLock, sessionId, stopCamera]);
+  }, [bindPreview, isSecure, requestWakeLock, sessionId, stopCamera, stopTracksOnly]);
 
   const switchCamera = useCallback(async () => {
-    const next = facingMode === "environment" ? "user" : "environment";
-    setFacingMode(next);
-    if (!streamRef.current) return;
+    if (switchingRef.current || !cameraOn) return;
+    switchingRef.current = true;
+    setSwitching(true);
+    setMessage(null);
+
+    const previous = facingRef.current;
+    const next: Facing = previous === "environment" ? "user" : "environment";
+
+    // Most phones cannot open a second camera while the first track is live.
+    // Stop first, then open the other lens — this is the main switch fix.
+    stopTracksOnly();
+
     try {
-      const stream = await getStream(next);
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
-      }
-      await connRef.current?.attachLocalStream(stream);
+      const stream = await openCamera(next);
+      facingRef.current = next;
+      setFacingMode(next);
+      await bindPreview(stream);
+      await connRef.current?.replaceVideoTrack(stream.getVideoTracks()[0] ?? null);
+      await requestWakeLock();
     } catch {
-      setMessage("Camera unavailable. Please check your phone camera.");
+      // Restore previous camera if the flip failed.
+      try {
+        const stream = await openCamera(previous);
+        facingRef.current = previous;
+        setFacingMode(previous);
+        await bindPreview(stream);
+        await connRef.current?.replaceVideoTrack(stream.getVideoTracks()[0] ?? null);
+        setMessage("Could not switch camera on this phone. Still using the previous camera.");
+      } catch {
+        setMessage("Camera unavailable. Please check your phone camera.");
+        setStatus("error");
+        setCameraOn(false);
+      }
+    } finally {
+      switchingRef.current = false;
+      setSwitching(false);
     }
-  }, [facingMode, getStream]);
+  }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
 
   useEffect(() => {
     return () => {
@@ -280,7 +376,7 @@ export function KissCamCameraClient() {
       : status === "connecting"
         ? "Connecting..."
         : status === "connected"
-          ? "Camera connected ✓"
+          ? `Camera connected ✓ · ${facingMode === "environment" ? "Rear" : "Front"}`
           : status === "lost"
             ? "Connection lost"
             : status === "reconnecting"
@@ -308,9 +404,14 @@ export function KissCamCameraClient() {
           playsInline
           autoPlay
         />
-        {!streamRef.current && status === "waiting" ? (
+        {!cameraOn && status === "waiting" ? (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-white/70">
             Press Start Camera to share video with the wedding screen.
+          </div>
+        ) : null}
+        {switching ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-sm font-semibold">
+            Switching camera…
           </div>
         ) : null}
       </div>
@@ -344,7 +445,7 @@ export function KissCamCameraClient() {
           size="xl"
           className="h-14 w-full bg-[#8b3a45] text-lg text-white hover:bg-[#732f38]"
           onClick={() => void startCamera()}
-          disabled={!sessionId || status === "connecting"}
+          disabled={!sessionId || status === "connecting" || switching}
         >
           Start Camera
         </Button>
@@ -353,15 +454,18 @@ export function KissCamCameraClient() {
           variant="secondary"
           className="h-12 w-full"
           onClick={() => void switchCamera()}
-          disabled={!streamRef.current}
+          disabled={!cameraOn || switching || status === "connecting"}
         >
-          Switch Camera
+          {switching
+            ? "Switching…"
+            : `Switch Camera (${facingMode === "environment" ? "to Front" : "to Rear"})`}
         </Button>
         <Button
           size="lg"
           variant="outline"
           className="h-12 w-full border-white/20 text-[#f7f1e8]"
           onClick={() => void stopCamera()}
+          disabled={switching}
         >
           Stop Camera
         </Button>
