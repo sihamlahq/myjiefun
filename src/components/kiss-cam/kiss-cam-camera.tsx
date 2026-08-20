@@ -317,6 +317,7 @@ export function KissCamCameraClient() {
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lensesRef = useRef<LensOption[]>([]);
+  const startingRef = useRef(false);
   const loadingBusyRef = useRef(false);
   const pauseCameraForLoadingRef = useRef<(notify?: boolean) => Promise<void>>(async () => undefined);
 
@@ -429,6 +430,8 @@ export function KissCamCameraClient() {
   }, []);
 
   const stopCamera = useCallback(async () => {
+    startingRef.current = false;
+    loadingBusyRef.current = false;
     await connRef.current?.dispose();
     connRef.current = null;
     stopTracksOnly();
@@ -442,7 +445,7 @@ export function KissCamCameraClient() {
 
   const pauseCameraForLoading = useCallback(
     async (notifyDisplay = true) => {
-      if (switchingRef.current || loadingBusyRef.current) return;
+      if (switchingRef.current || loadingBusyRef.current || startingRef.current) return;
       if (primaryAction === "start" && !cameraOn) return;
       loadingBusyRef.current = true;
 
@@ -452,7 +455,9 @@ export function KissCamCameraClient() {
       setMessage(null);
 
       const conn = connRef.current;
-      if (notifyDisplay && conn) {
+      // Tell the LED first, then drop only the camera track.
+      // Keep the WebRTC + realtime session alive so Start Camera can resume quickly.
+      if (notifyDisplay && conn?.alive) {
         try {
           await conn.sendControl("loading-on");
         } catch {
@@ -460,8 +465,14 @@ export function KissCamCameraClient() {
         }
       }
 
-      await connRef.current?.dispose();
-      connRef.current = null;
+      try {
+        if (conn?.alive) {
+          await conn.replaceVideoTrack(null);
+        }
+      } catch {
+        // ignore — local stop still proceeds
+      }
+
       stopTracksOnly();
       await releaseWakeLock();
       setStatus("waiting");
@@ -473,7 +484,8 @@ export function KissCamCameraClient() {
   pauseCameraForLoadingRef.current = pauseCameraForLoading;
 
   const startCamera = useCallback(async () => {
-    if (switchingRef.current || status === "connecting") return;
+    if (switchingRef.current || startingRef.current || loadingBusyRef.current) return;
+    startingRef.current = true;
 
     setMessage(null);
     // Swap the primary button to Loading Screen immediately.
@@ -484,6 +496,7 @@ export function KissCamCameraClient() {
       setPrimaryAction("start");
       setStatus("error");
       setMessage("Camera requires HTTPS. Open this page on a secure (https) link.");
+      startingRef.current = false;
       return;
     }
 
@@ -491,6 +504,7 @@ export function KissCamCameraClient() {
       setPrimaryAction("start");
       setStatus("error");
       setMessage("This camera session has expired. Please scan a new QR code.");
+      startingRef.current = false;
       return;
     }
 
@@ -498,13 +512,41 @@ export function KissCamCameraClient() {
       setPrimaryAction("start");
       setStatus("error");
       setMessage("Camera unavailable. Please check your phone camera.");
+      startingRef.current = false;
       return;
     }
 
     setStatus("connecting");
 
     try {
-      await stopCamera();
+      const existing = connRef.current?.alive ? connRef.current : null;
+
+      // If we only paused for loading, reuse the live peer connection.
+      if (existing) {
+        const stream = await openCamera(facingRef.current);
+        await bindPreview(stream);
+        await requestWakeLock();
+        const track = stream.getVideoTracks()[0] ?? null;
+        await existing.replaceVideoTrack(track);
+        void existing.sendControl("loading-off").catch(() => undefined);
+        setPrimaryAction("loading");
+        setStatus("connected");
+        setMessage(null);
+        startingRef.current = false;
+        return;
+      }
+
+      // Fresh connect (first start, or connection was fully stopped).
+      if (connRef.current) {
+        try {
+          await connRef.current.dispose();
+        } catch {
+          // ignore
+        }
+        connRef.current = null;
+      }
+      stopTracksOnly();
+
       const stream = await openCamera(facingRef.current);
       await bindPreview(stream);
       await requestWakeLock();
@@ -542,10 +584,10 @@ export function KissCamCameraClient() {
       connRef.current = conn;
       await conn.connect();
       await conn.attachLocalStream(stream);
-      // Clear loading on the LED once video is live again.
       void conn.sendControl("loading-off").catch(() => undefined);
       setPrimaryAction("loading");
       setStatus("connected");
+      setMessage(null);
     } catch (error) {
       setPrimaryAction("start");
       const name = error instanceof DOMException ? error.name : "";
@@ -554,12 +596,18 @@ export function KissCamCameraClient() {
       } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
         setMessage("Camera unavailable. Please check your phone camera.");
       } else {
-        setMessage("Camera unavailable. Please check your phone camera.");
+        setMessage(
+          error instanceof Error
+            ? `Unable to start camera: ${error.message}`
+            : "Camera unavailable. Please check your phone camera.",
+        );
       }
       setStatus("error");
       stopTracksOnly();
+    } finally {
+      startingRef.current = false;
     }
-  }, [bindPreview, isSecure, requestWakeLock, sessionId, status, stopCamera, stopTracksOnly]);
+  }, [bindPreview, isSecure, requestWakeLock, sessionId, stopTracksOnly]);
 
   const switchCamera = useCallback(async () => {
     if (switchingRef.current || !cameraOn) return;

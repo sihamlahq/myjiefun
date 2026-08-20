@@ -115,6 +115,10 @@ export class KissCamConnection {
     this.startStats();
   }
 
+  get alive() {
+    return !this.disposed && this.pc != null && this.channel != null;
+  }
+
   async attachLocalStream(stream: MediaStream) {
     this.localStream = stream;
     if (!this.pc) return;
