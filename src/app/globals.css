@@ -426,6 +426,23 @@ h3,
   /* default stage */
 }
 
+/* LED / laptop: stage always edge-to-edge (not locked to 16:9). */
+#kiss-cam-root {
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  background: #3a2430 !important;
+  overflow: hidden !important;
+}
+
+#kiss-cam-root .kiss-cam-stage {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+}
+
 #kiss-cam-root:fullscreen,
 #kiss-cam-root:-webkit-full-screen {
   width: 100vw !important;
