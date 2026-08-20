@@ -27,18 +27,24 @@ function labelMatchesFacing(label: string, facing: Facing) {
   return /back|rear|environment|world|main/.test(l);
 }
 
-/** Prefer the phone's native / max camera resolution when the device allows it. */
+/** Capture a smooth, clear stream for WebRTC — 720p–1080p, not 4K. */
 async function openCamera(facing: Facing): Promise<MediaStream> {
   let preferredDeviceId: string | undefined;
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const cams = devices.filter((d) => d.kind === "videoinput");
     const match = cams.find((d) => d.label && labelMatchesFacing(d.label, facing));
-    // If labels are blank (pre-permission), fall through to facingMode.
     preferredDeviceId = match?.deviceId;
   } catch {
     // ignore
   }
+
+  const baseVideo = {
+    // Cap at 1080p: 4K overloads phone encode + Wi‑Fi and feels laggy on LED.
+    width: { ideal: 1280, max: 1920 },
+    height: { ideal: 720, max: 1080 },
+    frameRate: { ideal: 30, max: 30 },
+  } as const;
 
   const attempts: MediaStreamConstraints[] = [];
 
@@ -47,9 +53,7 @@ async function openCamera(facing: Facing): Promise<MediaStream> {
       audio: false,
       video: {
         deviceId: { exact: preferredDeviceId },
-        width: { ideal: 4096 },
-        height: { ideal: 2160 },
-        frameRate: { ideal: 30 },
+        ...baseVideo,
       },
     });
   }
@@ -59,23 +63,21 @@ async function openCamera(facing: Facing): Promise<MediaStream> {
       audio: false,
       video: {
         facingMode: { exact: facing },
-        width: { ideal: 4096 },
-        height: { ideal: 2160 },
-        frameRate: { ideal: 30 },
+        ...baseVideo,
       },
     },
     {
       audio: false,
       video: {
         facingMode: { ideal: facing },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
         frameRate: { ideal: 30 },
       },
     },
     {
       audio: false,
-      video: { facingMode: { ideal: facing } },
+      video: { facingMode: { ideal: facing }, frameRate: { ideal: 30 } },
     },
     { audio: false, video: true },
   );
@@ -84,7 +86,7 @@ async function openCamera(facing: Facing): Promise<MediaStream> {
   for (const constraints of attempts) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      await boostToNativeResolution(stream);
+      await tuneCaptureTrack(stream);
       return stream;
     } catch (error) {
       lastError = error;
@@ -93,33 +95,25 @@ async function openCamera(facing: Facing): Promise<MediaStream> {
   throw lastError;
 }
 
-async function boostToNativeResolution(stream: MediaStream) {
+async function tuneCaptureTrack(stream: MediaStream) {
   const track = stream.getVideoTracks()[0];
   if (!track) return;
   try {
+    // Motion hint keeps framerate steadier than "detail" on constrained Wi‑Fi.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (track as any).contentHint = "detail";
+    (track as any).contentHint = "motion";
   } catch {
     // ignore
   }
 
-  const caps = typeof track.getCapabilities === "function" ? track.getCapabilities() : null;
-  if (!caps) return;
-
-  const widthMax = caps.width && "max" in caps.width ? caps.width.max : undefined;
-  const heightMax = caps.height && "max" in caps.height ? caps.height.max : undefined;
-  const fpsMax = caps.frameRate && "max" in caps.frameRate ? caps.frameRate.max : undefined;
-
-  if (!widthMax && !heightMax) return;
-
   try {
     await track.applyConstraints({
-      ...(widthMax ? { width: { ideal: widthMax } } : {}),
-      ...(heightMax ? { height: { ideal: heightMax } } : {}),
-      ...(fpsMax ? { frameRate: { ideal: Math.min(30, fpsMax) } } : { frameRate: { ideal: 30 } }),
+      width: { ideal: 1280, max: 1920 },
+      height: { ideal: 720, max: 1080 },
+      frameRate: { ideal: 30, max: 30 },
     });
   } catch {
-    // Keep whatever resolution the device already gave us.
+    // Keep whatever the device already gave us.
   }
 }
 
@@ -466,10 +460,11 @@ export function KissCamCameraClient() {
         <div className="kiss-cam-double-love-media">
           <video
             ref={videoRef}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover [transform:translateZ(0)]"
             muted
             playsInline
             autoPlay
+            disablePictureInPicture
           />
           {!cameraOn && status === "waiting" ? (
             <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm leading-relaxed text-white/75">

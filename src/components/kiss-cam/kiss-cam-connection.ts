@@ -56,6 +56,8 @@ export class KissCamConnection {
     this.pc = new RTCPeerConnection({
       iceServers,
       iceCandidatePoolSize: 4,
+      bundlePolicy: "max-bundle",
+      rtcpMuxPolicy: "require",
     });
 
     this.pc.onicecandidate = (event) => {
@@ -108,9 +110,9 @@ export class KissCamConnection {
     for (const track of stream.getTracks()) {
       if (track.kind === "video") {
         try {
-          // Prefer detail over motion so faces stay sharp on the LED wall.
+          // Motion keeps LED playback smoother on venue Wi‑Fi.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (track as any).contentHint = "detail";
+          (track as any).contentHint = "motion";
         } catch {
           // ignore unsupported
         }
@@ -138,7 +140,7 @@ export class KissCamConnection {
     if (track) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (track as any).contentHint = "detail";
+        (track as any).contentHint = "motion";
       } catch {
         // ignore
       }
@@ -164,9 +166,11 @@ export class KissCamConnection {
     }
   }
 
-  /** Push HD bitrate / resolution prefs on the outbound video sender. */
+  /** Prefer steady 30fps with enough bitrate for a clear 720p/1080p LED feed. */
   private async tuneVideoSender(sender: RTCRtpSender) {
     try {
+      await this.preferEfficientCodecs(sender);
+
       const params = sender.getParameters();
       if (!params.encodings || params.encodings.length === 0) {
         params.encodings = [{}];
@@ -175,15 +179,12 @@ export class KissCamConnection {
       const w = typeof settings.width === "number" ? settings.width : 1280;
       const h = typeof settings.height === "number" ? settings.height : 720;
       const pixels = w * h;
-      // Scale bitrate with native camera resolution.
       const maxBitrate =
-        pixels >= 3840 * 2160
-          ? 12_000_000
-          : pixels >= 1920 * 1080
-            ? 6_000_000
-            : pixels >= 1280 * 720
-              ? 3_500_000
-              : 2_000_000;
+        pixels >= 1920 * 1080
+          ? 4_500_000
+          : pixels >= 1280 * 720
+            ? 3_000_000
+            : 2_000_000;
 
       for (const encoding of params.encodings) {
         encoding.maxBitrate = maxBitrate;
@@ -191,10 +192,42 @@ export class KissCamConnection {
         encoding.scaleResolutionDownBy = 1;
         Object.assign(encoding, { priority: "high", networkPriority: "high" });
       }
-      Object.assign(params, { degradationPreference: "maintain-resolution" });
+      // Prefer smooth motion over locking resolution when bandwidth dips.
+      Object.assign(params, { degradationPreference: "maintain-framerate" });
       await sender.setParameters(params);
     } catch (error) {
       console.warn("[kiss-cam] could not set HD sender params", error);
+    }
+  }
+
+  private async preferEfficientCodecs(sender: RTCRtpSender) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const capabilities = (RTCRtpSender as any).getCapabilities?.("video") as
+        | { codecs?: Array<{ mimeType: string; [k: string]: unknown }> }
+        | undefined;
+      if (!capabilities?.codecs?.length) return;
+      // Prefer hardware-friendly H264, then VP8 (smooth), then VP9.
+      const rank = (mime: string) => {
+        const m = mime.toLowerCase();
+        if (m.includes("h264")) return 0;
+        if (m.includes("vp8")) return 1;
+        if (m.includes("vp9")) return 2;
+        if (m.includes("av1")) return 3;
+        return 9;
+      };
+      const ordered = [...capabilities.codecs].sort(
+        (a, b) => rank(a.mimeType) - rank(b.mimeType),
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const transceiver = this.pc
+        ?.getTransceivers()
+        .find((t) => t.sender === sender) as any;
+      if (transceiver?.setCodecPreferences) {
+        transceiver.setCodecPreferences(ordered);
+      }
+    } catch {
+      // Optional API — ignore.
     }
   }
 

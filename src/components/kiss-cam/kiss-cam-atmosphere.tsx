@@ -29,20 +29,36 @@ function makeHeartBalloons(count: number): Balloon[] {
  * Love-themed stage atmosphere — matches the mobile Kiss Cam rose palette
  * with soft double-heart silhouettes behind the couple / camera frame.
  */
-export function KissCamBackground({ active }: { active: boolean }) {
+export function KissCamBackground({
+  active,
+  lite = false,
+}: {
+  active: boolean;
+  /** Fewer animated effects while the live camera feed is compositing. */
+  lite?: boolean;
+}) {
   return (
     <div className="kiss-cam-love-stage absolute inset-0 overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_8%,rgba(255,245,248,.95),transparent_52%),radial-gradient(ellipse_at_12%_78%,rgba(255,182,193,.42),transparent_44%),radial-gradient(ellipse_at_88%_68%,rgba(232,121,154,.28),transparent_42%),radial-gradient(ellipse_at_50%_100%,rgba(90,40,55,.18),transparent_45%)]" />
 
-      <div className="kiss-cam-bokeh absolute -left-16 top-6 h-80 w-80 rounded-full bg-[#ffc9d4]/45 blur-3xl" />
-      <div className="kiss-cam-bokeh kiss-cam-bokeh-delay absolute -right-10 top-1/4 h-[28rem] w-[28rem] rounded-full bg-[#e8799a]/28 blur-3xl" />
-      <div className="kiss-cam-bokeh absolute bottom-[-8%] left-[28%] h-96 w-96 rounded-full bg-[#fff5f7]/55 blur-3xl" />
-      <div className="kiss-cam-bokeh absolute right-[18%] bottom-[12%] h-64 w-64 rounded-full bg-[#ff8fab]/22 blur-3xl" />
+      {!lite ? (
+        <>
+          <div className="kiss-cam-bokeh absolute -left-16 top-6 h-80 w-80 rounded-full bg-[#ffc9d4]/45 blur-3xl" />
+          <div className="kiss-cam-bokeh kiss-cam-bokeh-delay absolute -right-10 top-1/4 h-[28rem] w-[28rem] rounded-full bg-[#e8799a]/28 blur-3xl" />
+          <div className="kiss-cam-bokeh absolute bottom-[-8%] left-[28%] h-96 w-96 rounded-full bg-[#fff5f7]/55 blur-3xl" />
+          <div className="kiss-cam-bokeh absolute right-[18%] bottom-[12%] h-64 w-64 rounded-full bg-[#ff8fab]/22 blur-3xl" />
+        </>
+      ) : (
+        <>
+          <div className="absolute -left-10 top-8 h-56 w-56 rounded-full bg-[#ffc9d4]/30 blur-2xl" />
+          <div className="absolute -right-8 top-1/3 h-64 w-64 rounded-full bg-[#e8799a]/18 blur-2xl" />
+        </>
+      )}
 
       <LoveHeartMotifs />
 
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,rgba(58,36,48,.22))]" />
-      {active ? <SparkleField /> : null}
+      {active && !lite ? <SparkleField /> : null}
     </div>
   );
 }
@@ -157,7 +173,7 @@ export function KissCamBalloons({
   active: boolean;
   celebrate?: boolean;
 }) {
-  const balloons = useMemo(() => makeHeartBalloons(celebrate ? 18 : 10), [celebrate]);
+  const balloons = useMemo(() => makeHeartBalloons(celebrate ? 14 : 6), [celebrate]);
   if (!active) return null;
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">

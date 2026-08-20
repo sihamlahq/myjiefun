@@ -63,6 +63,7 @@ export function KissCamDisplay({
   }, [remoteStream]);
 
   const finalFrame = phase === "final" || phase === "celebration";
+  const cameraLive = cameraEnabled && Boolean(remoteStream);
 
   return (
     <div
@@ -73,7 +74,7 @@ export function KissCamDisplay({
       }
       style={fillViewport ? undefined : { aspectRatio: "16 / 9" }}
     >
-      <KissCamBackground active />
+      <KissCamBackground active lite={cameraLive} />
 
       <video
         ref={videoRef}
@@ -81,17 +82,18 @@ export function KissCamDisplay({
         muted
         playsInline
         autoPlay
+        disablePictureInPicture
         aria-hidden
       />
 
       <KissCamCanvasCompositor
         video={videoEl}
-        enabled={cameraEnabled && Boolean(remoteStream)}
+        enabled={cameraLive}
         layout={cameraLayout}
         fadeIn={fadeIn}
       />
 
-      <KissCamBalloons active celebrate={celebrate} />
+      <KissCamBalloons active={!cameraLive || celebrate} celebrate={celebrate} />
 
       {showCharacters ? (
         <>
