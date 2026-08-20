@@ -21,7 +21,7 @@ export function createShortCode(length = 6) {
   return out;
 }
 
-export const SESSION_TTL_MS = 5 * 60 * 1000;
+export const SESSION_TTL_MS = 15 * 60 * 1000;
 
 export function cameraPagePath(sessionId: string, siteUrl?: string) {
   const base = (siteUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://tablewedding.com").replace(

@@ -301,7 +301,17 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                 sessionId={state.sessionId}
                 shortCode={state.shortCode}
                 expiresAt={state.sessionExpiresAt}
-                onExpired={() => void refreshSession()}
+                onExpired={() => {
+                  // Keep a live camera session; only rotate pairing QR when waiting.
+                  if (state.cameraState === "connected" || state.cameraState === "connecting") {
+                    setState((s) => ({
+                      ...s,
+                      sessionExpiresAt: Date.now() + SESSION_TTL_MS,
+                    }));
+                    return;
+                  }
+                  void refreshSession();
+                }}
               />
 
               <div className="rounded-2xl border border-white/10 bg-[#3a2f28] p-4 text-[#f7f1e8]">
