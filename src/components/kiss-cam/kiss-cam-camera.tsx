@@ -665,48 +665,8 @@ export function KissCamCameraClient() {
         </svg>
         <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
         <KissCamLoadingOverlay active={loadingScreen} size="phone" />
-
-        {cameraOn ? (
-          <div className="absolute bottom-3 left-1/2 z-20 w-[min(92%,300px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#3a2430]/78 px-3 py-2.5 backdrop-blur-md">
-            <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffc9d4]/75">
-              <span>Zoom</span>
-              <span className="tabular-nums tracking-normal text-[#fff5f7]">
-                {zoomRange ? `${zoomValue.toFixed(1)}×` : "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
-                −
-              </span>
-              <input
-                type="range"
-                className="kiss-cam-zoom-slider min-w-0 flex-1"
-                min={zoomRange?.min ?? 1}
-                max={zoomRange?.max ?? 1}
-                step={zoomRange?.step ?? 0.1}
-                value={zoomRange ? zoomValue : 1}
-                disabled={!zoomRange || switching}
-                onInput={(e) => {
-                  void applyZoom(Number((e.target as HTMLInputElement).value));
-                }}
-                onChange={(e) => {
-                  void applyZoom(Number(e.target.value));
-                }}
-                aria-label="Camera zoom"
-              />
-              <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
-                +
-              </span>
-            </div>
-          </div>
-        ) : null}
       </div>
 
-      {cameraOn && !zoomRange ? (
-        <p className="mt-2 text-center text-[11px] text-[#ffc9d4]/55">
-          Zoom lens not available on this camera
-        </p>
-      ) : null}
       {message ? (
         <p className="mt-4 rounded-2xl border border-rose-300/35 bg-rose-950/45 px-3 py-2 text-center text-sm text-rose-50">
           {message}
@@ -735,6 +695,44 @@ export function KissCamCameraClient() {
       ) : null}
 
       <div className="mt-auto grid gap-3 pt-6">
+        <div className="rounded-2xl border border-rose-200/20 bg-[#3a2430]/65 px-3 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffc9d4]/75">
+            <span>Zoom</span>
+            <span className="tabular-nums tracking-normal text-[#fff5f7]">
+              {cameraOn && zoomRange ? `${zoomValue.toFixed(1)}×` : "—"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
+              −
+            </span>
+            <input
+              type="range"
+              className="kiss-cam-zoom-slider min-w-0 flex-1"
+              min={zoomRange?.min ?? 1}
+              max={zoomRange?.max ?? 1}
+              step={zoomRange?.step ?? 0.1}
+              value={zoomRange ? zoomValue : 1}
+              disabled={!cameraOn || !zoomRange || switching}
+              onInput={(e) => {
+                void applyZoom(Number((e.target as HTMLInputElement).value));
+              }}
+              onChange={(e) => {
+                void applyZoom(Number(e.target.value));
+              }}
+              aria-label="Camera zoom"
+            />
+            <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
+              +
+            </span>
+          </div>
+          {cameraOn && !zoomRange ? (
+            <p className="mt-1.5 text-center text-[11px] text-[#ffc9d4]/55">
+              Zoom lens not available on this camera
+            </p>
+          ) : null}
+        </div>
+
         <Button
           size="xl"
           className="h-14 w-full touch-manipulation bg-[#c45a78] text-lg text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864] active:scale-[0.98]"
