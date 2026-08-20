@@ -69,12 +69,38 @@ export function KissCamDisplay({
       if (!hadStream.current) setFadeIn(true);
       else setFadeIn(true);
       hadStream.current = true;
-      video.srcObject = remoteStream;
+      const sameObject = video.srcObject === remoteStream;
+      if (!sameObject) {
+        video.srcObject = remoteStream;
+      }
+      // iOS / Chrome often need an explicit play after unmute or replaceTrack.
       void video.play().catch(() => undefined);
+      const track = remoteStream.getVideoTracks()[0];
+      if (track) {
+        const kick = () => {
+          void video.play().catch(() => undefined);
+          setFadeIn(true);
+        };
+        track.addEventListener("unmute", kick);
+        track.addEventListener("ended", kick);
+        return () => {
+          track.removeEventListener("unmute", kick);
+          track.removeEventListener("ended", kick);
+        };
+      }
     } else {
       video.srcObject = null;
     }
   }, [remoteStream]);
+
+  // When loading clears, force the compositor video to wake up immediately.
+  useEffect(() => {
+    if (loading) return;
+    const video = videoRef.current;
+    if (!video?.srcObject) return;
+    void video.play().catch(() => undefined);
+    setFadeIn(true);
+  }, [loading]);
 
   // After the lip-kiss beat, fire a big LOVE burst on celebration.
   useEffect(() => {

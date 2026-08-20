@@ -147,7 +147,11 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             window.setTimeout(() => setLoveBurst(false), 2800);
           }
           if (action === "loading-on") setLoadingScreen(true);
-          if (action === "loading-off") setLoadingScreen(false);
+          if (action === "loading-off") {
+            setLoadingScreen(false);
+            // Nudge React to re-bind the live stream after camera resume.
+            setRemoteStream((prev) => (prev ? new MediaStream(prev.getTracks()) : prev));
+          }
           if (
             action === "countdown-1" ||
             action === "countdown-2" ||

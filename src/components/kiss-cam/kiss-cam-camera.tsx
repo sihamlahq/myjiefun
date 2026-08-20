@@ -159,8 +159,8 @@ function readActiveLensFactor(track: MediaStreamTrack | null, lenses: LensOption
 
 /**
  * Flagship phone profile (iPhone 11+ / Galaxy S23 Ultra class):
- * prefer 1080p60 — the smooth “normal” video mode these devices handle well.
- * Fall back to 1080p30, then 720p30. Never 4K over WebRTC.
+ * open quickly with ideal constraints, then upgrade toward 1080p60.
+ * Avoid long cascades of exact constraints that fail and delay Start Camera.
  */
 async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStream> {
   let preferredDeviceId = deviceId;
@@ -177,56 +177,30 @@ async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStrea
     }
   }
 
-  const hd60 = {
-    width: { ideal: 1920, max: 1920 },
-    height: { ideal: 1080, max: 1080 },
-    frameRate: { ideal: 60, min: 30, max: 60 },
-  } as const;
-
-  const hd30 = {
-    width: { ideal: 1920, max: 1920 },
-    height: { ideal: 1080, max: 1080 },
-    frameRate: { ideal: 30, min: 24, max: 30 },
-  } as const;
+  const softHd: MediaTrackConstraints = {
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    frameRate: { ideal: 30 },
+  };
 
   const attempts: MediaStreamConstraints[] = [];
 
-  const pushFacing = (video: MediaTrackConstraints) => {
-    if (preferredDeviceId) {
-      attempts.push({
-        audio: false,
-        video: { deviceId: { exact: preferredDeviceId }, ...video },
-      });
-    }
+  // Fast path first — ideals usually succeed on the first try.
+  if (preferredDeviceId) {
     attempts.push({
       audio: false,
-      video: { facingMode: { exact: facing }, ...video },
+      video: { deviceId: { ideal: preferredDeviceId }, ...softHd },
     });
-    attempts.push({
-      audio: false,
-      video: { facingMode: { ideal: facing }, ...video },
-    });
-  };
-
-  // Try smoothest first, then solid quality fallbacks.
-  pushFacing(hd60);
-  pushFacing(hd30);
-  attempts.push(
-    {
-      audio: false,
-      video: {
-        facingMode: { ideal: facing },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30, min: 24 },
-      },
-    },
-    {
-      audio: false,
-      video: { facingMode: { ideal: facing }, frameRate: { ideal: 30 } },
-    },
-    { audio: false, video: true },
-  );
+  }
+  attempts.push({
+    audio: false,
+    video: { facingMode: { ideal: facing }, ...softHd },
+  });
+  attempts.push({
+    audio: false,
+    video: { facingMode: { ideal: facing }, frameRate: { ideal: 30 } },
+  });
+  attempts.push({ audio: false, video: true });
 
   let lastError: unknown;
   for (const constraints of attempts) {
@@ -239,6 +213,28 @@ async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStrea
     }
   }
   throw lastError;
+}
+
+/** Tiny silent video track that keeps the WebRTC media path warm during loading. */
+function createPlaceholderVideoTrack(): MediaStreamTrack {
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 360;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.fillStyle = "#3a2430";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const stream = canvas.captureStream(5);
+  const track = stream.getVideoTracks()[0];
+  if (!track) throw new Error("Unable to create placeholder video track");
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (track as any).contentHint = "motion";
+  } catch {
+    // ignore
+  }
+  return track;
 }
 
 async function tuneCaptureTrack(stream: MediaStream) {
@@ -319,7 +315,19 @@ export function KissCamCameraClient() {
   const lensesRef = useRef<LensOption[]>([]);
   const startingRef = useRef(false);
   const loadingBusyRef = useRef(false);
+  const placeholderTrackRef = useRef<MediaStreamTrack | null>(null);
   const pauseCameraForLoadingRef = useRef<(notify?: boolean) => Promise<void>>(async () => undefined);
+
+  const stopPlaceholderTrack = useCallback(() => {
+    const track = placeholderTrackRef.current;
+    placeholderTrackRef.current = null;
+    if (!track) return;
+    try {
+      track.stop();
+    } catch {
+      // ignore
+    }
+  }, []);
 
 
   const isSecure =
@@ -432,6 +440,7 @@ export function KissCamCameraClient() {
   const stopCamera = useCallback(async () => {
     startingRef.current = false;
     loadingBusyRef.current = false;
+    stopPlaceholderTrack();
     await connRef.current?.dispose();
     connRef.current = null;
     stopTracksOnly();
@@ -441,7 +450,7 @@ export function KissCamCameraClient() {
     setStatus("waiting");
     setQuality(null);
     setMessage(null);
-  }, [releaseWakeLock, stopTracksOnly]);
+  }, [releaseWakeLock, stopPlaceholderTrack, stopTracksOnly]);
 
   const pauseCameraForLoading = useCallback(
     async (notifyDisplay = true) => {
@@ -455,8 +464,8 @@ export function KissCamCameraClient() {
       setMessage(null);
 
       const conn = connRef.current;
-      // Tell the LED first, then drop only the camera track.
-      // Keep the WebRTC + realtime session alive so Start Camera can resume quickly.
+      // Tell the LED first, then park a tiny placeholder on the peer connection
+      // so RTP/ICE stay warm. Buttons already work over signaling; video needs this.
       if (notifyDisplay && conn?.alive) {
         try {
           await conn.sendControl("loading-on");
@@ -467,23 +476,31 @@ export function KissCamCameraClient() {
 
       try {
         if (conn?.alive) {
-          await conn.replaceVideoTrack(null);
+          stopPlaceholderTrack();
+          const placeholder = createPlaceholderVideoTrack();
+          placeholderTrackRef.current = placeholder;
+          await conn.replaceVideoTrack(placeholder, { renegotiate: false });
         }
       } catch {
-        // ignore — local stop still proceeds
+        // Fallback: detach video if placeholder fails.
+        try {
+          if (conn?.alive) await conn.replaceVideoTrack(null, { renegotiate: false });
+        } catch {
+          // ignore — local stop still proceeds
+        }
       }
 
       stopTracksOnly();
       await releaseWakeLock();
       // Keep status as connected while the peer session is still alive —
-      // only the camera track is paused for the loading screen.
+      // only the camera hardware is paused for the loading screen.
       if (!conn?.alive) {
         setStatus("waiting");
         setQuality(null);
       }
       loadingBusyRef.current = false;
     },
-    [cameraOn, primaryAction, releaseWakeLock, stopTracksOnly],
+    [cameraOn, primaryAction, releaseWakeLock, stopPlaceholderTrack, stopTracksOnly],
   );
   pauseCameraForLoadingRef.current = pauseCameraForLoading;
 
@@ -525,13 +542,14 @@ export function KissCamCameraClient() {
     try {
       const existing = connRef.current?.alive ? connRef.current : null;
 
-      // If we only paused for loading, reuse the live peer connection.
+      // If we only paused for loading, reopen the lens and renegotiate media.
       if (existing) {
         const stream = await openCamera(facingRef.current);
         await bindPreview(stream);
         await requestWakeLock();
         const track = stream.getVideoTracks()[0] ?? null;
-        await existing.replaceVideoTrack(track);
+        await existing.replaceVideoTrack(track, { renegotiate: true });
+        stopPlaceholderTrack();
         void existing.sendControl("loading-off").catch(() => undefined);
         setPrimaryAction("loading");
         setStatus("connected");
@@ -540,7 +558,7 @@ export function KissCamCameraClient() {
         return;
       }
 
-      // Fresh connect (first start, or connection was fully stopped).
+      // Fresh connect: open the camera while signaling/ICE set up in parallel.
       if (connRef.current) {
         try {
           await connRef.current.dispose();
@@ -549,11 +567,8 @@ export function KissCamCameraClient() {
         }
         connRef.current = null;
       }
+      stopPlaceholderTrack();
       stopTracksOnly();
-
-      const stream = await openCamera(facingRef.current);
-      await bindPreview(stream);
-      await requestWakeLock();
 
       const supabase = createClient();
       const conn = new KissCamConnection(supabase, sessionId, "camera", {
@@ -586,8 +601,37 @@ export function KissCamCameraClient() {
         },
       });
       connRef.current = conn;
-      await conn.connect();
-      await conn.attachLocalStream(stream);
+
+      // Open the lens while ICE + Realtime subscribe — cuts time-to-first-frame.
+      const streamPromise = openCamera(facingRef.current);
+      try {
+        await conn.connect();
+        const stream = await streamPromise;
+        await bindPreview(stream);
+        await requestWakeLock();
+        await conn.attachLocalStream(stream);
+      } catch (bootError) {
+        // Stop a camera that opened while signaling failed, and drop a half-open PC.
+        try {
+          const leaked = await streamPromise.catch(() => null);
+          leaked?.getTracks().forEach((t) => {
+            try {
+              t.stop();
+            } catch {
+              // ignore
+            }
+          });
+        } catch {
+          // ignore
+        }
+        try {
+          await conn.dispose();
+        } catch {
+          // ignore
+        }
+        if (connRef.current === conn) connRef.current = null;
+        throw bootError;
+      }
       void conn.sendControl("loading-off").catch(() => undefined);
       setPrimaryAction("loading");
       setStatus("connected");
@@ -607,11 +651,12 @@ export function KissCamCameraClient() {
         );
       }
       setStatus("error");
+      stopPlaceholderTrack();
       stopTracksOnly();
     } finally {
       startingRef.current = false;
     }
-  }, [bindPreview, isSecure, requestWakeLock, sessionId, stopTracksOnly]);
+  }, [bindPreview, isSecure, requestWakeLock, sessionId, stopPlaceholderTrack, stopTracksOnly]);
 
   const switchCamera = useCallback(async () => {
     if (switchingRef.current || !cameraOn) return;

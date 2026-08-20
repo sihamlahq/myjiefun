@@ -66,7 +66,7 @@ export class KissCamConnection {
     const { iceServers } = await fetchIceServers();
     this.pc = new RTCPeerConnection({
       iceServers,
-      iceCandidatePoolSize: 4,
+      iceCandidatePoolSize: 8,
       bundlePolicy: "max-bundle",
       rtcpMuxPolicy: "require",
     });
@@ -79,6 +79,16 @@ export class KissCamConnection {
 
     this.pc.ontrack = (event) => {
       const stream = event.streams[0] ?? new MediaStream([event.track]);
+      // ReplaceTrack resume does not fire ontrack again — listen for unmute
+      // so the LED rebinds when the camera comes back after loading.
+      event.track.onunmute = () => {
+        this.handlers.onRemoteStream?.(
+          event.streams[0] ?? new MediaStream([event.track]),
+        );
+      };
+      event.track.onmute = () => {
+        // Keep the MediaStream reference; compositor handles blank frames.
+      };
       this.handlers.onRemoteStream?.(stream);
     };
 
@@ -97,16 +107,35 @@ export class KissCamConnection {
       config: { broadcast: { self: false } },
     });
 
-    this.channel
-      .on("broadcast", { event: "signal" }, ({ payload }) => {
-        void this.onSignal(payload as SignalMessage);
-      })
-      .subscribe((status) => {
+    this.channel.on("broadcast", { event: "signal" }, ({ payload }) => {
+      void this.onSignal(payload as SignalMessage);
+    });
+
+    // Wait until Realtime is actually subscribed before sending offers/controls.
+    // Otherwise the first camera offer is often dropped while buttons later work.
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Kiss Cam signaling timed out. Check the network and try again."));
+      }, 12_000);
+
+      this.channel!.subscribe((status) => {
         if (status === "SUBSCRIBED") {
+          clearTimeout(timeout);
           void this.send({ type: "hello", role: this.role });
           this.startHeartbeat();
+          resolve();
+        } else if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          clearTimeout(timeout);
+          reject(new Error(`Kiss Cam signaling failed (${status}).`));
         }
       });
+    });
+
+    if (this.disposed) return;
 
     if (this.role === "camera" && this.localStream) {
       await this.attachLocalStream(this.localStream);
@@ -116,7 +145,12 @@ export class KissCamConnection {
   }
 
   get alive() {
-    return !this.disposed && this.pc != null && this.channel != null;
+    return (
+      !this.disposed &&
+      this.pc != null &&
+      this.channel != null &&
+      this.pc.connectionState !== "closed"
+    );
   }
 
   async attachLocalStream(stream: MediaStream) {
@@ -147,10 +181,11 @@ export class KissCamConnection {
   }
 
   /**
-   * Swap only the outbound video track (camera flip) without tearing down
-   * the peer connection. Avoids a full renegotiation when possible.
+   * Swap the outbound video track without tearing down the peer connection.
+   * Pass `{ renegotiate: true }` after a loading pause so the LED picks up
+   * the live camera again — buttons use signaling; video needs a fresh offer.
    */
-  async replaceVideoTrack(track: MediaStreamTrack | null) {
+  async replaceVideoTrack(track: MediaStreamTrack | null, opts?: { renegotiate?: boolean }) {
     if (!this.pc) return;
     if (track) {
       try {
@@ -168,16 +203,29 @@ export class KissCamConnection {
       this.pc.getSenders().find((s) => s.track?.kind === "video") ??
       this.pc.getSenders().find((s) => s.track == null);
 
+    const needIceRestart =
+      this.pc.connectionState === "failed" ||
+      this.pc.connectionState === "disconnected" ||
+      this.pc.iceConnectionState === "failed" ||
+      this.pc.iceConnectionState === "disconnected";
+
     if (videoSender) {
       await videoSender.replaceTrack(track);
-      if (track) await this.tuneVideoSender(videoSender);
+      if (track) {
+        await this.tuneVideoSender(videoSender);
+        const shouldRenegotiate =
+          this.role === "camera" && (opts?.renegotiate === true || needIceRestart);
+        if (shouldRenegotiate) {
+          await this.createAndSendOffer(needIceRestart);
+        }
+      }
       return;
     }
 
     if (track) {
       const newSender = this.pc.addTrack(track, this.localStream ?? new MediaStream([track]));
       await this.tuneVideoSender(newSender);
-      if (this.role === "camera") await this.createAndSendOffer();
+      if (this.role === "camera") await this.createAndSendOffer(needIceRestart);
     }
   }
 
