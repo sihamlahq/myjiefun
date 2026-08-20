@@ -137,6 +137,8 @@ export function KissCamCameraClient() {
   const [cameraOn, setCameraOn] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [loveBurst, setLoveBurst] = useState(false);
+  const [loveBurstId, setLoveBurstId] = useState(0);
+  const [loveBusy, setLoveBusy] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -144,6 +146,9 @@ export function KissCamCameraClient() {
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const facingRef = useRef<Facing>("environment");
   const switchingRef = useRef(false);
+  const loveCooldownRef = useRef(false);
+  const loveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loveClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSecure =
     typeof window === "undefined" ||
@@ -350,11 +355,40 @@ export function KissCamCameraClient() {
   }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
 
   const triggerLove = useCallback(() => {
-    if (loveBurst) return;
+    // Short cooldown only — keeping the button disabled for the full animation
+    // made taps feel dead / laggy on phones.
+    if (loveCooldownRef.current || !cameraOn || switchingRef.current) return;
+    loveCooldownRef.current = true;
+    setLoveBusy(true);
+
+    setLoveBurstId((id) => id + 1);
     setLoveBurst(true);
-    void connRef.current?.sendControl("love");
-    window.setTimeout(() => setLoveBurst(false), 2600);
-  }, [loveBurst]);
+    // Fire signaling after paint so the UI reacts instantly.
+    queueMicrotask(() => {
+      void connRef.current?.sendControl("love").catch(() => undefined);
+    });
+
+    if (loveTimerRef.current) clearTimeout(loveTimerRef.current);
+    if (loveClearRef.current) clearTimeout(loveClearRef.current);
+
+    loveTimerRef.current = setTimeout(() => {
+      loveCooldownRef.current = false;
+      setLoveBusy(false);
+      loveTimerRef.current = null;
+    }, 350);
+
+    loveClearRef.current = setTimeout(() => {
+      setLoveBurst(false);
+      loveClearRef.current = null;
+    }, 1800);
+  }, [cameraOn]);
+
+  useEffect(() => {
+    return () => {
+      if (loveTimerRef.current) clearTimeout(loveTimerRef.current);
+      if (loveClearRef.current) clearTimeout(loveClearRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -483,7 +517,7 @@ export function KissCamCameraClient() {
             vectorEffect="non-scaling-stroke"
           />
         </svg>
-        <KissCamLoveBurst active={loveBurst} size="phone" />
+        <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
       </div>
 
       {message ? (
@@ -504,7 +538,10 @@ export function KissCamCameraClient() {
             className="h-12 w-full rounded-xl border border-rose-200/25 bg-[#3a2430]/80 px-4 text-center font-heading text-2xl tracking-[0.3em] text-[#fff5f7]"
             placeholder="ABC123"
           />
-          <Button className="h-12 w-full bg-[#c45a78] text-white hover:bg-[#a84864]" onClick={() => void resolveCode()}>
+          <Button
+            className="h-12 w-full touch-manipulation bg-[#c45a78] text-white hover:bg-[#a84864] active:scale-[0.98]"
+            onClick={() => void resolveCode()}
+          >
             Continue
           </Button>
         </div>
@@ -513,24 +550,36 @@ export function KissCamCameraClient() {
       <div className="mt-auto grid gap-3 pt-6">
         <Button
           size="xl"
-          className="h-14 w-full bg-[#c45a78] text-lg text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864]"
+          className="h-14 w-full touch-manipulation bg-[#c45a78] text-lg text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864] active:scale-[0.98]"
           onClick={() => void startCamera()}
           disabled={!sessionId || status === "connecting" || switching}
         >
           Start Camera
         </Button>
         <Button
+          type="button"
           size="lg"
-          className="h-12 w-full border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-base font-semibold text-white shadow-[0_8px_22px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864]"
-          onClick={triggerLove}
-          disabled={!cameraOn || switching || loveBurst}
+          className="h-12 w-full touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-base font-semibold text-white shadow-[0_8px_22px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.97]"
+          onPointerDown={(e) => {
+            // Instant feedback on mobile (avoids 300ms-feel click lag).
+            if (e.button !== 0) return;
+            e.preventDefault();
+            triggerLove();
+          }}
+          onClick={(e) => {
+            // Keyboard / accessibility fallback when pointerdown didn't fire.
+            e.preventDefault();
+            triggerLove();
+          }}
+          disabled={!cameraOn || switching || loveBusy}
+          aria-pressed={loveBurst}
         >
-          {loveBurst ? "♥ Loving…" : "♥ Love"}
+          ♥ Love
         </Button>
         <Button
           size="lg"
           variant="secondary"
-          className="h-12 w-full border border-rose-200/20 bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/18"
+          className="h-12 w-full touch-manipulation border border-rose-200/20 bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/18 active:scale-[0.98]"
           onClick={() => void switchCamera()}
           disabled={!cameraOn || switching || status === "connecting"}
         >
@@ -541,7 +590,7 @@ export function KissCamCameraClient() {
         <Button
           size="lg"
           variant="outline"
-          className="h-12 w-full border-rose-200/25 text-[#ffd6e0]"
+          className="h-12 w-full touch-manipulation border-rose-200/25 text-[#ffd6e0] active:scale-[0.98]"
           onClick={() => void stopCamera()}
           disabled={switching}
         >
