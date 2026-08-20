@@ -12,7 +12,7 @@ type SignalMessage =
   | { type: "answer"; sdp: RTCSessionDescriptionInit }
   | { type: "ice"; candidate: RTCIceCandidateInit }
   | { type: "bye" }
-  | { type: "control"; action: "start" | "reset" | "preview" };
+  | { type: "control"; action: "start" | "reset" | "preview" | "love" };
 
 type Handlers = {
   onRemoteStream?: (stream: MediaStream | null) => void;
@@ -20,7 +20,7 @@ type Handlers = {
   onPeerPresence?: (present: boolean) => void;
   onQuality?: (quality: ConnectionQuality) => void;
   onError?: (message: string) => void;
-  onControl?: (action: "start" | "reset" | "preview") => void;
+  onControl?: (action: "start" | "reset" | "preview" | "love") => void;
 };
 
 /**
@@ -412,7 +412,7 @@ export class KissCamConnection {
     this.handlers.onRemoteStream?.(null);
   }
 
-  async sendControl(action: "start" | "reset" | "preview") {
+  async sendControl(action: "start" | "reset" | "preview" | "love") {
     await this.send({ type: "control", action });
   }
 }

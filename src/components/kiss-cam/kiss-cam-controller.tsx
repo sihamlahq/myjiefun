@@ -30,6 +30,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [turnOk, setTurnOk] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loveBurst, setLoveBurst] = useState(false);
   const connRef = useRef<KissCamConnection | null>(null);
   const rafRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
@@ -137,6 +138,10 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           if (action === "start") startAnimationRef.current("running");
           if (action === "preview") startAnimationRef.current("preview");
           if (action === "reset") resetAnimationRef.current();
+          if (action === "love") {
+            setLoveBurst(true);
+            window.setTimeout(() => setLoveBurst(false), 2800);
+          }
         },
         onError: (message) => {
           if (!cancelled) {
@@ -303,6 +308,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
               cameraLayout={state.cameraLayout}
               remoteStream={remoteStream}
               celebrate={celebrate}
+              loveBurst={loveBurst}
               showCharacters
               fillViewport={state.fullscreen}
               className={state.fullscreen ? "h-full w-full" : ""}

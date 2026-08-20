@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { KissCamConnection } from "@/components/kiss-cam/kiss-cam-connection";
+import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import { KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
 import type { ConnectionQuality } from "@/components/kiss-cam/kiss-cam-types";
 
@@ -135,6 +136,7 @@ export function KissCamCameraClient() {
   const [codeInput, setCodeInput] = useState(codeParam);
   const [cameraOn, setCameraOn] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [loveBurst, setLoveBurst] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -347,6 +349,13 @@ export function KissCamCameraClient() {
     }
   }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
 
+  const triggerLove = useCallback(() => {
+    if (loveBurst) return;
+    setLoveBurst(true);
+    void connRef.current?.sendControl("love");
+    window.setTimeout(() => setLoveBurst(false), 2600);
+  }, [loveBurst]);
+
   useEffect(() => {
     return () => {
       void stopCamera();
@@ -384,57 +393,118 @@ export function KissCamCameraClient() {
               : "Something went wrong";
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-[#2a221c] px-4 py-6 text-[#f7f1e8]">
+    <main className="kiss-cam-phone-shell mx-auto flex min-h-[100dvh] max-w-md flex-col px-4 py-6 text-[#fff5f7]">
+      {/* Hidden clip definition for the wide double-heart preview */}
+      <svg width={0} height={0} className="absolute" aria-hidden>
+        <defs>
+          <clipPath id="kiss-cam-double-love-clip" clipPathUnits="objectBoundingBox">
+            {/* Left heart */}
+            <path d="M0.34,0.96 C0.34,0.96 -0.02,0.62 -0.02,0.34 C-0.02,0.16 0.10,0.06 0.24,0.10 C0.31,0.12 0.36,0.22 0.38,0.34 C0.40,0.22 0.47,0.10 0.56,0.10 C0.70,0.06 0.80,0.18 0.78,0.34 C0.76,0.58 0.50,0.88 0.34,0.96 Z" />
+            {/* Right heart — overlaps for a wide double-love silhouette */}
+            <path d="M0.66,0.96 C0.66,0.96 0.30,0.62 0.30,0.34 C0.28,0.18 0.38,0.06 0.52,0.10 C0.59,0.12 0.64,0.22 0.66,0.34 C0.68,0.22 0.75,0.10 0.84,0.10 C0.98,0.06 1.08,0.18 1.06,0.34 C1.04,0.58 0.82,0.88 0.66,0.96 Z" />
+          </clipPath>
+        </defs>
+      </svg>
+
       <header className="text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#d4af37]/90">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.38em] text-[#ffc9d4]/80">
           TableWedding
         </p>
-        <h1 className="font-heading mt-1 text-3xl">Kiss Cam Camera</h1>
-        <p className="mt-2 text-sm text-[#f7f1e8]/65">{statusText}</p>
+        <h1 className="kiss-cam-love-title mt-1 text-[clamp(3.25rem,14vw,4.5rem)]">
+          <span className="kiss-cam-love-title-accent mr-1 text-[0.72em]" aria-hidden>
+            ♥
+          </span>
+          Kiss Cam
+          <span className="kiss-cam-love-title-accent ml-1 text-[0.72em]" aria-hidden>
+            ♥
+          </span>
+        </h1>
+        <p className="font-heading mt-1 text-sm italic tracking-wide text-[#ffd6e0]/75">
+          Share a moment of love
+        </p>
+        <p className="mt-3 text-sm text-[#fff5f7]/70">{statusText}</p>
         <div className="mt-2 flex justify-center">
           <KissCamSignalBars quality={quality} />
         </div>
       </header>
 
-      <div className="relative mt-5 aspect-[3/4] overflow-hidden rounded-3xl border border-[#d4af37]/35 bg-black/40 shadow-lg">
-        <video
-          ref={videoRef}
-          className="h-full w-full object-cover"
-          muted
-          playsInline
-          autoPlay
-        />
-        {!cameraOn && status === "waiting" ? (
-          <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-white/70">
-            Press Start Camera to share video with the wedding screen.
-          </div>
-        ) : null}
-        {switching ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-sm font-semibold">
-            Switching camera…
-          </div>
-        ) : null}
+      <div className="relative kiss-cam-double-love mx-auto mt-5 w-full">
+        <div className="kiss-cam-double-love-media">
+          <video
+            ref={videoRef}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            autoPlay
+          />
+          {!cameraOn && status === "waiting" ? (
+            <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm leading-relaxed text-white/75">
+              Press Start Camera to share video with the wedding screen.
+            </div>
+          ) : null}
+          {switching ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#3a2430]/55 text-sm font-semibold">
+              Switching camera…
+            </div>
+          ) : null}
+        </div>
+        <svg
+          className="kiss-cam-double-love-stroke"
+          viewBox="0 0 100 72"
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <path
+            d="M34,69 C34,69 -2,45 -2,24 C-2,11 10,4 24,7 C31,9 36,16 38,24 C40,16 47,7 56,7 C70,4 80,13 78,24 C76,42 50,63 34,69 Z"
+            fill="none"
+            stroke="rgba(255, 201, 212, 0.95)"
+            strokeWidth="1.2"
+            vectorEffect="non-scaling-stroke"
+          />
+          <path
+            d="M66,69 C66,69 30,45 30,24 C28,13 38,4 52,7 C59,9 64,16 66,24 C68,16 75,7 84,7 C98,4 108,13 106,24 C104,42 82,63 66,69 Z"
+            fill="none"
+            stroke="rgba(255, 201, 212, 0.95)"
+            strokeWidth="1.2"
+            vectorEffect="non-scaling-stroke"
+          />
+          <path
+            d="M34,69 C34,69 -2,45 -2,24 C-2,11 10,4 24,7 C31,9 36,16 38,24 C40,16 47,7 56,7 C70,4 80,13 78,24 C76,42 50,63 34,69 Z"
+            fill="none"
+            stroke="rgba(255, 248, 250, 0.4)"
+            strokeWidth="0.45"
+            vectorEffect="non-scaling-stroke"
+          />
+          <path
+            d="M66,69 C66,69 30,45 30,24 C28,13 38,4 52,7 C59,9 64,16 66,24 C68,16 75,7 84,7 C98,4 108,13 106,24 C104,42 82,63 66,69 Z"
+            fill="none"
+            stroke="rgba(255, 248, 250, 0.4)"
+            strokeWidth="0.45"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+        <KissCamLoveBurst active={loveBurst} size="phone" />
       </div>
 
       {message ? (
-        <p className="mt-4 rounded-xl border border-rose-400/30 bg-rose-950/40 px-3 py-2 text-center text-sm text-rose-100">
+        <p className="mt-4 rounded-2xl border border-rose-300/35 bg-rose-950/45 px-3 py-2 text-center text-sm text-rose-50">
           {message}
         </p>
       ) : null}
 
       {!sessionId ? (
         <div className="mt-4 space-y-2">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[#e8d5b5]/80">
+          <label className="block text-xs font-semibold uppercase tracking-wider text-[#ffc9d4]/75">
             Enter pairing code
           </label>
           <input
             value={codeInput}
             onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
             maxLength={8}
-            className="h-12 w-full rounded-xl border border-white/15 bg-[#3a2f28] px-4 text-center font-heading text-2xl tracking-[0.3em]"
+            className="h-12 w-full rounded-xl border border-rose-200/25 bg-[#3a2430]/80 px-4 text-center font-heading text-2xl tracking-[0.3em] text-[#fff5f7]"
             placeholder="ABC123"
           />
-          <Button className="h-12 w-full" onClick={() => void resolveCode()}>
+          <Button className="h-12 w-full bg-[#c45a78] text-white hover:bg-[#a84864]" onClick={() => void resolveCode()}>
             Continue
           </Button>
         </div>
@@ -443,7 +513,7 @@ export function KissCamCameraClient() {
       <div className="mt-auto grid gap-3 pt-6">
         <Button
           size="xl"
-          className="h-14 w-full bg-[#8b3a45] text-lg text-white hover:bg-[#732f38]"
+          className="h-14 w-full bg-[#c45a78] text-lg text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864]"
           onClick={() => void startCamera()}
           disabled={!sessionId || status === "connecting" || switching}
         >
@@ -451,8 +521,16 @@ export function KissCamCameraClient() {
         </Button>
         <Button
           size="lg"
+          className="h-12 w-full border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-base font-semibold text-white shadow-[0_8px_22px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864]"
+          onClick={triggerLove}
+          disabled={!cameraOn || switching || loveBurst}
+        >
+          {loveBurst ? "♥ Loving…" : "♥ Love"}
+        </Button>
+        <Button
+          size="lg"
           variant="secondary"
-          className="h-12 w-full"
+          className="h-12 w-full border border-rose-200/20 bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/18"
           onClick={() => void switchCamera()}
           disabled={!cameraOn || switching || status === "connecting"}
         >
@@ -463,7 +541,7 @@ export function KissCamCameraClient() {
         <Button
           size="lg"
           variant="outline"
-          className="h-12 w-full border-white/20 text-[#f7f1e8]"
+          className="h-12 w-full border-rose-200/25 text-[#ffd6e0]"
           onClick={() => void stopCamera()}
           disabled={switching}
         >

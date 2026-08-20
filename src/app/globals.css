@@ -11,6 +11,7 @@
   --danger: #9b2c2c;
   --radius: 0.75rem;
   --font-heading: "Cormorant Garamond", "Noto Serif SC", "Songti SC", "PingFang SC", Georgia, serif;
+  --font-kiss: "Great Vibes", "Cormorant Garamond", Georgia, cursive;
   --font-body: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -213,13 +214,175 @@ h3,
   .kiss-cam-figure,
   .kiss-cam-held-balloon,
   .kiss-cam-breathe,
-  .kiss-cam-held-hands {
+  .kiss-cam-held-hands,
+  .kiss-cam-love-title,
+  .kiss-cam-love-title-accent,
+  .kiss-cam-love-bloom,
+  .kiss-cam-love-spark,
+  .kiss-cam-love-pop,
+  .kiss-cam-love-word {
     animation: none !important;
     transition: none !important;
   }
 }
 
 /* —— Kiss Cam —— */
+.font-kiss {
+  font-family: var(--font-kiss);
+}
+
+.kiss-cam-love-title {
+  font-family: var(--font-kiss);
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #fff5f7 0%, #ffc9d4 42%, #e8799a 78%, #b84a6a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.35)) drop-shadow(0 8px 18px rgba(184, 74, 106, 0.35));
+  animation: kiss-cam-title-glow 3.6s ease-in-out infinite;
+}
+
+.kiss-cam-love-title-accent {
+  display: inline-block;
+  animation: kiss-cam-title-heart 2.4s ease-in-out infinite;
+}
+
+@keyframes kiss-cam-title-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.35)) drop-shadow(0 8px 18px rgba(184, 74, 106, 0.28));
+  }
+  50% {
+    filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.5)) drop-shadow(0 10px 22px rgba(232, 121, 154, 0.45));
+  }
+}
+
+@keyframes kiss-cam-title-heart {
+  0%,
+  100% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.12) translateY(-2px);
+  }
+}
+
+.kiss-cam-phone-shell {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(255, 214, 224, 0.55), transparent 58%),
+    radial-gradient(ellipse 70% 45% at 100% 30%, rgba(255, 182, 193, 0.28), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 0% 70%, rgba(232, 180, 200, 0.22), transparent 48%),
+    linear-gradient(165deg, #3a2430 0%, #2a1a22 45%, #1f1419 100%);
+}
+
+.kiss-cam-double-love {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 3.55;
+  max-height: min(52dvh, 420px);
+}
+
+.kiss-cam-double-love-media {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-clip-path: url(#kiss-cam-double-love-clip);
+  clip-path: url(#kiss-cam-double-love-clip);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.kiss-cam-double-love-stroke {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 10px 24px rgba(90, 30, 50, 0.45));
+}
+
+.kiss-cam-love-bloom {
+  width: min(52vw, 240px);
+  height: min(52vw, 240px);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 245, 248, 0.85) 0%, rgba(255, 182, 193, 0.35) 38%, transparent 70%);
+  animation: kiss-cam-love-bloom 2.4s ease-out forwards;
+}
+
+.kiss-cam-love-spark {
+  animation: kiss-cam-love-spark 2.2s cubic-bezier(0.16, 0.84, 0.34, 1) forwards;
+}
+
+.kiss-cam-love-pop {
+  animation: kiss-cam-love-pop 2.4s cubic-bezier(0.16, 0.9, 0.3, 1) forwards;
+}
+
+.kiss-cam-love-word {
+  animation: kiss-cam-love-word 2.4s ease-out forwards;
+  text-shadow: 0 4px 24px rgba(184, 74, 106, 0.55);
+}
+
+@keyframes kiss-cam-love-bloom {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.65);
+  }
+}
+
+@keyframes kiss-cam-love-spark {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--sx, 0px)), calc(-50% + var(--sy, 0px))) scale(0.2);
+  }
+}
+
+@keyframes kiss-cam-love-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(0deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--hx, 0px)), calc(-50% + var(--hy, 0px)))
+      scale(var(--hs, 1)) rotate(var(--hr, 0deg));
+  }
+}
+
+@keyframes kiss-cam-love-word {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -58%) scale(1);
+  }
+}
+
 .kiss-cam-stage {
   /* default stage */
 }

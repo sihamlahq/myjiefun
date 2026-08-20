@@ -9,6 +9,7 @@ import {
   KissCamHearts,
 } from "@/components/kiss-cam/kiss-cam-atmosphere";
 import { KissCamCanvasCompositor } from "@/components/kiss-cam/kiss-cam-canvas-compositor";
+import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 
 type KissCamDisplayProps = {
@@ -20,6 +21,7 @@ type KissCamDisplayProps = {
   cameraLayout: CameraLayoutMode;
   remoteStream: MediaStream | null;
   celebrate: boolean;
+  loveBurst?: boolean;
   showCharacters: boolean;
   /** Fill the parent completely (true fullscreen) — no 16:9 letterboxing. */
   fillViewport?: boolean;
@@ -35,6 +37,7 @@ export function KissCamDisplay({
   cameraLayout,
   remoteStream,
   celebrate,
+  loveBurst = false,
   showCharacters,
   fillViewport = false,
   className = "",
@@ -98,8 +101,9 @@ export function KissCamDisplay({
         </>
       ) : null}
 
-      <KissCamHearts active={celebrate} />
-      <KissCamConfetti active={celebrate} />
+      <KissCamHearts active={celebrate || loveBurst} />
+      <KissCamConfetti active={celebrate || loveBurst} />
+      <KissCamLoveBurst active={loveBurst} size="stage" />
 
       {phase === "countdown" && countdownValue != null ? (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
