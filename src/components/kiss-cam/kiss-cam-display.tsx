@@ -16,6 +16,8 @@ import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-
 type KissCamDisplayProps = {
   phase: KissCamAnimationPhase;
   countdownValue: number | null;
+  /** Manual countdown from the phone (1 / 2 / 3 buttons). */
+  remoteCountdown?: 1 | 2 | 3 | null;
   coupleNames: string;
   tagline?: string;
   cameraEnabled: boolean;
@@ -32,6 +34,7 @@ type KissCamDisplayProps = {
 export function KissCamDisplay({
   phase,
   countdownValue,
+  remoteCountdown = null,
   coupleNames,
   tagline = "A Moment to Remember",
   cameraEnabled,
@@ -88,6 +91,10 @@ export function KissCamDisplay({
   const finalFrame = phase === "final" || phase === "celebration";
   const cameraLive = cameraEnabled && Boolean(remoteStream);
   const showBigLove = loveBurst || autoLove;
+  const overlayCountdown =
+    remoteCountdown ?? (phase === "countdown" ? countdownValue : null);
+  const countdownKey =
+    remoteCountdown != null ? `remote-${remoteCountdown}` : `auto-${countdownValue}`;
 
   return (
     <div
@@ -130,12 +137,12 @@ export function KissCamDisplay({
       <KissCamConfetti active={celebrate || showBigLove} />
       <KissCamLoveBurst active={showBigLove} burstId={autoLoveId} size="stage" word="LOVE" />
 
-      {phase === "countdown" && countdownValue != null ? (
+      {overlayCountdown != null ? (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <div key={countdownValue} className="kiss-cam-countdown-wrap relative flex items-center justify-center">
+          <div key={countdownKey} className="kiss-cam-countdown-wrap relative flex items-center justify-center">
             <span className="kiss-cam-countdown-ring" aria-hidden />
             <span className="kiss-cam-countdown font-heading text-[min(30vw,240px)] font-semibold leading-none text-[#5a2f38]/92 drop-shadow-[0_10px_36px_rgba(90,40,50,.28)]">
-              {countdownValue}
+              {overlayCountdown}
             </span>
           </div>
         </div>

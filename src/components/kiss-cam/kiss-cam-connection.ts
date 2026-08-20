@@ -5,6 +5,15 @@ import { fetchIceServers } from "@/components/kiss-cam/kiss-cam-ice";
 import { signalingChannelName } from "@/components/kiss-cam/kiss-cam-session";
 import type { ConnectionQuality } from "@/components/kiss-cam/kiss-cam-types";
 
+export type KissCamControlAction =
+  | "start"
+  | "reset"
+  | "preview"
+  | "love"
+  | "countdown-1"
+  | "countdown-2"
+  | "countdown-3";
+
 type SignalMessage =
   | { type: "hello"; role: "display" | "camera" }
   | { type: "heartbeat"; role: "display" | "camera"; ts: number }
@@ -12,7 +21,7 @@ type SignalMessage =
   | { type: "answer"; sdp: RTCSessionDescriptionInit }
   | { type: "ice"; candidate: RTCIceCandidateInit }
   | { type: "bye" }
-  | { type: "control"; action: "start" | "reset" | "preview" | "love" };
+  | { type: "control"; action: KissCamControlAction };
 
 type Handlers = {
   onRemoteStream?: (stream: MediaStream | null) => void;
@@ -20,7 +29,7 @@ type Handlers = {
   onPeerPresence?: (present: boolean) => void;
   onQuality?: (quality: ConnectionQuality) => void;
   onError?: (message: string) => void;
-  onControl?: (action: "start" | "reset" | "preview" | "love") => void;
+  onControl?: (action: KissCamControlAction) => void;
 };
 
 /**
@@ -439,7 +448,7 @@ export class KissCamConnection {
     this.handlers.onRemoteStream?.(null);
   }
 
-  async sendControl(action: "start" | "reset" | "preview" | "love") {
+  async sendControl(action: KissCamControlAction) {
     await this.send({ type: "control", action });
   }
 }

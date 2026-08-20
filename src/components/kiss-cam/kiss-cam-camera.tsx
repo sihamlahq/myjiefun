@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { KissCamConnection } from "@/components/kiss-cam/kiss-cam-connection";
+import {
+  KissCamConnection,
+  type KissCamControlAction,
+} from "@/components/kiss-cam/kiss-cam-connection";
 import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import { KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
 import type { ConnectionQuality } from "@/components/kiss-cam/kiss-cam-types";
@@ -18,6 +21,49 @@ type UiStatus =
   | "error";
 
 type Facing = "environment" | "user";
+
+type ZoomRange = {
+  min: number;
+  max: number;
+  step: number;
+};
+
+type TrackZoomCaps = MediaTrackCapabilities & {
+  zoom?: { min: number; max: number; step?: number };
+};
+
+type TrackZoomSettings = MediaTrackSettings & {
+  zoom?: number;
+};
+
+function readZoomRange(track: MediaStreamTrack | null | undefined): ZoomRange | null {
+  if (!track || typeof track.getCapabilities !== "function") return null;
+  try {
+    const caps = track.getCapabilities() as TrackZoomCaps;
+    const z = caps.zoom;
+    if (!z || typeof z.min !== "number" || typeof z.max !== "number") return null;
+    if (!(z.max > z.min)) return null;
+    const step = typeof z.step === "number" && z.step > 0 ? z.step : Math.max(0.1, (z.max - z.min) / 20);
+    return { min: z.min, max: z.max, step };
+  } catch {
+    return null;
+  }
+}
+
+function readZoomValue(track: MediaStreamTrack | null | undefined, range: ZoomRange): number {
+  try {
+    const settings = track?.getSettings?.() as TrackZoomSettings | undefined;
+    if (typeof settings?.zoom === "number") return settings.zoom;
+  } catch {
+    // ignore
+  }
+  return range.min;
+}
+
+function clampZoom(value: number, range: ZoomRange) {
+  const stepped = Math.round(value / range.step) * range.step;
+  return Math.min(range.max, Math.max(range.min, Number(stepped.toFixed(3))));
+}
 
 function labelMatchesFacing(label: string, facing: Facing) {
   const l = label.toLowerCase();
@@ -133,6 +179,9 @@ export function KissCamCameraClient() {
   const [loveBurst, setLoveBurst] = useState(false);
   const [loveBurstId, setLoveBurstId] = useState(0);
   const [loveBusy, setLoveBusy] = useState(false);
+  const [countdownBusy, setCountdownBusy] = useState<1 | 2 | 3 | null>(null);
+  const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
+  const [zoomValue, setZoomValue] = useState(1);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -143,6 +192,10 @@ export function KissCamCameraClient() {
   const loveCooldownRef = useRef(false);
   const loveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loveClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownCooldownRef = useRef(false);
+  const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoomRangeRef = useRef<ZoomRange | null>(null);
 
   const isSecure =
     typeof window === "undefined" ||
@@ -205,16 +258,32 @@ export function KissCamCameraClient() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [requestWakeLock]);
 
-  const bindPreview = useCallback(async (stream: MediaStream) => {
-    streamRef.current = stream;
-    setCameraOn(true);
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      // iOS often needs a fresh play() after srcObject swap.
-      videoRef.current.load?.();
-      await videoRef.current.play().catch(() => undefined);
+  const syncZoomFromStream = useCallback((stream: MediaStream | null) => {
+    const track = stream?.getVideoTracks()[0] ?? null;
+    const range = readZoomRange(track);
+    zoomRangeRef.current = range;
+    setZoomRange(range);
+    if (range) {
+      setZoomValue(readZoomValue(track, range));
+    } else {
+      setZoomValue(1);
     }
   }, []);
+
+  const bindPreview = useCallback(
+    async (stream: MediaStream) => {
+      streamRef.current = stream;
+      setCameraOn(true);
+      syncZoomFromStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        // iOS often needs a fresh play() after srcObject swap.
+        videoRef.current.load?.();
+        await videoRef.current.play().catch(() => undefined);
+      }
+    },
+    [syncZoomFromStream],
+  );
 
   const stopTracksOnly = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => {
@@ -227,6 +296,9 @@ export function KissCamCameraClient() {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
+    zoomRangeRef.current = null;
+    setZoomRange(null);
+    setZoomValue(1);
   }, []);
 
   const stopCamera = useCallback(async () => {
@@ -348,6 +420,35 @@ export function KissCamCameraClient() {
     }
   }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
 
+  const nudgeZoom = useCallback(async (direction: 1 | -1) => {
+    const range = zoomRangeRef.current;
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!range || !track || !cameraOn || switchingRef.current) return;
+
+    const current = readZoomValue(track, range);
+    const next = clampZoom(current + direction * range.step * 2, range);
+    if (Math.abs(next - current) < range.step / 4) return;
+
+    try {
+      await track.applyConstraints({
+        // Chrome / Android camera zoom; ignored when unsupported.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        advanced: [{ zoom: next } as any],
+      });
+      const applied = readZoomValue(track, range);
+      setZoomValue(applied);
+    } catch {
+      try {
+        // Safari / some WebKit builds accept zoom on the root constraints object.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await track.applyConstraints({ zoom: next } as any);
+        setZoomValue(readZoomValue(track, range));
+      } catch {
+        // Lens zoom not writable on this device / browser.
+      }
+    }
+  }, [cameraOn]);
+
   const triggerLove = useCallback(() => {
     // Short cooldown only — keeping the button disabled for the full animation
     // made taps feel dead / laggy on phones.
@@ -377,10 +478,39 @@ export function KissCamCameraClient() {
     }, 1800);
   }, [cameraOn]);
 
+  const triggerCountdown = useCallback(
+    (value: 1 | 2 | 3) => {
+      if (countdownCooldownRef.current || !cameraOn || switchingRef.current) return;
+      countdownCooldownRef.current = true;
+      setCountdownBusy(value);
+
+      const action = `countdown-${value}` as KissCamControlAction;
+      queueMicrotask(() => {
+        void connRef.current?.sendControl(action).catch(() => undefined);
+      });
+
+      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+      if (countdownClearRef.current) clearTimeout(countdownClearRef.current);
+
+      countdownTimerRef.current = setTimeout(() => {
+        countdownCooldownRef.current = false;
+        countdownTimerRef.current = null;
+      }, 280);
+
+      countdownClearRef.current = setTimeout(() => {
+        setCountdownBusy(null);
+        countdownClearRef.current = null;
+      }, 900);
+    },
+    [cameraOn],
+  );
+
   useEffect(() => {
     return () => {
       if (loveTimerRef.current) clearTimeout(loveTimerRef.current);
       if (loveClearRef.current) clearTimeout(loveClearRef.current);
+      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+      if (countdownClearRef.current) clearTimeout(countdownClearRef.current);
     };
   }, []);
 
@@ -513,8 +643,57 @@ export function KissCamCameraClient() {
           />
         </svg>
         <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
+
+        {cameraOn ? (
+          <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-[#3a2430]/72 px-2 py-1.5 backdrop-blur-md">
+            <Button
+              type="button"
+              size="icon"
+              className="h-11 w-11 touch-manipulation rounded-full bg-[#fff5f7]/15 text-xl font-semibold text-[#fff5f7] hover:bg-[#fff5f7]/25 active:scale-95 disabled:opacity-35"
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                void nudgeZoom(-1);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                void nudgeZoom(-1);
+              }}
+              disabled={!zoomRange || switching || zoomValue <= (zoomRange?.min ?? 1)}
+              aria-label="Zoom out"
+            >
+              −
+            </Button>
+            <span className="min-w-[3.5rem] text-center text-sm font-semibold tabular-nums text-[#fff5f7]">
+              {zoomRange ? `${zoomValue.toFixed(1)}×` : "1.0×"}
+            </span>
+            <Button
+              type="button"
+              size="icon"
+              className="h-11 w-11 touch-manipulation rounded-full bg-[#fff5f7]/15 text-xl font-semibold text-[#fff5f7] hover:bg-[#fff5f7]/25 active:scale-95 disabled:opacity-35"
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                void nudgeZoom(1);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                void nudgeZoom(1);
+              }}
+              disabled={!zoomRange || switching || zoomValue >= (zoomRange?.max ?? 1)}
+              aria-label="Zoom in"
+            >
+              +
+            </Button>
+          </div>
+        ) : null}
       </div>
 
+      {cameraOn && !zoomRange ? (
+        <p className="mt-2 text-center text-[11px] text-[#ffc9d4]/55">
+          Zoom lens not available on this camera
+        </p>
+      ) : null}
       {message ? (
         <p className="mt-4 rounded-2xl border border-rose-300/35 bg-rose-950/45 px-3 py-2 text-center text-sm text-rose-50">
           {message}
@@ -571,6 +750,38 @@ export function KissCamCameraClient() {
         >
           ♥ Love
         </Button>
+
+        <div className="grid grid-cols-3 gap-2">
+          {([1, 2, 3] as const).map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="lg"
+              className={`h-14 touch-manipulation text-2xl font-semibold text-white shadow-[0_8px_20px_rgba(90,40,55,0.28)] active:scale-[0.96] ${
+                countdownBusy === value
+                  ? "bg-[#ff8fab]"
+                  : "bg-[#5a2f38] hover:bg-[#7a3f4c]"
+              }`}
+              onPointerDown={(e) => {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                triggerCountdown(value);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                triggerCountdown(value);
+              }}
+              disabled={!cameraOn || switching}
+              aria-label={`Show countdown ${value} on the wedding screen`}
+            >
+              {value}
+            </Button>
+          ))}
+        </div>
+        <p className="-mt-1 text-center text-[11px] font-medium uppercase tracking-[0.22em] text-[#ffc9d4]/65">
+          Countdown on screen
+        </p>
+
         <Button
           size="lg"
           variant="secondary"

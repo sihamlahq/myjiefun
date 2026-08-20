@@ -31,12 +31,14 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [turnOk, setTurnOk] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loveBurst, setLoveBurst] = useState(false);
+  const [remoteCountdown, setRemoteCountdown] = useState<1 | 2 | 3 | null>(null);
   const connRef = useRef<KissCamConnection | null>(null);
   const rafRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const creatingSession = useRef(false);
   const startAnimationRef = useRef<(mode: "running" | "preview") => void>(() => undefined);
   const resetAnimationRef = useRef<() => void>(() => undefined);
+  const remoteCountdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cameraStateRef = useRef(state.cameraState);
   cameraStateRef.current = state.cameraState;
 
@@ -142,6 +144,21 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             setLoveBurst(true);
             window.setTimeout(() => setLoveBurst(false), 2800);
           }
+          if (
+            action === "countdown-1" ||
+            action === "countdown-2" ||
+            action === "countdown-3"
+          ) {
+            const value = Number(action.slice(-1)) as 1 | 2 | 3;
+            if (remoteCountdownTimerRef.current) {
+              clearTimeout(remoteCountdownTimerRef.current);
+            }
+            setRemoteCountdown(value);
+            remoteCountdownTimerRef.current = setTimeout(() => {
+              setRemoteCountdown(null);
+              remoteCountdownTimerRef.current = null;
+            }, 1200);
+          }
         },
         onError: (message) => {
           if (!cancelled) {
@@ -158,6 +175,10 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
 
     return () => {
       cancelled = true;
+      if (remoteCountdownTimerRef.current) {
+        clearTimeout(remoteCountdownTimerRef.current);
+        remoteCountdownTimerRef.current = null;
+      }
       void connRef.current?.dispose();
       connRef.current = null;
     };
@@ -263,6 +284,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         <KissCamDisplay
           phase={state.animation}
           countdownValue={state.countdownEnabled ? state.countdownValue : null}
+          remoteCountdown={remoteCountdown}
           coupleNames={coupleNames}
           tagline={tagline}
           cameraEnabled={state.cameraEnabled}
