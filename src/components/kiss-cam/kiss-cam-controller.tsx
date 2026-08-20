@@ -32,6 +32,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [error, setError] = useState<string | null>(null);
   const [loveBurst, setLoveBurst] = useState(false);
   const [remoteCountdown, setRemoteCountdown] = useState<1 | 2 | 3 | null>(null);
+  const [remoteCountdownTick, setRemoteCountdownTick] = useState(0);
   const connRef = useRef<KissCamConnection | null>(null);
   const rafRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
@@ -153,7 +154,9 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             if (remoteCountdownTimerRef.current) {
               clearTimeout(remoteCountdownTimerRef.current);
             }
+            // Always bump tick so pressing the same digit again restarts the animation.
             setRemoteCountdown(value);
+            setRemoteCountdownTick((n) => n + 1);
             remoteCountdownTimerRef.current = setTimeout(() => {
               setRemoteCountdown(null);
               remoteCountdownTimerRef.current = null;
@@ -285,6 +288,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           phase={state.animation}
           countdownValue={state.countdownEnabled ? state.countdownValue : null}
           remoteCountdown={remoteCountdown}
+          remoteCountdownTick={remoteCountdownTick}
           coupleNames={coupleNames}
           tagline={tagline}
           cameraEnabled={state.cameraEnabled}

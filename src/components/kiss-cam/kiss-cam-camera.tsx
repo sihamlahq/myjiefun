@@ -480,7 +480,10 @@ export function KissCamCameraClient() {
 
   const triggerCountdown = useCallback(
     (value: 1 | 2 | 3) => {
-      if (countdownCooldownRef.current || !cameraOn || switchingRef.current) return;
+      if (!cameraOn || switchingRef.current) return;
+      // Allow pressing the same digit again immediately — only skip double-fire
+      // from pointerdown + click on the same gesture (~120ms).
+      if (countdownCooldownRef.current) return;
       countdownCooldownRef.current = true;
       setCountdownBusy(value);
 
@@ -495,12 +498,12 @@ export function KissCamCameraClient() {
       countdownTimerRef.current = setTimeout(() => {
         countdownCooldownRef.current = false;
         countdownTimerRef.current = null;
-      }, 280);
+      }, 120);
 
       countdownClearRef.current = setTimeout(() => {
         setCountdownBusy(null);
         countdownClearRef.current = null;
-      }, 900);
+      }, 700);
     },
     [cameraOn],
   );

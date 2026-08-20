@@ -18,6 +18,8 @@ type KissCamDisplayProps = {
   countdownValue: number | null;
   /** Manual countdown from the phone (1 / 2 / 3 buttons). */
   remoteCountdown?: 1 | 2 | 3 | null;
+  /** Bumps on every phone press so the same digit can replay. */
+  remoteCountdownTick?: number;
   coupleNames: string;
   tagline?: string;
   cameraEnabled: boolean;
@@ -35,6 +37,7 @@ export function KissCamDisplay({
   phase,
   countdownValue,
   remoteCountdown = null,
+  remoteCountdownTick = 0,
   coupleNames,
   tagline = "A Moment to Remember",
   cameraEnabled,
@@ -94,7 +97,9 @@ export function KissCamDisplay({
   const overlayCountdown =
     remoteCountdown ?? (phase === "countdown" ? countdownValue : null);
   const countdownKey =
-    remoteCountdown != null ? `remote-${remoteCountdown}` : `auto-${countdownValue}`;
+    remoteCountdown != null
+      ? `remote-${remoteCountdown}-${remoteCountdownTick}`
+      : `auto-${countdownValue}`;
 
   return (
     <div
