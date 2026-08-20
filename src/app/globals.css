@@ -203,4 +203,180 @@ h3,
   .checkin-popout-shine {
     animation: none;
   }
+
+  .kiss-cam-balloon,
+  .kiss-cam-sparkle,
+  .kiss-cam-heart,
+  .kiss-cam-confetti,
+  .kiss-cam-bokeh,
+  .kiss-cam-countdown,
+  .kiss-cam-figure {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* —— Kiss Cam —— */
+.kiss-cam-figure {
+  transition: left 1.1s cubic-bezier(0.4, 0, 0.2, 1), transform 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, left;
+}
+
+.kiss-cam-bokeh {
+  animation: kiss-cam-bokeh-drift 18s ease-in-out infinite alternate;
+}
+
+.kiss-cam-bokeh-delay {
+  animation-delay: -7s;
+}
+
+@keyframes kiss-cam-bokeh-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.5rem, -1.5rem, 0) scale(1.08);
+  }
+}
+
+.kiss-cam-sparkle {
+  animation: kiss-cam-sparkle 3.6s ease-in-out infinite;
+  opacity: 0;
+}
+
+@keyframes kiss-cam-sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  40% {
+    opacity: 0.9;
+    transform: scale(1.2);
+  }
+}
+
+.kiss-cam-balloon {
+  position: relative;
+  border-radius: 50% 50% 50% 50% / 55% 55% 45% 45%;
+  animation-name: kiss-cam-float;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  box-shadow: inset -6px -8px 14px rgba(255, 255, 255, 0.35), 0 8px 18px rgba(60, 40, 20, 0.12);
+  will-change: transform;
+}
+
+.kiss-cam-balloon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 1px;
+  height: 28px;
+  background: rgba(120, 90, 60, 0.35);
+  transform: translateX(-50%);
+}
+
+.kiss-cam-balloon-heart {
+  background: transparent !important;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.kiss-cam-balloon-heart::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.55;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 21s-7.2-4.6-9.6-9.2C.6 8.2 2.4 4.8 6 4.8c2 0 3.3 1.2 4 2.2.7-1 2-2.2 4-2.2 3.6 0 5.4 3.4 3.6 7C19.2 16.4 12 21 12 21z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 21s-7.2-4.6-9.6-9.2C.6 8.2 2.4 4.8 6 4.8c2 0 3.3 1.2 4 2.2.7-1 2-2.2 4-2.2 3.6 0 5.4 3.4 3.6 7C19.2 16.4 12 21 12 21z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+
+.kiss-cam-balloon-heart::after {
+  display: none;
+}
+
+@keyframes kiss-cam-float {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(-4deg);
+  }
+  50% {
+    transform: translate3d(12px, -55vh, 0) rotate(5deg);
+  }
+  100% {
+    transform: translate3d(-8px, -110vh, 0) rotate(-3deg);
+  }
+}
+
+.kiss-cam-heart {
+  animation: kiss-cam-heart-rise 2.8s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes kiss-cam-heart-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -46vh, 0) scale(1.15);
+  }
+}
+
+.kiss-cam-confetti {
+  animation: kiss-cam-confetti-fall 3.2s ease-in forwards;
+  opacity: 0;
+}
+
+@keyframes kiss-cam-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -10%, 0) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.15;
+    transform: translate3d(18px, 110vh, 0) rotate(240deg);
+  }
+}
+
+.kiss-cam-countdown {
+  animation: kiss-cam-count-pop 0.45s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+@keyframes kiss-cam-count-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.kiss-cam-kiss-glow {
+  background: radial-gradient(circle at 50% 45%, rgba(255, 230, 210, 0.45), transparent 55%);
+  animation: kiss-cam-glow 1.4s ease-out;
+}
+
+@keyframes kiss-cam-glow {
+  from {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.55;
+  }
 }

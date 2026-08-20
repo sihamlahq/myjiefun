@@ -35,7 +35,8 @@ export async function updateSession(request: NextRequest) {
   const isPublic =
     isAuthPage ||
     path.startsWith("/reception") ||
-    path.startsWith("/api/health");
+    path.startsWith("/api/health") ||
+    path.startsWith("/api/kiss-cam");
 
   if (!user && !isPublic) {
     const redirect = request.nextUrl.clone();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { computeStats, sumParty } from "@/lib/stats";
 import { cn, formatPercent } from "@/lib/utils";
@@ -304,6 +305,17 @@ export function ReceptionLiveBoard({
         {names}
       </h1>
       <p className="mt-6 text-xl text-[var(--foreground)]/70 sm:text-2xl">{line}</p>
+
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <Link
+          href="/reception/kiss-cam"
+          prefetch
+          className="inline-flex items-center gap-2 rounded-2xl border border-[var(--accent)]/45 bg-white/75 px-5 py-3 text-sm font-semibold text-[var(--foreground)] shadow-[0_12px_40px_rgba(44,42,38,.10)] backdrop-blur transition hover:bg-white/90"
+        >
+          <span aria-hidden>💕</span>
+          Kiss Cam
+        </Link>
+      </div>
 
       <div className="mt-12 grid w-full max-w-5xl gap-4 md:grid-cols-4">
         <TvMetric label="Arrived" value={stats.checkedIn} detail={`${totalGuests} total guests`} />
