@@ -23,55 +23,138 @@ type UiStatus =
 
 type Facing = "environment" | "user";
 
-type ZoomRange = {
-  min: number;
-  max: number;
-  step: number;
+/** Stock-style zoom step (physical lens switch or optical zoom stop — not soft digital). */
+type LensOption = {
+  key: string;
+  factor: number;
+  label: string;
+  deviceId?: string;
+  /** Optical zoom constraint value when staying on one multi-cam device (e.g. iPhone). */
+  zoom?: number;
 };
 
 type TrackZoomCaps = MediaTrackCapabilities & {
   zoom?: { min: number; max: number; step?: number };
+  facingMode?: string[];
 };
 
 type TrackZoomSettings = MediaTrackSettings & {
   zoom?: number;
+  deviceId?: string;
 };
-
-function readZoomRange(track: MediaStreamTrack | null | undefined): ZoomRange | null {
-  if (!track || typeof track.getCapabilities !== "function") return null;
-  try {
-    const caps = track.getCapabilities() as TrackZoomCaps;
-    const z = caps.zoom;
-    if (!z || typeof z.min !== "number" || typeof z.max !== "number") return null;
-    if (!(z.max > z.min)) return null;
-    const step = typeof z.step === "number" && z.step > 0 ? z.step : Math.max(0.1, (z.max - z.min) / 20);
-    return { min: z.min, max: z.max, step };
-  } catch {
-    return null;
-  }
-}
-
-function readZoomValue(track: MediaStreamTrack | null | undefined, range: ZoomRange): number {
-  try {
-    const settings = track?.getSettings?.() as TrackZoomSettings | undefined;
-    if (typeof settings?.zoom === "number") return settings.zoom;
-  } catch {
-    // ignore
-  }
-  return range.min;
-}
-
-function clampZoom(value: number, range: ZoomRange) {
-  const stepped = Math.round(value / range.step) * range.step;
-  return Math.min(range.max, Math.max(range.min, Number(stepped.toFixed(3))));
-}
 
 function labelMatchesFacing(label: string, facing: Facing) {
   const l = label.toLowerCase();
   if (facing === "user") {
     return /front|user|face|selfie/.test(l);
   }
-  return /back|rear|environment|world|main/.test(l);
+  return /back|rear|environment|world|main|triple|dual|wide|tele|ultra/.test(l);
+}
+
+function isFrontLabel(label: string) {
+  return /front|user|face|selfie/.test(label.toLowerCase());
+}
+
+/** Guess stock zoom factor from a camera label (Samsung / Pixel / iOS naming). */
+function lensFactorFromLabel(label: string): number | null {
+  const l = label.toLowerCase();
+  if (isFrontLabel(l)) return null;
+  if (/ultra|ultra[\s-]?wide|ultrawide|0\.5/.test(l)) return 0.5;
+  if (/periscope|5[\s]?[x×]/.test(l)) return 5;
+  if (/3[\s]?[x×]/.test(l)) return 3;
+  if (/2[\s]?[x×]|telephoto|tele\b/.test(l)) return 2;
+  if (/back|rear|wide|environment|dual|triple|camera/.test(l)) return 1;
+  return null;
+}
+
+function formatLensLabel(factor: number) {
+  if (factor === 0.5) return "0.5×";
+  if (Number.isInteger(factor)) return `${factor}×`;
+  return `${factor.toFixed(1)}×`;
+}
+
+/**
+ * Build stock zoom options:
+ * 1) Prefer switching physical rear lenses (sharp, like the Camera app)
+ * 2) Else snap the device zoom constraint to optical stops (1× / 2× / 3×…) — never fine digital creep
+ */
+function buildLensOptions(
+  devices: MediaDeviceInfo[],
+  track: MediaStreamTrack | null,
+  facing: Facing,
+): LensOption[] {
+  const byFactor = new Map<number, LensOption>();
+
+  if (facing === "environment") {
+    const rear = devices.filter(
+      (d) => d.kind === "videoinput" && d.label && !isFrontLabel(d.label),
+    );
+    for (const device of rear) {
+      const factor = lensFactorFromLabel(device.label);
+      if (factor == null) continue;
+      // Keep the first (usually primary) device for each factor.
+      if (byFactor.has(factor)) continue;
+      byFactor.set(factor, {
+        key: `device-${device.deviceId}`,
+        factor,
+        label: formatLensLabel(factor),
+        deviceId: device.deviceId,
+      });
+    }
+  }
+
+  // Single multi-camera module (common on iPhone): use discrete optical zoom stops.
+  if (byFactor.size <= 1 && track && typeof track.getCapabilities === "function") {
+    try {
+      const caps = track.getCapabilities() as TrackZoomCaps;
+      const z = caps.zoom;
+      if (z && typeof z.min === "number" && typeof z.max === "number" && z.max > z.min) {
+        const stops = [0.5, 1, 2, 3, 5].filter((f) => f >= z.min - 0.05 && f <= z.max + 0.05);
+        const unique = stops.length >= 2 ? stops : [z.min, Math.min(z.max, Math.max(z.min, 1))];
+        for (const factor of unique) {
+          const zoom = Math.min(z.max, Math.max(z.min, factor));
+          byFactor.set(factor, {
+            key: `zoom-${factor}`,
+            factor,
+            label: formatLensLabel(factor),
+            zoom,
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const list = [...byFactor.values()].sort((a, b) => a.factor - b.factor);
+  return list;
+}
+
+function readActiveLensFactor(track: MediaStreamTrack | null, lenses: LensOption[]): number {
+  if (!lenses.length) return 1;
+  try {
+    const settings = track?.getSettings?.() as TrackZoomSettings | undefined;
+    if (settings?.deviceId) {
+      const byDevice = lenses.find((l) => l.deviceId === settings.deviceId);
+      if (byDevice) return byDevice.factor;
+    }
+    if (typeof settings?.zoom === "number") {
+      let best = lenses[0]!;
+      let bestDist = Infinity;
+      for (const lens of lenses) {
+        const target = lens.zoom ?? lens.factor;
+        const dist = Math.abs(target - settings.zoom);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = lens;
+        }
+      }
+      return best.factor;
+    }
+  } catch {
+    // ignore
+  }
+  return lenses.find((l) => l.factor === 1)?.factor ?? lenses[0]!.factor;
 }
 
 /**
@@ -79,15 +162,19 @@ function labelMatchesFacing(label: string, facing: Facing) {
  * prefer 1080p60 — the smooth “normal” video mode these devices handle well.
  * Fall back to 1080p30, then 720p30. Never 4K over WebRTC.
  */
-async function openCamera(facing: Facing): Promise<MediaStream> {
-  let preferredDeviceId: string | undefined;
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const cams = devices.filter((d) => d.kind === "videoinput");
-    const match = cams.find((d) => d.label && labelMatchesFacing(d.label, facing));
-    preferredDeviceId = match?.deviceId;
-  } catch {
-    // ignore
+async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStream> {
+  let preferredDeviceId = deviceId;
+  if (!preferredDeviceId) {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter((d) => d.kind === "videoinput");
+      // Prefer the main wide (1×) rear / front camera — not ultra-wide.
+      const labeled = cams.filter((d) => d.label && labelMatchesFacing(d.label, facing));
+      const wide = labeled.find((d) => lensFactorFromLabel(d.label) === 1);
+      preferredDeviceId = wide?.deviceId ?? labeled[0]?.deviceId;
+    } catch {
+      // ignore
+    }
   }
 
   const hd60 = {
@@ -214,8 +301,8 @@ export function KissCamCameraClient() {
   /** Primary control slot: Start Camera ↔ Loading Screen (swaps instantly on press). */
   const [primaryAction, setPrimaryAction] = useState<"start" | "loading">("start");
   const [countdownBusy, setCountdownBusy] = useState<1 | 2 | 3 | null>(null);
-  const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
-  const [zoomValue, setZoomValue] = useState(1);
+  const [lenses, setLenses] = useState<LensOption[]>([]);
+  const [activeLens, setActiveLens] = useState(1);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -229,7 +316,7 @@ export function KissCamCameraClient() {
   const countdownCooldownRef = useRef(false);
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const zoomRangeRef = useRef<ZoomRange | null>(null);
+  const lensesRef = useRef<LensOption[]>([]);
   const loadingBusyRef = useRef(false);
   const pauseCameraForLoadingRef = useRef<(notify?: boolean) => Promise<void>>(async () => undefined);
 
@@ -295,23 +382,26 @@ export function KissCamCameraClient() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [requestWakeLock]);
 
-  const syncZoomFromStream = useCallback((stream: MediaStream | null) => {
+  const syncLensesFromStream = useCallback(async (stream: MediaStream | null) => {
     const track = stream?.getVideoTracks()[0] ?? null;
-    const range = readZoomRange(track);
-    zoomRangeRef.current = range;
-    setZoomRange(range);
-    if (range) {
-      setZoomValue(readZoomValue(track, range));
-    } else {
-      setZoomValue(1);
+    let devices: MediaDeviceInfo[] = [];
+    try {
+      // Labels are often empty until after the first permission grant.
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch {
+      devices = [];
     }
+    const options = buildLensOptions(devices, track, facingRef.current);
+    lensesRef.current = options;
+    setLenses(options);
+    setActiveLens(readActiveLensFactor(track, options));
   }, []);
 
   const bindPreview = useCallback(
     async (stream: MediaStream) => {
       streamRef.current = stream;
       setCameraOn(true);
-      syncZoomFromStream(stream);
+      await syncLensesFromStream(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         // iOS often needs a fresh play() after srcObject swap.
@@ -319,7 +409,7 @@ export function KissCamCameraClient() {
         await videoRef.current.play().catch(() => undefined);
       }
     },
-    [syncZoomFromStream],
+    [syncLensesFromStream],
   );
 
   const stopTracksOnly = useCallback(() => {
@@ -333,9 +423,9 @@ export function KissCamCameraClient() {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
-    zoomRangeRef.current = null;
-    setZoomRange(null);
-    setZoomValue(1);
+    lensesRef.current = [];
+    setLenses([]);
+    setActiveLens(1);
   }, []);
 
   const stopCamera = useCallback(async () => {
@@ -511,32 +601,61 @@ export function KissCamCameraClient() {
     }
   }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
 
-  const applyZoom = useCallback(
-    async (raw: number) => {
-      const range = zoomRangeRef.current;
-      const track = streamRef.current?.getVideoTracks()[0];
-      if (!range || !track || !cameraOn || switchingRef.current) return;
+  const selectLens = useCallback(
+    async (lens: LensOption) => {
+      if (!cameraOn || switchingRef.current) return;
+      if (lens.factor === activeLens) return;
 
-      const next = clampZoom(raw, range);
-      setZoomValue(next);
-
-      try {
-        await track.applyConstraints({
-          // Chrome / Android camera zoom; ignored when unsupported.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          advanced: [{ zoom: next } as any],
-        });
-      } catch {
+      // Optical zoom stop on the same multi-cam module (iPhone-style) — sharp.
+      if (lens.zoom != null && !lens.deviceId) {
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (!track) return;
+        setActiveLens(lens.factor);
         try {
-          // Safari / some WebKit builds accept zoom on the root constraints object.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await track.applyConstraints({ zoom: next } as any);
+          await track.applyConstraints({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            advanced: [{ zoom: lens.zoom } as any],
+          });
         } catch {
-          // Lens zoom not writable on this device / browser.
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await track.applyConstraints({ zoom: lens.zoom } as any);
+          } catch {
+            setMessage("This zoom lens is not available on this phone.");
+          }
         }
+        return;
+      }
+
+      // Physical lens switch (Samsung / Pixel stock camera style) — sharp.
+      if (!lens.deviceId) return;
+      switchingRef.current = true;
+      setSwitching(true);
+      setMessage(null);
+      setActiveLens(lens.factor);
+
+      const previousStream = streamRef.current;
+      try {
+        const stream = await openCamera(facingRef.current, lens.deviceId);
+        previousStream?.getTracks().forEach((t) => {
+          try {
+            t.stop();
+          } catch {
+            // ignore
+          }
+        });
+        await bindPreview(stream);
+        await connRef.current?.replaceVideoTrack(stream.getVideoTracks()[0] ?? null);
+        await requestWakeLock();
+      } catch {
+        setActiveLens(readActiveLensFactor(streamRef.current?.getVideoTracks()[0] ?? null, lensesRef.current));
+        setMessage("Could not switch to that lens. Staying on the current camera.");
+      } finally {
+        switchingRef.current = false;
+        setSwitching(false);
       }
     },
-    [cameraOn],
+    [activeLens, bindPreview, cameraOn, requestWakeLock],
   );
 
   const triggerLove = useCallback(() => {
@@ -769,41 +888,50 @@ export function KissCamCameraClient() {
 
       <div className="mt-auto grid gap-3 pt-6">
         <div className="rounded-2xl border border-rose-200/20 bg-[#3a2430]/65 px-3 py-2.5">
-          <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffc9d4]/75">
+          <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffc9d4]/75">
             <span>Zoom</span>
             <span className="tabular-nums tracking-normal text-[#fff5f7]">
-              {cameraOn && zoomRange ? `${zoomValue.toFixed(1)}×` : "—"}
+              {cameraOn && lenses.length ? formatLensLabel(activeLens) : "—"}
             </span>
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
-              −
-            </span>
-            <input
-              type="range"
-              className="kiss-cam-zoom-slider min-w-0 flex-1"
-              min={zoomRange?.min ?? 1}
-              max={zoomRange?.max ?? 1}
-              step={zoomRange?.step ?? 0.1}
-              value={zoomRange ? zoomValue : 1}
-              disabled={!cameraOn || !zoomRange || switching}
-              onInput={(e) => {
-                void applyZoom(Number((e.target as HTMLInputElement).value));
-              }}
-              onChange={(e) => {
-                void applyZoom(Number(e.target.value));
-              }}
-              aria-label="Camera zoom"
-            />
-            <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
-              +
-            </span>
-          </div>
-          {cameraOn && !zoomRange ? (
-            <p className="mt-1.5 text-center text-[11px] text-[#ffc9d4]/55">
-              Zoom lens not available on this camera
+          {cameraOn && lenses.length > 1 ? (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {lenses.map((lens) => {
+                const selected = Math.abs(lens.factor - activeLens) < 0.05;
+                return (
+                  <button
+                    key={lens.key}
+                    type="button"
+                    className={`min-h-11 min-w-11 touch-manipulation rounded-full px-3 text-sm font-semibold transition-[transform,background-color,color] active:scale-95 ${
+                      selected
+                        ? "bg-[#ff8fab] text-white shadow-[0_6px_16px_rgba(255,143,171,0.35)]"
+                        : "bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/2"
+                    }`}
+                    disabled={switching}
+                    aria-pressed={selected}
+                    aria-label={`Zoom ${lens.label}`}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.preventDefault();
+                      void selectLens(lens);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void selectLens(lens);
+                    }}
+                  >
+                    {lens.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-center text-[11px] text-[#ffc9d4]/55">
+              {cameraOn
+                ? "Stock zoom lenses not available on this camera"
+                : "Start camera to use stock zoom lenses"}
             </p>
-          ) : null}
+          )}
         </div>
 
         {primaryAction === "loading" ? (
