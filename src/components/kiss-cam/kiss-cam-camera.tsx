@@ -181,6 +181,8 @@ export function KissCamCameraClient() {
   const [loveBurstId, setLoveBurstId] = useState(0);
   const [loveBusy, setLoveBusy] = useState(false);
   const [loadingScreen, setLoadingScreen] = useState(false);
+  /** Primary control slot: Start Camera ↔ Loading Screen (swaps instantly on press). */
+  const [primaryAction, setPrimaryAction] = useState<"start" | "loading">("start");
   const [countdownBusy, setCountdownBusy] = useState<1 | 2 | 3 | null>(null);
   const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
   const [zoomValue, setZoomValue] = useState(1);
@@ -311,6 +313,8 @@ export function KissCamCameraClient() {
     connRef.current = null;
     stopTracksOnly();
     await releaseWakeLock();
+    setLoadingScreen(false);
+    setPrimaryAction("start");
     setStatus("waiting");
     setQuality(null);
     setMessage(null);
@@ -319,9 +323,11 @@ export function KissCamCameraClient() {
   const pauseCameraForLoading = useCallback(
     async (notifyDisplay = true) => {
       if (switchingRef.current || loadingBusyRef.current) return;
+      if (primaryAction === "start" && !cameraOn) return;
       loadingBusyRef.current = true;
 
-      // Instant local feedback — don't wait on signaling / teardown.
+      // Swap the primary button to Start Camera immediately.
+      setPrimaryAction("start");
       setLoadingScreen(true);
       setMessage(null);
 
@@ -342,28 +348,34 @@ export function KissCamCameraClient() {
       setQuality(null);
       loadingBusyRef.current = false;
     },
-    [releaseWakeLock, stopTracksOnly],
+    [cameraOn, primaryAction, releaseWakeLock, stopTracksOnly],
   );
   pauseCameraForLoadingRef.current = pauseCameraForLoading;
 
   const startCamera = useCallback(async () => {
+    if (switchingRef.current || status === "connecting") return;
+
     setMessage(null);
-    // Starting the camera always clears the loading/paused state.
+    // Swap the primary button to Loading Screen immediately.
+    setPrimaryAction("loading");
     setLoadingScreen(false);
 
     if (!isSecure) {
+      setPrimaryAction("start");
       setStatus("error");
       setMessage("Camera requires HTTPS. Open this page on a secure (https) link.");
       return;
     }
 
     if (!sessionId) {
+      setPrimaryAction("start");
       setStatus("error");
       setMessage("This camera session has expired. Please scan a new QR code.");
       return;
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
+      setPrimaryAction("start");
       setStatus("error");
       setMessage("Camera unavailable. Please check your phone camera.");
       return;
@@ -412,8 +424,10 @@ export function KissCamCameraClient() {
       await conn.attachLocalStream(stream);
       // Clear loading on the LED once video is live again.
       void conn.sendControl("loading-off").catch(() => undefined);
+      setPrimaryAction("loading");
       setStatus("connected");
     } catch (error) {
+      setPrimaryAction("start");
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
         setMessage("Camera access is required to use the mobile camera.");
@@ -425,7 +439,7 @@ export function KissCamCameraClient() {
       setStatus("error");
       stopTracksOnly();
     }
-  }, [bindPreview, isSecure, requestWakeLock, sessionId, stopCamera, stopTracksOnly]);
+  }, [bindPreview, isSecure, requestWakeLock, sessionId, status, stopCamera, stopTracksOnly]);
 
   const switchCamera = useCallback(async () => {
     if (switchingRef.current || !cameraOn) return;
@@ -762,14 +776,44 @@ export function KissCamCameraClient() {
           ) : null}
         </div>
 
-        <Button
-          size="xl"
-          className="h-14 w-full touch-manipulation bg-[#c45a78] text-lg text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864] active:scale-[0.98]"
-          onClick={() => void startCamera()}
-          disabled={!sessionId || status === "connecting" || switching}
-        >
-          Start Camera
-        </Button>
+        {primaryAction === "loading" ? (
+          <Button
+            type="button"
+            size="xl"
+            className="h-14 w-full touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-lg font-semibold text-white shadow-[0_10px_28px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.98]"
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              void pauseCameraForLoading(true);
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              void pauseCameraForLoading(true);
+            }}
+            disabled={switching || status === "connecting"}
+            aria-pressed={loadingScreen}
+          >
+            Loading Screen
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="xl"
+            className="h-14 w-full touch-manipulation bg-[#c45a78] text-lg text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864] active:scale-[0.98]"
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              void startCamera();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              void startCamera();
+            }}
+            disabled={!sessionId || status === "connecting" || switching}
+          >
+            {status === "connecting" ? "Starting…" : "Start Camera"}
+          </Button>
+        )}
         <Button
           type="button"
           size="lg"
@@ -789,29 +833,6 @@ export function KissCamCameraClient() {
           aria-pressed={loveBurst}
         >
           ♥ Love
-        </Button>
-
-        <Button
-          type="button"
-          size="lg"
-          className={`h-12 w-full touch-manipulation text-base font-semibold transition-transform active:scale-[0.97] ${
-            loadingScreen
-              ? "bg-[#ff8fab]/90 text-white shadow-[0_8px_22px_rgba(255,143,171,0.35)]"
-              : "border border-[#ffc9d4]/35 bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/18"
-          }`}
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            void pauseCameraForLoading(true);
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            void pauseCameraForLoading(true);
-          }}
-          disabled={!cameraOn || switching || status === "connecting" || loadingScreen}
-          aria-pressed={loadingScreen}
-        >
-          {loadingScreen ? "Paused — tap Start Camera" : "Loading Screen"}
         </Button>
 
         <div className="grid grid-cols-3 gap-2">
