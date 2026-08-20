@@ -406,10 +406,11 @@ export class KissCamConnection {
 
       let score = 70;
       if (bitrateKbps != null) {
-        if (bitrateKbps > 2000) score = 98;
-        else if (bitrateKbps > 1200) score = 90;
-        else if (bitrateKbps > 600) score = 75;
-        else if (bitrateKbps > 250) score = 55;
+        if (bitrateKbps > 3500) score = 98;
+        else if (bitrateKbps > 2200) score = 92;
+        else if (bitrateKbps > 1200) score = 80;
+        else if (bitrateKbps > 600) score = 65;
+        else if (bitrateKbps > 250) score = 50;
         else score = 30;
       }
       if (packetLoss != null) {
