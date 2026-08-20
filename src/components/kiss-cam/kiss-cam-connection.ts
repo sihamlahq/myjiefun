@@ -106,15 +106,46 @@ export class KissCamConnection {
     this.localStream = stream;
     if (!this.pc) return;
     for (const track of stream.getTracks()) {
+      if (track.kind === "video") {
+        try {
+          // Prefer detail over motion so faces stay sharp on the LED wall.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (track as any).contentHint = "detail";
+        } catch {
+          // ignore unsupported
+        }
+      }
       const existing = this.pc.getSenders().find((s) => s.track?.kind === track.kind);
       if (existing) {
         await existing.replaceTrack(track);
+        if (track.kind === "video") await this.tuneVideoSender(existing);
       } else {
-        this.pc.addTrack(track, stream);
+        const sender = this.pc.addTrack(track, stream);
+        if (track.kind === "video") await this.tuneVideoSender(sender);
       }
     }
     if (this.role === "camera") {
       await this.createAndSendOffer();
+    }
+  }
+
+  /** Push HD bitrate / resolution prefs on the outbound video sender. */
+  private async tuneVideoSender(sender: RTCRtpSender) {
+    try {
+      const params = sender.getParameters();
+      if (!params.encodings || params.encodings.length === 0) {
+        params.encodings = [{}];
+      }
+      for (const encoding of params.encodings) {
+        encoding.maxBitrate = 4_000_000; // ~4 Mbps for 1080p
+        encoding.maxFramerate = 30;
+        encoding.scaleResolutionDownBy = 1;
+        Object.assign(encoding, { priority: "high", networkPriority: "high" });
+      }
+      Object.assign(params, { degradationPreference: "maintain-resolution" });
+      await sender.setParameters(params);
+    } catch (error) {
+      console.warn("[kiss-cam] could not set HD sender params", error);
     }
   }
 
@@ -287,9 +318,10 @@ export class KissCamConnection {
 
       let score = 70;
       if (bitrateKbps != null) {
-        if (bitrateKbps > 800) score = 95;
-        else if (bitrateKbps > 400) score = 80;
-        else if (bitrateKbps > 150) score = 55;
+        if (bitrateKbps > 2000) score = 98;
+        else if (bitrateKbps > 1200) score = 90;
+        else if (bitrateKbps > 600) score = 75;
+        else if (bitrateKbps > 250) score = 55;
         else score = 30;
       }
       if (packetLoss != null) {

@@ -111,6 +111,16 @@ export function KissCamCameraClient() {
         audio: false,
         video: {
           facingMode: { ideal: facing },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          frameRate: { ideal: 30, max: 30 },
+          aspectRatio: { ideal: 16 / 9 },
+        },
+      },
+      {
+        audio: false,
+        video: {
+          facingMode: { ideal: facing },
           width: { ideal: 1280 },
           height: { ideal: 720 },
           frameRate: { ideal: 30, max: 30 },
@@ -118,7 +128,7 @@ export function KissCamCameraClient() {
       },
       {
         audio: false,
-        video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
       },
       { audio: false, video: true },
     ];
@@ -126,7 +136,22 @@ export function KissCamCameraClient() {
     let lastError: unknown;
     for (const constraints of attempts) {
       try {
-        return await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const track = stream.getVideoTracks()[0];
+        if (track) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (track as any).contentHint = "detail";
+            await track.applyConstraints({
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              frameRate: { ideal: 30 },
+            });
+          } catch {
+            // Device may not support 1080p — keep whatever we got.
+          }
+        }
+        return stream;
       } catch (error) {
         lastError = error;
       }
