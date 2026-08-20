@@ -253,175 +253,157 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
     <div
       id="kiss-cam-root"
       className={cn(
-        "min-h-screen bg-[#2a221c] text-[var(--foreground)]",
-        state.fullscreen && "fixed inset-0 z-[100] h-dvh min-h-0 w-screen overflow-hidden bg-[#3a2430]",
+        // Always fill the laptop / LED viewport — no 16:9 letterbox or side gutters.
+        "fixed inset-0 z-50 h-dvh min-h-dvh w-screen max-w-[100vw] overflow-hidden bg-[#3a2430] text-[var(--foreground)]",
+        state.fullscreen && "z-[100]",
       )}
     >
-      <div
-        className={cn(
-          "mx-auto flex max-w-[1600px] flex-col gap-4 p-3 sm:p-5",
-          state.fullscreen && "m-0 h-full max-h-none w-full max-w-none p-0",
-        )}
-      >
-        {showChrome ? (
-          <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#3a2f28]/90 px-4 py-3 text-[#f7f1e8]">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#d4af37]/90">
-                TableWedding
-              </p>
-              <h1 className="kiss-cam-love-title text-[2.4rem] leading-none">Kiss Cam</h1>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-sm">
-              <CameraStatusDot state={state.cameraState} />
-              <KissCamSignalBars quality={state.connectionQuality} className="text-[#f7f1e8]/80" />
-              <span>
-                Animation:{" "}
-                <strong className="font-semibold">
-                  {state.status === "standby" ? "Ready" : state.animation}
-                </strong>
-              </span>
-              <Link href="/reception" className="text-[#e8d5b5] underline-offset-2 hover:underline">
-                ← Reception
-              </Link>
-            </div>
-          </header>
-        ) : null}
+      {/* Stage is always edge-to-edge (no 16:9 letterbox card). */}
+      <div className="absolute inset-0">
+        <KissCamDisplay
+          phase={state.animation}
+          countdownValue={state.countdownEnabled ? state.countdownValue : null}
+          coupleNames={coupleNames}
+          tagline={tagline}
+          cameraEnabled={state.cameraEnabled}
+          cameraLayout={state.cameraLayout}
+          remoteStream={remoteStream}
+          celebrate={celebrate}
+          loveBurst={loveBurst}
+          showCharacters
+          fillViewport
+          className="h-full w-full"
+        />
+      </div>
 
-        <div
-          className={cn(
-            "grid gap-4 lg:grid-cols-[1fr_300px]",
-            state.fullscreen && "h-full min-h-0 grid-cols-1 gap-0",
-          )}
-        >
-          <div
-            className={cn(
-              "overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,.45)]",
-              state.fullscreen && "h-full min-h-0 rounded-none border-0 shadow-none",
-            )}
-          >
-            <KissCamDisplay
-              phase={state.animation}
-              countdownValue={state.countdownEnabled ? state.countdownValue : null}
-              coupleNames={coupleNames}
-              tagline={tagline}
-              cameraEnabled={state.cameraEnabled}
-              cameraLayout={state.cameraLayout}
-              remoteStream={remoteStream}
-              celebrate={celebrate}
-              loveBurst={loveBurst}
-              showCharacters
-              fillViewport={state.fullscreen}
-              className={state.fullscreen ? "h-full w-full" : ""}
-            />
+      {showChrome ? (
+        <header className="absolute inset-x-0 top-0 z-40 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-b from-[#2a1a22]/88 to-transparent px-4 pb-8 pt-[max(0.75rem,env(safe-area-inset-top))] text-[#f7f1e8]">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#ffc9d4]/90">
+              TableWedding
+            </p>
+            <h1 className="kiss-cam-love-title text-[2.4rem] leading-none">Kiss Cam</h1>
           </div>
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <CameraStatusDot state={state.cameraState} />
+            <KissCamSignalBars quality={state.connectionQuality} className="text-[#f7f1e8]/80" />
+            <span>
+              Animation:{" "}
+              <strong className="font-semibold">
+                {state.status === "standby" ? "Ready" : state.animation}
+              </strong>
+            </span>
+            <Link href="/reception" className="text-[#ffd6e0] underline-offset-2 hover:underline">
+              ← Reception
+            </Link>
+          </div>
+        </header>
+      ) : null}
 
-          {showChrome ? (
-            <aside className="flex flex-col gap-3">
-              <KissCamQRCode
-                sessionId={state.sessionId}
-                shortCode={state.shortCode}
-                expiresAt={state.sessionExpiresAt}
-                onExpired={() => {
-                  // Keep a live camera session; only rotate pairing QR when waiting.
-                  const cam = cameraStateRef.current;
-                  if (cam === "connected" || cam === "connecting" || cam === "reconnecting") {
+      {showChrome ? (
+        <aside className="absolute bottom-3 right-3 z-40 flex max-h-[min(72dvh,640px)] w-[min(100%-1.5rem,300px)] flex-col gap-3 overflow-y-auto sm:bottom-4 sm:right-4">
+          <KissCamQRCode
+            sessionId={state.sessionId}
+            shortCode={state.shortCode}
+            expiresAt={state.sessionExpiresAt}
+            onExpired={() => {
+              const cam = cameraStateRef.current;
+              if (cam === "connected" || cam === "connecting" || cam === "reconnecting") {
+                setState((s) => ({
+                  ...s,
+                  sessionExpiresAt: Date.now() + SESSION_TTL_MS,
+                }));
+                return;
+              }
+              void refreshSession();
+            }}
+          />
+
+          <div className="rounded-2xl border border-white/10 bg-[#3a2f28]/92 p-4 text-[#f7f1e8] shadow-[0_16px_40px_rgba(0,0,0,.35)] backdrop-blur-md">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ffc9d4]/90">
+              Controls
+            </p>
+            <div className="mt-3 grid gap-2">
+              <Button
+                size="lg"
+                className="h-12 w-full bg-[#c45a78] text-white hover:bg-[#a84864]"
+                onClick={() => startAnimation("running")}
+              >
+                Start Kiss Cam
+              </Button>
+              <div className="grid grid-cols-3 gap-2">
+                <Button variant="secondary" onClick={() => startAnimation("preview")}>
+                  Preview
+                </Button>
+                <Button variant="outline" className="border-white/20 text-[#f7f1e8]" onClick={resetAnimation}>
+                  Reset
+                </Button>
+                <Button variant="gold" onClick={() => void toggleFullscreen()}>
+                  Fullscreen
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2 text-sm">
+              <ToggleRow
+                label="Countdown"
+                on={state.countdownEnabled}
+                onToggle={() => setState((s) => ({ ...s, countdownEnabled: !s.countdownEnabled }))}
+              />
+              <ToggleRow
+                label="Camera"
+                on={state.cameraEnabled}
+                onToggle={() => setState((s) => ({ ...s, cameraEnabled: !s.cameraEnabled }))}
+              />
+              <ToggleRow
+                label="Auto Return"
+                on={state.autoReturn}
+                onToggle={() => setState((s) => ({ ...s, autoReturn: !s.autoReturn }))}
+              />
+              <label className="flex items-center justify-between gap-2">
+                <span>Duration</span>
+                <select
+                  className="rounded-lg border border-white/15 bg-[#2a221c] px-2 py-1 text-sm"
+                  value={String(state.durationScale)}
+                  onChange={(e) =>
+                    setState((s) => ({ ...s, durationScale: Number(e.target.value) || 1 }))
+                  }
+                >
+                  <option value="0.75">Faster</option>
+                  <option value="1">Standard</option>
+                  <option value="1.25">Slower</option>
+                </select>
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>Camera frame</span>
+                <select
+                  className="rounded-lg border border-white/15 bg-[#2a221c] px-2 py-1 text-sm"
+                  value={state.cameraLayout}
+                  onChange={(e) =>
                     setState((s) => ({
                       ...s,
-                      sessionExpiresAt: Date.now() + SESSION_TTL_MS,
-                    }));
-                    return;
+                      cameraLayout: e.target.value as CameraLayoutMode,
+                    }))
                   }
-                  void refreshSession();
-                }}
-              />
+                >
+                  <option value="center">Center</option>
+                  <option value="portrait">Portrait</option>
+                  <option value="rounded">Rounded cinematic</option>
+                  <option value="full">Full background</option>
+                </select>
+              </label>
+            </div>
 
-              <div className="rounded-2xl border border-white/10 bg-[#3a2f28] p-4 text-[#f7f1e8]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d4af37]/90">
-                  Controls
-                </p>
-                <div className="mt-3 grid gap-2">
-                  <Button
-                    size="lg"
-                    className="h-12 w-full bg-[#8b3a45] text-white hover:bg-[#732f38]"
-                    onClick={() => startAnimation("running")}
-                  >
-                    Start Kiss Cam
-                  </Button>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button variant="secondary" onClick={() => startAnimation("preview")}>
-                      Preview
-                    </Button>
-                    <Button variant="outline" className="border-white/20 text-[#f7f1e8]" onClick={resetAnimation}>
-                      Reset
-                    </Button>
-                    <Button variant="gold" onClick={() => void toggleFullscreen()}>
-                      Fullscreen
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-2 text-sm">
-                  <ToggleRow
-                    label="Countdown"
-                    on={state.countdownEnabled}
-                    onToggle={() => setState((s) => ({ ...s, countdownEnabled: !s.countdownEnabled }))}
-                  />
-                  <ToggleRow
-                    label="Camera"
-                    on={state.cameraEnabled}
-                    onToggle={() => setState((s) => ({ ...s, cameraEnabled: !s.cameraEnabled }))}
-                  />
-                  <ToggleRow
-                    label="Auto Return"
-                    on={state.autoReturn}
-                    onToggle={() => setState((s) => ({ ...s, autoReturn: !s.autoReturn }))}
-                  />
-                  <label className="flex items-center justify-between gap-2">
-                    <span>Duration</span>
-                    <select
-                      className="rounded-lg border border-white/15 bg-[#2a221c] px-2 py-1 text-sm"
-                      value={String(state.durationScale)}
-                      onChange={(e) =>
-                        setState((s) => ({ ...s, durationScale: Number(e.target.value) || 1 }))
-                      }
-                    >
-                      <option value="0.75">Faster</option>
-                      <option value="1">Standard</option>
-                      <option value="1.25">Slower</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center justify-between gap-2">
-                    <span>Camera frame</span>
-                    <select
-                      className="rounded-lg border border-white/15 bg-[#2a221c] px-2 py-1 text-sm"
-                      value={state.cameraLayout}
-                      onChange={(e) =>
-                        setState((s) => ({
-                          ...s,
-                          cameraLayout: e.target.value as CameraLayoutMode,
-                        }))
-                      }
-                    >
-                      <option value="center">Center</option>
-                      <option value="portrait">Portrait</option>
-                      <option value="rounded">Rounded cinematic</option>
-                      <option value="full">Full background</option>
-                    </select>
-                  </label>
-                </div>
-
-                {turnOk === false ? (
-                  <p className="mt-3 text-xs text-amber-200/90">
-                    TURN not configured — venue Wi‑Fi may need{" "}
-                    <code className="text-[10px]">TURN_URLS</code> env vars for reliable relay.
-                  </p>
-                ) : null}
-                {error ? <p className="mt-2 text-xs text-rose-200">{error}</p> : null}
-              </div>
-            </aside>
-          ) : null}
-        </div>
-      </div>
+            {turnOk === false ? (
+              <p className="mt-3 text-xs text-amber-200/90">
+                TURN not configured — venue Wi‑Fi may need{" "}
+                <code className="text-[10px]">TURN_URLS</code> env vars for reliable relay.
+              </p>
+            ) : null}
+            {error ? <p className="mt-2 text-xs text-rose-200">{error}</p> : null}
+          </div>
+        </aside>
+      ) : null}
     </div>
   );
 }
