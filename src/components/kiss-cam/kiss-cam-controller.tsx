@@ -381,7 +381,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                 onClick={() => toggleLoadingScreen()}
                 aria-pressed={loadingScreen}
               >
-                {loadingScreen ? "Hide Loading Screen" : "Loading Screen"}
+                {loadingScreen ? "Clear Loading Screen" : "Loading Screen"}
               </Button>
               <div className="grid grid-cols-3 gap-2">
                 <Button variant="secondary" onClick={() => startAnimation("preview")}>
