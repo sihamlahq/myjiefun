@@ -776,3 +776,58 @@ h3,
     opacity: 0.6;
   }
 }
+
+/* Mobile camera zoom slider — large touch target */
+.kiss-cam-zoom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.kiss-cam-zoom-slider:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.kiss-cam-zoom-slider:focus-visible {
+  outline: 2px solid rgba(255, 201, 212, 0.8);
+  outline-offset: 2px;
+  border-radius: 9999px;
+}
+
+.kiss-cam-zoom-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(255, 245, 247, 0.25), rgba(255, 143, 171, 0.75));
+}
+
+.kiss-cam-zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -10px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 245, 247, 0.95);
+  background: #c45a78;
+  box-shadow: 0 4px 14px rgba(90, 40, 55, 0.45);
+}
+
+.kiss-cam-zoom-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(255, 245, 247, 0.25), rgba(255, 143, 171, 0.75));
+}
+
+.kiss-cam-zoom-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 245, 247, 0.95);
+  background: #c45a78;
+  box-shadow: 0 4px 14px rgba(90, 40, 55, 0.45);
+}

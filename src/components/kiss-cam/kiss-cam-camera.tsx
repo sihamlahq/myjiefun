@@ -420,34 +420,33 @@ export function KissCamCameraClient() {
     }
   }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
 
-  const nudgeZoom = useCallback(async (direction: 1 | -1) => {
-    const range = zoomRangeRef.current;
-    const track = streamRef.current?.getVideoTracks()[0];
-    if (!range || !track || !cameraOn || switchingRef.current) return;
+  const applyZoom = useCallback(
+    async (raw: number) => {
+      const range = zoomRangeRef.current;
+      const track = streamRef.current?.getVideoTracks()[0];
+      if (!range || !track || !cameraOn || switchingRef.current) return;
 
-    const current = readZoomValue(track, range);
-    const next = clampZoom(current + direction * range.step * 2, range);
-    if (Math.abs(next - current) < range.step / 4) return;
+      const next = clampZoom(raw, range);
+      setZoomValue(next);
 
-    try {
-      await track.applyConstraints({
-        // Chrome / Android camera zoom; ignored when unsupported.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        advanced: [{ zoom: next } as any],
-      });
-      const applied = readZoomValue(track, range);
-      setZoomValue(applied);
-    } catch {
       try {
-        // Safari / some WebKit builds accept zoom on the root constraints object.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await track.applyConstraints({ zoom: next } as any);
-        setZoomValue(readZoomValue(track, range));
+        await track.applyConstraints({
+          // Chrome / Android camera zoom; ignored when unsupported.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          advanced: [{ zoom: next } as any],
+        });
       } catch {
-        // Lens zoom not writable on this device / browser.
+        try {
+          // Safari / some WebKit builds accept zoom on the root constraints object.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await track.applyConstraints({ zoom: next } as any);
+        } catch {
+          // Lens zoom not writable on this device / browser.
+        }
       }
-    }
-  }, [cameraOn]);
+    },
+    [cameraOn],
+  );
 
   const triggerLove = useCallback(() => {
     // Short cooldown only — keeping the button disabled for the full animation
@@ -648,46 +647,37 @@ export function KissCamCameraClient() {
         <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
 
         {cameraOn ? (
-          <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/15 bg-[#3a2430]/72 px-2 py-1.5 backdrop-blur-md">
-            <Button
-              type="button"
-              size="icon"
-              className="h-11 w-11 touch-manipulation rounded-full bg-[#fff5f7]/15 text-xl font-semibold text-[#fff5f7] hover:bg-[#fff5f7]/25 active:scale-95 disabled:opacity-35"
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                void nudgeZoom(-1);
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                void nudgeZoom(-1);
-              }}
-              disabled={!zoomRange || switching || zoomValue <= (zoomRange?.min ?? 1)}
-              aria-label="Zoom out"
-            >
-              −
-            </Button>
-            <span className="min-w-[3.5rem] text-center text-sm font-semibold tabular-nums text-[#fff5f7]">
-              {zoomRange ? `${zoomValue.toFixed(1)}×` : "1.0×"}
-            </span>
-            <Button
-              type="button"
-              size="icon"
-              className="h-11 w-11 touch-manipulation rounded-full bg-[#fff5f7]/15 text-xl font-semibold text-[#fff5f7] hover:bg-[#fff5f7]/25 active:scale-95 disabled:opacity-35"
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                void nudgeZoom(1);
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                void nudgeZoom(1);
-              }}
-              disabled={!zoomRange || switching || zoomValue >= (zoomRange?.max ?? 1)}
-              aria-label="Zoom in"
-            >
-              +
-            </Button>
+          <div className="absolute bottom-3 left-1/2 z-20 w-[min(92%,300px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#3a2430]/78 px-3 py-2.5 backdrop-blur-md">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffc9d4]/75">
+              <span>Zoom</span>
+              <span className="tabular-nums tracking-normal text-[#fff5f7]">
+                {zoomRange ? `${zoomValue.toFixed(1)}×` : "—"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
+                −
+              </span>
+              <input
+                type="range"
+                className="kiss-cam-zoom-slider min-w-0 flex-1"
+                min={zoomRange?.min ?? 1}
+                max={zoomRange?.max ?? 1}
+                step={zoomRange?.step ?? 0.1}
+                value={zoomRange ? zoomValue : 1}
+                disabled={!zoomRange || switching}
+                onInput={(e) => {
+                  void applyZoom(Number((e.target as HTMLInputElement).value));
+                }}
+                onChange={(e) => {
+                  void applyZoom(Number(e.target.value));
+                }}
+                aria-label="Camera zoom"
+              />
+              <span className="w-4 text-center text-base font-semibold text-[#fff5f7]/70" aria-hidden>
+                +
+              </span>
+            </div>
           </div>
         ) : null}
       </div>
