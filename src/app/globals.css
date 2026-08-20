@@ -220,7 +220,8 @@ h3,
   .kiss-cam-love-bloom,
   .kiss-cam-love-spark,
   .kiss-cam-love-pop,
-  .kiss-cam-love-word {
+  .kiss-cam-love-word,
+  .kiss-cam-stage-hearts {
     animation: none !important;
     transition: none !important;
   }
@@ -397,6 +398,30 @@ h3,
   }
 }
 
+.kiss-cam-love-stage {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(255, 214, 224, 0.7), transparent 58%),
+    radial-gradient(ellipse 70% 45% at 100% 30%, rgba(255, 182, 193, 0.4), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 0% 70%, rgba(232, 180, 200, 0.35), transparent 48%),
+    linear-gradient(165deg, #fff5f7 0%, #ffd6e0 38%, #f0b8c8 72%, #e8a0b4 100%);
+}
+
+.kiss-cam-stage-hearts {
+  animation: kiss-cam-stage-hearts-breathe 6.5s ease-in-out infinite;
+}
+
+@keyframes kiss-cam-stage-hearts-breathe {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.28;
+    transform: translate(-50%, -50%) scale(1.03);
+  }
+}
+
 .kiss-cam-stage {
   /* default stage */
 }
@@ -406,7 +431,7 @@ h3,
   width: 100vw !important;
   height: 100vh !important;
   max-width: none !important;
-  background: #e8f2f8 !important;
+  background: #3a2430 !important;
   overflow: hidden !important;
 }
 

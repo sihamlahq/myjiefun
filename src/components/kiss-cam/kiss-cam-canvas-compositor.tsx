@@ -151,11 +151,11 @@ export function KissCamCanvasCompositor({
       if (layout !== "full") {
         ctx.save();
         ctx.globalAlpha = opacityRef.current * 0.9;
-        ctx.strokeStyle = "rgba(184, 149, 106, 0.85)";
+        ctx.strokeStyle = "rgba(232, 121, 154, 0.85)";
         ctx.lineWidth = Math.max(1.5, Math.min(w, h) * 0.002);
         roundRectPath(ctx, fx, fy, fw, fh, radius);
         ctx.stroke();
-        ctx.strokeStyle = "rgba(255, 248, 235, 0.35)";
+        ctx.strokeStyle = "rgba(255, 245, 248, 0.4)";
         ctx.lineWidth = 1;
         roundRectPath(ctx, fx + 3, fy + 3, fw - 6, fh - 6, Math.max(0, radius - 3));
         ctx.stroke();

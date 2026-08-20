@@ -254,7 +254,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       id="kiss-cam-root"
       className={cn(
         "min-h-screen bg-[#2a221c] text-[var(--foreground)]",
-        state.fullscreen && "fixed inset-0 z-[100] h-dvh min-h-0 w-screen overflow-hidden bg-[#e8f2f8]",
+        state.fullscreen && "fixed inset-0 z-[100] h-dvh min-h-0 w-screen overflow-hidden bg-[#3a2430]",
       )}
     >
       <div
@@ -269,7 +269,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
               <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#d4af37]/90">
                 TableWedding
               </p>
-              <h1 className="font-heading text-3xl leading-none">Kiss Cam</h1>
+              <h1 className="kiss-cam-love-title text-[2.4rem] leading-none">Kiss Cam</h1>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-sm">
               <CameraStatusDot state={state.cameraState} />

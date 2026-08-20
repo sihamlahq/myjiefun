@@ -68,8 +68,8 @@ export function KissCamDisplay({
     <div
       className={
         fillViewport
-          ? `kiss-cam-stage relative h-full w-full overflow-hidden bg-[#e8f2f8] ${className}`
-          : `kiss-cam-stage relative aspect-video w-full overflow-hidden bg-[#e8f2f8] ${className}`
+          ? `kiss-cam-stage relative h-full w-full overflow-hidden bg-[#3a2430] ${className}`
+          : `kiss-cam-stage relative aspect-video w-full overflow-hidden bg-[#3a2430] ${className}`
       }
       style={fillViewport ? undefined : { aspectRatio: "16 / 9" }}
     >
@@ -122,17 +122,30 @@ export function KissCamDisplay({
 
       {finalFrame ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-[6%] z-30 flex flex-col items-center px-6 text-center">
-          <p className="font-heading text-[clamp(1.75rem,4.5vw,3.75rem)] font-semibold tracking-wide text-[#3a2a22]">
+          <p className="font-heading text-[clamp(1.75rem,4.5vw,3.75rem)] font-semibold tracking-wide text-[#3a2430]">
             {coupleNames}
           </p>
-          <p className="mt-2 text-[clamp(0.75rem,1.6vw,1.15rem)] font-semibold uppercase tracking-[0.35em] text-[#6a7a88]/85">
+          <p className="mt-2 text-[clamp(0.75rem,1.6vw,1.15rem)] font-semibold uppercase tracking-[0.35em] text-[#8b3a55]/80">
             {tagline}
           </p>
         </div>
       ) : phase === "idle" && !remoteStream ? (
-        <div className="pointer-events-none absolute inset-x-0 top-[8%] z-10 flex flex-col items-center px-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-[#6a7a88]/75">Kiss Cam</p>
-          <p className="font-heading mt-2 text-3xl text-[#3a2a22]/85 sm:text-4xl">{coupleNames}</p>
+        <div className="pointer-events-none absolute inset-x-0 top-[7%] z-10 flex flex-col items-center px-6 text-center">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#c45a78]/80">
+            TableWedding
+          </p>
+          <h2 className="kiss-cam-love-title mt-1 text-[clamp(2.75rem,7vw,5.5rem)]">
+            <span className="kiss-cam-love-title-accent mr-1 text-[0.72em]" aria-hidden>
+              ♥
+            </span>
+            Kiss Cam
+            <span className="kiss-cam-love-title-accent ml-1 text-[0.72em]" aria-hidden>
+              ♥
+            </span>
+          </h2>
+          <p className="font-heading mt-2 text-xl italic tracking-wide text-[#5a2f38]/75 sm:text-2xl">
+            {coupleNames}
+          </p>
         </div>
       ) : null}
     </div>
