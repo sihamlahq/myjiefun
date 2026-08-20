@@ -226,6 +226,10 @@ h3,
   .kiss-cam-kiss-emoji-inner,
   .kiss-cam-kiss-emoji-glyph,
   .kiss-cam-kiss-emoji-bloom,
+  .kiss-cam-loading-heart,
+  .kiss-cam-loading-dot,
+  .kiss-cam-loading-title,
+  .kiss-cam-loading-bar-fill,
   .kiss-cam-stage-hearts {
     animation: none !important;
     transition: none !important;
@@ -774,6 +778,106 @@ h3,
   }
   to {
     opacity: 0.6;
+  }
+}
+
+/* Soft loading overlay — background + couple remain visible */
+.kiss-cam-loading-veil {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 28%, rgba(255, 245, 248, 0.78), transparent 70%),
+    linear-gradient(180deg, rgba(255, 245, 248, 0.42) 0%, rgba(255, 245, 248, 0.12) 52%, transparent 78%);
+}
+
+.kiss-cam-loading-orbit {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.kiss-cam-loading-heart {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: #c45a78;
+  font-size: 1.65rem;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  animation: kiss-cam-loading-heart 1.4s ease-in-out infinite;
+  text-shadow: 0 4px 16px rgba(196, 90, 120, 0.35);
+}
+
+.kiss-cam-loading-heart-b {
+  animation-delay: 0.7s;
+  color: #e8799a;
+  font-size: 1.15rem;
+}
+
+.kiss-cam-loading-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin: -0.275rem 0 0 -0.275rem;
+  border-radius: 9999px;
+  background: #fff5f7;
+  box-shadow: 0 0 0 6px rgba(255, 201, 212, 0.35);
+  animation: kiss-cam-loading-spin 1.6s linear infinite;
+  transform-origin: 0.275rem 1.65rem;
+}
+
+.kiss-cam-loading-title {
+  animation: kiss-cam-loading-pulse 1.8s ease-in-out infinite;
+}
+
+.kiss-cam-loading-bar {
+  width: min(42vw, 220px);
+  height: 6px;
+  background: rgba(196, 90, 120, 0.2);
+}
+
+.kiss-cam-loading-bar-fill {
+  display: block;
+  height: 100%;
+  width: 40%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #ffc9d4, #c45a78, #ffc9d4);
+  animation: kiss-cam-loading-bar 1.35s ease-in-out infinite;
+}
+
+@keyframes kiss-cam-loading-heart {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+}
+
+@keyframes kiss-cam-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes kiss-cam-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes kiss-cam-loading-bar {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(280%);
   }
 }
 

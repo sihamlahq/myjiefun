@@ -31,6 +31,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [turnOk, setTurnOk] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loveBurst, setLoveBurst] = useState(false);
+  const [loadingScreen, setLoadingScreen] = useState(false);
   const [remoteCountdown, setRemoteCountdown] = useState<1 | 2 | 3 | null>(null);
   const [remoteCountdownTick, setRemoteCountdownTick] = useState(0);
   const connRef = useRef<KissCamConnection | null>(null);
@@ -145,6 +146,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             setLoveBurst(true);
             window.setTimeout(() => setLoveBurst(false), 2800);
           }
+          if (action === "loading-on") setLoadingScreen(true);
+          if (action === "loading-off") setLoadingScreen(false);
           if (
             action === "countdown-1" ||
             action === "countdown-2" ||
@@ -273,6 +276,16 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const celebrate = state.animation === "celebration" || state.animation === "final";
   const showChrome = !state.fullscreen;
 
+  const toggleLoadingScreen = useCallback((next?: boolean) => {
+    setLoadingScreen((prev) => {
+      const value = typeof next === "boolean" ? next : !prev;
+      void connRef.current
+        ?.sendControl(value ? "loading-on" : "loading-off")
+        .catch(() => undefined);
+      return value;
+    });
+  }, []);
+
   return (
     <div
       id="kiss-cam-root"
@@ -296,6 +309,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           remoteStream={remoteStream}
           celebrate={celebrate}
           loveBurst={loveBurst}
+          loading={loadingScreen}
           showCharacters
           fillViewport
           className="h-full w-full"
@@ -356,6 +370,18 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                 onClick={() => startAnimation("running")}
               >
                 Start Kiss Cam
+              </Button>
+              <Button
+                size="lg"
+                className={`h-12 w-full touch-manipulation ${
+                  loadingScreen
+                    ? "bg-[#ff8fab] text-white hover:bg-[#ff7a9a]"
+                    : "border border-white/20 bg-white/10 text-[#f7f1e8] hover:bg-white/15"
+                }`}
+                onClick={() => toggleLoadingScreen()}
+                aria-pressed={loadingScreen}
+              >
+                {loadingScreen ? "Hide Loading Screen" : "Loading Screen"}
               </Button>
               <div className="grid grid-cols-3 gap-2">
                 <Button variant="secondary" onClick={() => startAnimation("preview")}>

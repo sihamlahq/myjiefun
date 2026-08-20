@@ -10,6 +10,7 @@ import {
 } from "@/components/kiss-cam/kiss-cam-atmosphere";
 import { KissCamCanvasCompositor } from "@/components/kiss-cam/kiss-cam-canvas-compositor";
 import { KissCamKissEmoji } from "@/components/kiss-cam/kiss-cam-kiss-emoji";
+import { KissCamLoadingOverlay } from "@/components/kiss-cam/kiss-cam-loading";
 import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 
@@ -27,6 +28,8 @@ type KissCamDisplayProps = {
   remoteStream: MediaStream | null;
   celebrate: boolean;
   loveBurst?: boolean;
+  /** Soft loading overlay — keeps background + couple visible. */
+  loading?: boolean;
   showCharacters: boolean;
   /** Fill the parent completely (true fullscreen) — no 16:9 letterboxing. */
   fillViewport?: boolean;
@@ -45,6 +48,7 @@ export function KissCamDisplay({
   remoteStream,
   celebrate,
   loveBurst = false,
+  loading = false,
   showCharacters,
   fillViewport = false,
   className = "",
@@ -94,8 +98,11 @@ export function KissCamDisplay({
   const finalFrame = phase === "final" || phase === "celebration";
   const cameraLive = cameraEnabled && Boolean(remoteStream);
   const showBigLove = loveBurst || autoLove;
-  const overlayCountdown =
-    remoteCountdown ?? (phase === "countdown" ? countdownValue : null);
+  // Keep couple calmly on stage while loading (background stays too).
+  const characterPhase: KissCamAnimationPhase = loading ? "idle" : phase;
+  const overlayCountdown = loading
+    ? null
+    : (remoteCountdown ?? (phase === "countdown" ? countdownValue : null));
   const countdownKey =
     remoteCountdown != null
       ? `remote-${remoteCountdown}-${remoteCountdownTick}`
@@ -133,14 +140,16 @@ export function KissCamDisplay({
 
       {showCharacters ? (
         <>
-          <GroomFigure phase={phase} className="z-[3]" />
-          <BrideFigure phase={phase} className="z-[4]" />
+          <GroomFigure phase={characterPhase} className="z-[3]" />
+          <BrideFigure phase={characterPhase} className="z-[4]" />
         </>
       ) : null}
 
-      <KissCamHearts active={celebrate || showBigLove} />
-      <KissCamConfetti active={celebrate || showBigLove} />
-      <KissCamLoveBurst active={showBigLove} burstId={autoLoveId} size="stage" word="LOVE" />
+      <KissCamHearts active={!loading && (celebrate || showBigLove)} />
+      <KissCamConfetti active={!loading && (celebrate || showBigLove)} />
+      <KissCamLoveBurst active={!loading && showBigLove} burstId={autoLoveId} size="stage" word="LOVE" />
+
+      <KissCamLoadingOverlay active={loading} size="stage" />
 
       {overlayCountdown != null ? (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
@@ -153,14 +162,14 @@ export function KissCamDisplay({
         </div>
       ) : null}
 
-      {phase === "kiss" ? (
+      {!loading && phase === "kiss" ? (
         <>
           <div className="pointer-events-none absolute inset-0 z-10 kiss-cam-kiss-glow" aria-hidden />
           <KissCamKissEmoji />
         </>
       ) : null}
 
-      {finalFrame ? (
+      {!loading && finalFrame ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-[6%] z-30 flex flex-col items-center px-6 text-center">
           <p className="font-heading text-[clamp(1.75rem,4.5vw,3.75rem)] font-semibold tracking-wide text-[#3a2430]">
             {coupleNames}
@@ -169,7 +178,7 @@ export function KissCamDisplay({
             {tagline}
           </p>
         </div>
-      ) : phase === "idle" && !remoteStream ? (
+      ) : !loading && phase === "idle" && !remoteStream ? (
         <div className="pointer-events-none absolute inset-x-0 top-[7%] z-10 flex flex-col items-center px-6 text-center">
           <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#c45a78]/80">
             TableWedding

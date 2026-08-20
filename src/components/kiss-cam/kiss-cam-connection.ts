@@ -10,6 +10,8 @@ export type KissCamControlAction =
   | "reset"
   | "preview"
   | "love"
+  | "loading-on"
+  | "loading-off"
   | "countdown-1"
   | "countdown-2"
   | "countdown-3";

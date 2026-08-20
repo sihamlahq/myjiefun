@@ -8,6 +8,7 @@ import {
   KissCamConnection,
   type KissCamControlAction,
 } from "@/components/kiss-cam/kiss-cam-connection";
+import { KissCamLoadingOverlay } from "@/components/kiss-cam/kiss-cam-loading";
 import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import { KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
 import type { ConnectionQuality } from "@/components/kiss-cam/kiss-cam-types";
@@ -179,6 +180,7 @@ export function KissCamCameraClient() {
   const [loveBurst, setLoveBurst] = useState(false);
   const [loveBurstId, setLoveBurstId] = useState(0);
   const [loveBusy, setLoveBusy] = useState(false);
+  const [loadingScreen, setLoadingScreen] = useState(false);
   const [countdownBusy, setCountdownBusy] = useState<1 | 2 | 3 | null>(null);
   const [zoomRange, setZoomRange] = useState<ZoomRange | null>(null);
   const [zoomValue, setZoomValue] = useState(1);
@@ -357,6 +359,10 @@ export function KissCamCameraClient() {
           if (!present) setStatus((s) => (s === "connected" ? "reconnecting" : s));
         },
         onQuality: setQuality,
+        onControl: (action) => {
+          if (action === "loading-on") setLoadingScreen(true);
+          if (action === "loading-off") setLoadingScreen(false);
+        },
         onError: () => {
           setMessage("Unable to connect to the wedding screen. Please scan the QR code again.");
           setStatus("reconnecting");
@@ -507,6 +513,19 @@ export function KissCamCameraClient() {
     [cameraOn],
   );
 
+  const toggleLoadingScreen = useCallback(() => {
+    if (!cameraOn || switchingRef.current) return;
+    setLoadingScreen((prev) => {
+      const next = !prev;
+      queueMicrotask(() => {
+        void connRef.current
+          ?.sendControl(next ? "loading-on" : "loading-off")
+          .catch(() => undefined);
+      });
+      return next;
+    });
+  }, [cameraOn]);
+
   useEffect(() => {
     return () => {
       if (loveTimerRef.current) clearTimeout(loveTimerRef.current);
@@ -645,6 +664,7 @@ export function KissCamCameraClient() {
           />
         </svg>
         <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
+        <KissCamLoadingOverlay active={loadingScreen} size="phone" />
 
         {cameraOn ? (
           <div className="absolute bottom-3 left-1/2 z-20 w-[min(92%,300px)] -translate-x-1/2 rounded-2xl border border-white/15 bg-[#3a2430]/78 px-3 py-2.5 backdrop-blur-md">
@@ -742,6 +762,29 @@ export function KissCamCameraClient() {
           aria-pressed={loveBurst}
         >
           ♥ Love
+        </Button>
+
+        <Button
+          type="button"
+          size="lg"
+          className={`h-12 w-full touch-manipulation text-base font-semibold active:scale-[0.97] ${
+            loadingScreen
+              ? "bg-[#ff8fab] text-white shadow-[0_8px_22px_rgba(255,143,171,0.35)] hover:bg-[#ff7a9a]"
+              : "border border-[#ffc9d4]/35 bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/18"
+          }`}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            toggleLoadingScreen();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            toggleLoadingScreen();
+          }}
+          disabled={!cameraOn || switching}
+          aria-pressed={loadingScreen}
+        >
+          {loadingScreen ? "Hide Loading Screen" : "Loading Screen"}
         </Button>
 
         <div className="grid grid-cols-3 gap-2">
