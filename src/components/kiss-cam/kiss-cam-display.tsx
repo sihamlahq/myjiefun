@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BrideFigure, GroomFigure, HeldHandsAccent } from "@/components/kiss-cam/kiss-cam-characters";
+import { BrideFigure, GroomFigure } from "@/components/kiss-cam/kiss-cam-characters";
 import {
   KissCamBackground,
   KissCamBalloons,
@@ -99,7 +99,6 @@ export function KissCamDisplay({
         <>
           <GroomFigure phase={phase} className="z-[3]" />
           <BrideFigure phase={phase} className="z-[4]" />
-          <HeldHandsAccent phase={phase} />
         </>
       ) : null}
 

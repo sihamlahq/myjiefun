@@ -193,7 +193,7 @@ export function GroomFigure({
           <line x1="120" y1="160" x2="120" y2="268" stroke="#c9a66b" strokeWidth="1.4" opacity="0.5" />
         </g>
 
-        {/* left arm + hand (outer — balloon) */}
+        {/* left arm + hand (outer — balloon). Hand stays glued to arm tip. */}
         <g
           className="kiss-cam-arm-left"
           style={{
@@ -206,7 +206,7 @@ export function GroomFigure({
             fill="none"
             stroke={TUX}
             strokeWidth="18"
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
           <path
             d="M78 138 Q52 190 62 250"
@@ -222,7 +222,7 @@ export function GroomFigure({
           <HeartBalloon color={BALLOON_PINK} x={54} y={120} />
         </g>
 
-        {/* right arm + hand (inner — hold hands) */}
+        {/* right arm + hand (inner — hold hands). Rotate only — no extra hand layer. */}
         <g
           className="kiss-cam-arm-right"
           style={{
@@ -235,7 +235,7 @@ export function GroomFigure({
             fill="none"
             stroke={TUX_DARK}
             strokeWidth="18"
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
           <path
             d="M162 138 Q198 185 188 248"
@@ -245,12 +245,7 @@ export function GroomFigure({
             strokeLinecap="round"
             opacity="0.35"
           />
-          <g
-            className="kiss-cam-hand-right"
-            style={{
-              transform: `translate(${innerReach * 8}px, ${innerReach * -6}px)`,
-            }}
-          >
+          <g className="kiss-cam-hand-right">
             <circle cx="188" cy="256" r="11" fill={SKIN} stroke={STROKE} strokeWidth={STROKE_W} />
           </g>
         </g>
@@ -342,7 +337,7 @@ export function BrideFigure({
           />
         </g>
 
-        {/* left arm (inner — hold hands) */}
+        {/* left arm (inner — hold hands). Rotate only — hand stays on the wrist. */}
         <g
           className="kiss-cam-arm-left"
           style={{
@@ -355,7 +350,7 @@ export function BrideFigure({
             fill="none"
             stroke={SKIN_SOFT}
             strokeWidth="15"
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
           <path
             d="M96 132 Q58 180 70 246"
@@ -365,12 +360,7 @@ export function BrideFigure({
             strokeLinecap="round"
             opacity="0.3"
           />
-          <g
-            className="kiss-cam-hand-left"
-            style={{
-              transform: `translate(${innerReach * -8}px, ${innerReach * -6}px)`,
-            }}
-          >
+          <g className="kiss-cam-hand-left">
             <circle cx="70" cy="254" r="10.5" fill={SKIN} stroke={STROKE} strokeWidth={STROKE_W} />
           </g>
         </g>
@@ -388,7 +378,7 @@ export function BrideFigure({
             fill="none"
             stroke={SKIN}
             strokeWidth="15"
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
           <path
             d="M164 132 Q202 178 192 246"
@@ -441,39 +431,6 @@ export function BrideFigure({
           <circle cx="130" cy="40" r="3.2" fill="#e8c97a" stroke={STROKE} strokeWidth="1" />
           <Face cx={130} cy={76} pose={pose} looking={headLooking} />
         </g>
-      </svg>
-    </div>
-  );
-}
-
-/** Clasped hands accent — appears when holdProgress is full, centered between couple */
-export function HeldHandsAccent({
-  phase,
-  className,
-}: {
-  phase: KissCamAnimationPhase;
-  className?: string;
-}) {
-  const show =
-    phase === "holdHands" ||
-    phase === "romanticPause" ||
-    phase === "moveCloser" ||
-    phase === "countdown" ||
-    phase === "kiss" ||
-    phase === "celebration" ||
-    phase === "final";
-  if (!show) return null;
-  return (
-    <div
-      className={cn(
-        "kiss-cam-held-hands pointer-events-none absolute bottom-[28%] left-1/2 z-[5] -translate-x-1/2",
-        className,
-      )}
-      aria-hidden
-    >
-      <svg viewBox="0 0 64 40" className="h-10 w-16 opacity-95">
-        <circle cx="24" cy="22" r="11" fill={SKIN} stroke={STROKE} strokeWidth="2" />
-        <circle cx="40" cy="22" r="11" fill={SKIN_SOFT} stroke={STROKE} strokeWidth="2" />
       </svg>
     </div>
   );
