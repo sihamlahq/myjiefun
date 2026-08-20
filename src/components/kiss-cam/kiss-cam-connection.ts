@@ -202,10 +202,7 @@ export class KissCamConnection {
 
   private async preferEfficientCodecs(sender: RTCRtpSender) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const capabilities = (RTCRtpSender as any).getCapabilities?.("video") as
-        | { codecs?: Array<{ mimeType: string; [k: string]: unknown }> }
-        | undefined;
+      const capabilities = RTCRtpSender.getCapabilities?.("video");
       if (!capabilities?.codecs?.length) return;
       // Prefer hardware-friendly H264, then VP8 (smooth), then VP9.
       const rank = (mime: string) => {
@@ -219,11 +216,8 @@ export class KissCamConnection {
       const ordered = [...capabilities.codecs].sort(
         (a, b) => rank(a.mimeType) - rank(b.mimeType),
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transceiver = this.pc
-        ?.getTransceivers()
-        .find((t) => t.sender === sender) as any;
-      if (transceiver?.setCodecPreferences) {
+      const transceiver = this.pc?.getTransceivers().find((t) => t.sender === sender);
+      if (transceiver && typeof transceiver.setCodecPreferences === "function") {
         transceiver.setCodecPreferences(ordered);
       }
     } catch {
