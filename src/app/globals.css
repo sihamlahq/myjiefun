@@ -642,7 +642,7 @@ h3,
 }
 
 .kiss-cam-kiss-glow {
-  background: radial-gradient(circle at 50% 45%, rgba(255, 230, 235, 0.5), rgba(200, 225, 240, 0.15) 45%, transparent 60%);
+  background: radial-gradient(circle at 50% 45%, rgba(255, 230, 235, 0.55), rgba(232, 121, 154, 0.22) 45%, transparent 62%);
   animation: kiss-cam-glow 1.4s ease-out;
 }
 
