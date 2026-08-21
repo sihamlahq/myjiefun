@@ -96,12 +96,15 @@ function ArmChain({
   rig,
   angles,
   balloon,
+  /** When "baked", the hand is already painted into the forearm asset — do not mount a second hand image. */
+  handMode = "separate",
 }: {
   which: "left" | "right";
   base: string;
   rig: CharacterRigJoints;
   angles: ArmAngles;
   balloon?: { color: string };
+  handMode?: "separate" | "baked";
 }) {
   const shoulder = which === "left" ? rig.leftShoulder : rig.rightShoulder;
   const elbow = which === "left" ? rig.leftElbow : rig.rightElbow;
@@ -133,7 +136,7 @@ function ArmChain({
             transform: `rotate(${angles.hand}deg)`,
           }}
         >
-          <LayerImg src={`${base}/${which}-hand.png`} />
+          {handMode === "separate" ? <LayerImg src={`${base}/${which}-hand.png`} /> : null}
           {balloon ? (
             <Balloon
               xPct={pct(rig.handRest[which].x, "x")}
@@ -254,8 +257,8 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
               <LayerImg src={`${base}/torso.png`} />
             </div>
 
-            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} />
-            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} />
+            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} handMode="separate" />
+            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} handMode="separate" />
 
             <div
               className="kiss-cam-head absolute inset-0"
@@ -341,8 +344,9 @@ export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps)
               <LayerImg src={`${base}/bodice.png`} />
             </div>
 
-            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} />
-            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} balloon={{ color: "#f7d6de" }} />
+            {/* Bride hand pixels are painted into the forearm masters; mounting *-hand.png duplicated them. */}
+            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} handMode="baked" />
+            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} balloon={{ color: "#f7d6de" }} handMode="baked" />
 
             <div
               className="kiss-cam-head absolute inset-0"
