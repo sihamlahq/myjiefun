@@ -32,8 +32,8 @@ export type CharacterPose = {
 };
 
 /**
- * Couple composition for A-pose masters — wider center gap.
- * Idle ~±18%. Hold ~±7%. Kiss ~±2.5%. Celebration ~±8%.
+ * Couple composition for A-pose masters — wide center gap.
+ * Idle ~±24%. Hold ~±10%. Kiss ~±4%. Celebration ~±12%.
  * Body lean kept small; heads do most of the kiss motion.
  */
 export function poseForPhase(
@@ -43,7 +43,7 @@ export function poseForPhase(
   const dir = side === "groom" ? -1 : 1;
 
   const base: CharacterPose = {
-    x: dir * 18,
+    x: dir * 24,
     y: 0,
     bodyRot: 0,
     headRot: 0,
@@ -59,11 +59,11 @@ export function poseForPhase(
 
   switch (phase) {
     case "idle":
-      return { ...base, x: dir * 18, balloonSway: 1 };
+      return { ...base, x: dir * 24, balloonSway: 1 };
     case "approach":
       return {
         ...base,
-        x: dir * 12,
+        x: dir * 16,
         bodyRot: dir * -0.8,
         headRot: dir * -2.5,
         holdProgress: 0.35,
@@ -72,7 +72,7 @@ export function poseForPhase(
     case "holdHands":
       return {
         ...base,
-        x: dir * 7,
+        x: dir * 10,
         bodyRot: dir * -1.2,
         headRot: dir * -3.5,
         holdProgress: 1,
@@ -82,7 +82,7 @@ export function poseForPhase(
     case "romanticPause":
       return {
         ...base,
-        x: dir * 6.5,
+        x: dir * 9,
         bodyRot: dir * -1.5,
         headRot: dir * -4,
         holdProgress: 1,
@@ -93,7 +93,7 @@ export function poseForPhase(
     case "moveCloser":
       return {
         ...base,
-        x: dir * 4.5,
+        x: dir * 6.5,
         y: -0.3,
         bodyRot: dir * -2,
         headRot: dir * -5.5,
@@ -107,7 +107,7 @@ export function poseForPhase(
     case "countdown":
       return {
         ...base,
-        x: dir * 3.5,
+        x: dir * 5,
         y: -0.6,
         bodyRot: dir * -2.5,
         headRot: dir * -7,
@@ -121,7 +121,7 @@ export function poseForPhase(
     case "kiss":
       return {
         ...base,
-        x: dir * 2.5,
+        x: dir * 4,
         y: -0.9,
         bodyRot: dir * -3,
         headRot: dir * -6,
@@ -137,7 +137,7 @@ export function poseForPhase(
     case "final":
       return {
         ...base,
-        x: dir * 8,
+        x: dir * 12,
         y: -0.3,
         bodyRot: dir * -1.5,
         headRot: dir * -2.5,
