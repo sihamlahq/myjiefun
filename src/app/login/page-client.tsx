@@ -33,7 +33,12 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      router.push(params.get("next") || "/dashboard");
+      const next = params.get("next");
+      const safeNext =
+        next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login")
+          ? next
+          : "/dashboard";
+      router.push(safeNext);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

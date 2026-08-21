@@ -32,9 +32,17 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isAuthPage = path.startsWith("/login");
+
+  // Guest phone camera stays public (QR). LED Kiss Cam controller requires staff login.
+  const isKissCamCamera = path.startsWith("/reception/kiss-cam/camera");
+  const isKissCamLed =
+    path === "/reception/kiss-cam" ||
+    (path.startsWith("/reception/kiss-cam/") && !isKissCamCamera);
+
   const isPublic =
     isAuthPage ||
-    path.startsWith("/reception") ||
+    isKissCamCamera ||
+    (path.startsWith("/reception") && !isKissCamLed) ||
     path.startsWith("/api/health") ||
     path.startsWith("/api/kiss-cam");
 
@@ -46,8 +54,14 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAuthPage) {
+    const next = request.nextUrl.searchParams.get("next");
+    const safeNext =
+      next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login")
+        ? next
+        : "/dashboard";
     const redirect = request.nextUrl.clone();
-    redirect.pathname = "/dashboard";
+    redirect.pathname = safeNext;
+    redirect.search = "";
     return NextResponse.redirect(redirect);
   }
 
