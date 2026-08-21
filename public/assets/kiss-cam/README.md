@@ -2,20 +2,28 @@
 
 ## Live characters (layered puppets)
 
-Animation uses PNG layers + CSS transforms in `kiss-cam-puppet.tsx`.
-Pose state machine stays in `kiss-cam-pose.ts`.
+Animation uses transparent PNG layers + CSS transforms in `kiss-cam-puppet.tsx`.
+Pose state machine stays in `kiss-cam-pose.ts` (idle / breath / hold / kiss / return).
 
 | Path | Purpose |
 |------|---------|
-| `groom/*.png` | Groom puppet layers (head, hair, torso, arms, hands, legs, shoes) |
+| `groom/*.png` | Groom puppet layers cut from the premium master |
 | `bride/*.png` | Bride puppet layers (+ tiara, veil, bodice, skirt) |
-| `masters/*-master-preview.png` | Overlaid reconstruction previews |
+| `masters/*-master.png` | Full-body painted masters (source of truth) |
+| `masters/*-master-placed.png` | Masters placed on the 720×1380 stage |
+| `masters/*-master-preview.png` | Layer stack reconstruction previews |
+| `masters/joints.json` | Joint pivots for the puppet rig |
 
-Regenerate layers:
+### Regenerating layers from masters
 
 ```bash
-node scripts/generate-kiss-cam-layers.cjs
+# Requires the v2 masters under /opt/cursor/artifacts/kiss-cam-masters/
+# or update MASTER_SRC paths inside the script.
+node scripts/split-kiss-cam-masters.cjs
 ```
+
+Do **not** use `scripts/generate-kiss-cam-layers.cjs` for production art — that SVG
+path only produces flat cartoon layers and will overwrite the premium PNGs.
 
 ## Character Rig Debug (development only)
 
@@ -28,8 +36,8 @@ Shows layer bounds, joint pivots, and hand-hold targets. **Never enabled in prod
 
 | File | Purpose |
 |------|---------|
-| `groom.svg` / `bride.svg` | Older static references (not used by the live puppet) |
+| `groom.svg` / `bride.svg` | Older static cartoon references (not used by live puppets) |
 | `balloons.svg` / `hearts.svg` / `background.svg` | Atmosphere references |
 | `music/` | LED background music |
 
-Visual language: layered semi-realistic wedding illustration with adult proportions.
+Visual language: premium semi-realistic wedding invitation illustration with adult proportions.
