@@ -49,9 +49,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
 
   const music = useKissCamMusic();
   const musicPlayRef = useRef(music.play);
-  const musicStopRef = useRef(music.stop);
   musicPlayRef.current = music.play;
-  musicStopRef.current = music.stop;
 
   // Character Rig Debug — development only (never in production builds).
   const rigDebugAvailable = process.env.NODE_ENV !== "production";
@@ -241,7 +239,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const resetAnimation = useCallback(() => {
     startedAtRef.current = null;
     cancelAnimationFrame(rafRef.current);
-    musicStopRef.current(true);
+    // Music keeps looping in the background until Stop music is pressed.
     setState((s) => ({
       ...s,
       status: "standby",
@@ -275,7 +273,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       if (elapsed >= total) {
         if (state.autoReturn) {
           startedAtRef.current = null;
-          musicStopRef.current(true);
+          // Leave background music running after the show ends.
           setState((s) => ({
             ...s,
             status: "standby",
@@ -294,17 +292,6 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, [state.status, state.countdownEnabled, state.autoReturn, state.durationScale]);
-
-  // Soft-pause music under the loading overlay; resume when cleared mid-show.
-  useEffect(() => {
-    if (loadingScreen) {
-      musicStopRef.current(true);
-      return;
-    }
-    if (state.status === "running" || state.status === "preview") {
-      void musicPlayRef.current();
-    }
-  }, [loadingScreen, state.status]);
 
   const toggleFullscreen = useCallback(async () => {
     const root = document.getElementById("kiss-cam-root");
@@ -477,7 +464,30 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                       ? `Theme: ${music.trackLabel}`
                       : music.trackLabel
                     : "No track — choose a wedding song"}
+                  {music.playing ? " · playing" : ""}
                 </p>
+                <p className="mt-1 text-[11px] text-[#f7f1e8]/55">
+                  Keeps playing after the animation ends — press Stop music to end it.
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    className="h-9 bg-[#c45a78] text-white hover:bg-[#a84864]"
+                    disabled={!music.ready || !music.enabled || music.muted}
+                    onClick={() => void music.play()}
+                  >
+                    Play music
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 border-white/20 text-[#f7f1e8]"
+                    disabled={!music.playing && !music.ready}
+                    onClick={() => music.stop(true)}
+                  >
+                    Stop music
+                  </Button>
+                </div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <Button
                     type="button"
@@ -576,16 +586,36 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         </aside>
       ) : null}
 
-      {/* Always-reachable mute while fullscreen on the LED */}
+      {/* Always-reachable music controls while fullscreen on the LED */}
       {state.fullscreen && music.ready ? (
-        <button
-          type="button"
-          className="absolute bottom-4 left-4 z-50 rounded-full border border-white/20 bg-[#3a2f28]/85 px-4 py-2 text-sm font-semibold text-[#f7f1e8] shadow-lg backdrop-blur-md hover:bg-[#3a2f28]"
-          onClick={() => music.setMuted(!music.muted)}
-          aria-pressed={music.muted}
-        >
-          {music.muted ? "Unmute music" : "Mute music"}
-        </button>
+        <div className="absolute bottom-4 left-4 z-50 flex gap-2">
+          {music.playing ? (
+            <button
+              type="button"
+              className="rounded-full border border-white/20 bg-[#3a2f28]/85 px-4 py-2 text-sm font-semibold text-[#f7f1e8] shadow-lg backdrop-blur-md hover:bg-[#3a2f28]"
+              onClick={() => music.stop(true)}
+            >
+              Stop music
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="rounded-full border border-white/20 bg-[#3a2f28]/85 px-4 py-2 text-sm font-semibold text-[#f7f1e8] shadow-lg backdrop-blur-md hover:bg-[#3a2f28]"
+              onClick={() => void music.play()}
+              disabled={!music.enabled || music.muted}
+            >
+              Play music
+            </button>
+          )}
+          <button
+            type="button"
+            className="rounded-full border border-white/20 bg-[#3a2f28]/85 px-4 py-2 text-sm font-semibold text-[#f7f1e8] shadow-lg backdrop-blur-md hover:bg-[#3a2f28]"
+            onClick={() => music.setMuted(!music.muted)}
+            aria-pressed={music.muted}
+          >
+            {music.muted ? "Unmute" : "Mute"}
+          </button>
+        </div>
       ) : null}
     </div>
   );

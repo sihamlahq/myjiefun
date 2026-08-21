@@ -211,6 +211,11 @@ export function useKissCamMusic() {
       setError("Choose a music file for the LED screen first.");
       return;
     }
+    // Keep looping in the background — do not restart if already playing.
+    if (!audio.paused) {
+      setError(null);
+      return;
+    }
     clearFade();
     setError(null);
     audio.muted = false;
@@ -219,7 +224,7 @@ export function useKissCamMusic() {
       await audio.play();
       fadeTo(targetVolumeRef.current, false);
     } catch {
-      setError("Tap Start again or choose a music file to allow playback.");
+      setError("Tap Play music or Start again to allow playback.");
       setPlaying(false);
     }
   }, [clearFade, enabled, fadeTo, muted]);
