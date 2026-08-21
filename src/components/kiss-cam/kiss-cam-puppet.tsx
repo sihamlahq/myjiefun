@@ -12,12 +12,13 @@ import {
 
 /**
  * Layered 2D puppet characters for Kiss Cam.
- * Artwork: /public/assets/kiss-cam/{groom|bride}/*.png (480×920 canvas).
+ * Artwork: /public/assets/kiss-cam/{groom|bride}/*.png (720×1380 canvas).
+ * Layers are cut from premium painted masters (scripts/split-kiss-cam-masters.cjs).
  * Pose state machine: kiss-cam-pose.ts (unchanged).
  */
 
-const STAGE_W = 480;
-const STAGE_H = 920;
+const STAGE_W = 720;
+const STAGE_H = 1380;
 
 type LayerImgProps = {
   src: string;
@@ -44,29 +45,29 @@ function pct(value: number, axis: "x" | "y") {
   return axis === "x" ? (value / STAGE_W) * 100 : (value / STAGE_H) * 100;
 }
 
-// Joints in master canvas coordinates (must match generate-kiss-cam-layers.cjs)
+// Joints in master canvas coordinates (from masters/joints.json)
 const GROOM_JOINTS = {
-  neck: { x: 240, y: 188 },
-  leftShoulder: { x: 168, y: 250 },
-  leftElbow: { x: 148, y: 370 },
-  leftWrist: { x: 150, y: 490 },
-  rightShoulder: { x: 312, y: 250 },
-  rightElbow: { x: 332, y: 370 },
-  rightWrist: { x: 330, y: 490 },
+  neck: { x: 361, y: 195 },
+  leftShoulder: { x: 266, y: 289 },
+  leftElbow: { x: 226, y: 504 },
+  leftWrist: { x: 218, y: 692 },
+  rightShoulder: { x: 455, y: 289 },
+  rightElbow: { x: 495, y: 504 },
+  rightWrist: { x: 503, y: 692 },
   /** Target for inner hand when holdProgress = 1 (toward bride) */
-  holdHandTarget: { x: 400, y: 500 },
+  holdHandTarget: { x: 542, y: 719 },
 };
 
 const BRIDE_JOINTS = {
-  neck: { x: 240, y: 188 },
-  veilAttach: { x: 240, y: 160 },
-  leftShoulder: { x: 190, y: 260 },
-  leftElbow: { x: 165, y: 385 },
-  leftWrist: { x: 166, y: 505 },
-  rightShoulder: { x: 290, y: 260 },
-  rightElbow: { x: 315, y: 385 },
-  rightWrist: { x: 314, y: 505 },
-  holdHandTarget: { x: 80, y: 500 },
+  neck: { x: 360, y: 155 },
+  veilAttach: { x: 360, y: 113 },
+  leftShoulder: { x: 191, y: 227 },
+  leftElbow: { x: 120, y: 393 },
+  leftWrist: { x: 106, y: 538 },
+  rightShoulder: { x: 528, y: 227 },
+  rightElbow: { x: 599, y: 393 },
+  rightWrist: { x: 613, y: 538 },
+  holdHandTarget: { x: 36, y: 558 },
 };
 
 function Balloon({ xPct, yPct, color }: { xPct: number; yPct: number; color: string }) {

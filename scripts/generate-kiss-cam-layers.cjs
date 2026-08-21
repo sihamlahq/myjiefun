@@ -1,9 +1,20 @@
 /**
- * Generate transparent Kiss Cam puppet layer PNGs from aligned SVG masters.
- * Canvas: 480×920 — all layers share the same coordinate space.
+ * DEPRECATED — flat cartoon SVG → PNG generator.
+ * Do NOT run this for production Kiss Cam art; it overwrites premium master-cut layers.
+ * Use scripts/split-kiss-cam-masters.cjs instead.
  *
- * Run: node scripts/generate-kiss-cam-layers.mjs
+ * Canvas: 480×920 (legacy). Live puppets now use 720×1380 premium PNGs.
+ *
+ * Run: node scripts/generate-kiss-cam-layers.cjs
  */
+if (process.env.FORCE_CARTOON_LAYERS !== "1") {
+  console.error(
+    "Refusing to run: this script generates flat cartoon layers.\n" +
+      "Use: node scripts/split-kiss-cam-masters.cjs\n" +
+      "Or set FORCE_CARTOON_LAYERS=1 to override (not recommended).",
+  );
+  process.exit(1);
+}
 const fs = require("fs");
 const path = require("path");
 const sharp = require("sharp");
