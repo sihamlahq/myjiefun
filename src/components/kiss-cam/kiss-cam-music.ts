@@ -65,7 +65,7 @@ export function useKissCamMusic() {
       audio.volume = muted ? 0 : targetVolumeRef.current;
       audio.muted = muted;
       try {
-        await audio.load?.();
+        audio.load();
       } catch {
         // Some browsers throw on load(); play() will surface real errors.
       }
