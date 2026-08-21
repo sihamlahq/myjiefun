@@ -1,34 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 460" fill="none">
-  <!-- TableWedding Kiss Cam — Groom (replaceable static reference)
-       Live animation uses modular React SVG groups in kiss-cam-characters.tsx.
-       Look: pompadour, black double-breasted suit, white shirt, slim black tie. -->
-  <ellipse cx="120" cy="444" rx="48" ry="9" fill="rgba(70,60,50,.12)"/>
-  <path d="M92 268 L86 412 L114 412 L118 268Z" fill="#141416" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
-  <path d="M122 268 L128 412 L156 412 L148 268Z" fill="#0a0a0c" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
-  <path d="M84 412 L86 424 L116 424 L114 412Z" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.6"/>
-  <path d="M126 412 L128 424 L158 424 L156 412Z" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.6"/>
-  <path d="M76 128 C76 108 96 96 120 96 C144 96 164 108 164 128 L174 272 L66 272Z" fill="#141416" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
-  <path d="M112 108 L120 200 L128 108Z" fill="#fffcf8" stroke="#4a4038" stroke-width="1.5"/>
-  <path d="M108 104 L120 118 L132 104 L126 100 L120 108 L114 100Z" fill="#fffcf8" stroke="#4a4038" stroke-width="1.4"/>
-  <path d="M116 116 L120 124 L124 116 L122 112 L120 114 L118 112Z" fill="#101012" stroke="#4a4038" stroke-width="1.1"/>
-  <path d="M117 124 L120 198 L123 124Z" fill="#101012" stroke="#4a4038" stroke-width="1.1"/>
-  <path d="M108 108 L88 150 L104 156 L116 122Z" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.5"/>
-  <path d="M132 108 L152 150 L136 156 L124 122Z" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.5"/>
-  <circle cx="108" cy="168" r="3.2" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.1"/>
-  <circle cx="132" cy="168" r="3.2" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.1"/>
-  <circle cx="108" cy="198" r="3.2" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.1"/>
-  <circle cx="132" cy="198" r="3.2" fill="#0a0a0c" stroke="#4a4038" stroke-width="1.1"/>
-  <path d="M78 138 Q52 190 62 250" fill="none" stroke="#141416" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="62" cy="258" r="11" fill="#f6d2bc" stroke="#4a4038" stroke-width="2.2"/>
-  <path d="M162 138 Q198 185 188 248" fill="none" stroke="#0a0a0c" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="188" cy="256" r="11" fill="#f6d2bc" stroke="#4a4038" stroke-width="2.2"/>
-  <circle cx="120" cy="70" r="42" fill="#f6d2bc" stroke="#4a4038" stroke-width="2.2"/>
-  <path d="M80 72 C78 52 92 36 108 32 L102 62Z" fill="#2c211c" stroke="#4a4038" stroke-width="2.2"/>
-  <path d="M160 74 C162 54 150 38 134 34 L138 64Z" fill="#2c211c" stroke="#4a4038" stroke-width="2.2"/>
-  <path d="M92 64 C86 22 112 8 130 12 C156 18 162 42 154 62 C142 48 124 42 106 52Z" fill="#2c211c" stroke="#4a4038" stroke-width="2.2" stroke-linejoin="round"/>
-  <circle cx="109" cy="72" r="2.5" fill="#4a4038"/>
-  <circle cx="131" cy="72" r="2.5" fill="#4a4038"/>
-  <path d="M111 85 Q120 95 129 85" fill="none" stroke="#e8a0a8" stroke-width="2.2" stroke-linecap="round"/>
-  <line x1="54" y1="158" x2="54" y2="230" stroke="#9a8b82" stroke-width="1.4" stroke-linecap="round"/>
-  <path d="M54 148 C76 128 82 102 54 112 C26 102 32 128 54 148Z" fill="#f4b6c4" stroke="#4a4038" stroke-width="1.9"/>
+  <!-- Kiss Cam groom — premium semi-realistic reference (live art in kiss-cam-characters.tsx) -->
+  <defs>
+    <linearGradient id="g-skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7d4bc"/><stop offset="100%" stop-color="#e8b396"/>
+    </linearGradient>
+    <linearGradient id="g-tux" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#222226"/><stop offset="100%" stop-color="#0c0c0e"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="120" cy="444" rx="46" ry="8" fill="rgba(70,60,50,.14)"/>
+  <path d="M94 275 C92 330 88 380 90 412 L114 412 C116 380 116 330 118 275Z" fill="url(#g-tux)" stroke="#5a4a42" stroke-width="1.6"/>
+  <path d="M122 275 C124 330 126 380 126 412 L150 412 C152 380 148 330 146 275Z" fill="#0c0c0e" stroke="#5a4a42" stroke-width="1.6"/>
+  <path d="M88 412 L86 424 C90 426 110 426 114 424 L114 412Z" fill="#0c0c0e" stroke="#5a4a42" stroke-width="1.3"/>
+  <path d="M126 412 L126 424 C130 426 150 426 154 424 L152 412Z" fill="#0c0c0e" stroke="#5a4a42" stroke-width="1.3"/>
+  <path d="M78 132 C78 112 96 100 120 100 C144 100 162 112 162 132 L170 275 L70 275Z" fill="url(#g-tux)" stroke="#5a4a42" stroke-width="1.7"/>
+  <path d="M112 112 L120 210 L128 112Z" fill="#fffcf8" stroke="#5a4a42" stroke-width="1.2"/>
+  <path d="M108 106 L120 120 L132 106 L127 102 L120 110 L113 102Z" fill="#fffcf8" stroke="#5a4a42" stroke-width="1.15"/>
+  <path d="M116 118 L120 126 L124 118 L122 114 L120 116 L118 114Z" fill="#101012"/>
+  <path d="M117.5 126 L120 208 L122.5 126Z" fill="#101012"/>
+  <path d="M110 110 L86 152 L104 160 L118 124Z" fill="#0c0c0e" stroke="#5a4a42" stroke-width="1.3"/>
+  <path d="M130 110 L154 152 L136 160 L122 124Z" fill="#0c0c0e" stroke="#5a4a42" stroke-width="1.3"/>
+  <circle cx="108" cy="168" r="2.8" fill="#0c0c0e" stroke="#5a4a42"/><circle cx="132" cy="168" r="2.8" fill="#0c0c0e" stroke="#5a4a42"/>
+  <circle cx="108" cy="198" r="2.8" fill="#0c0c0e" stroke="#5a4a42"/><circle cx="132" cy="198" r="2.8" fill="#0c0c0e" stroke="#5a4a42"/>
+  <path d="M78 138 Q52 190 62 250" fill="none" stroke="#161618" stroke-width="15"/>
+  <ellipse cx="62" cy="258" rx="9.5" ry="10.5" fill="url(#g-skin)" stroke="#5a4a42" stroke-width="1.5"/>
+  <path d="M162 138 Q198 185 188 248" fill="none" stroke="#0c0c0e" stroke-width="15"/>
+  <ellipse cx="188" cy="256" rx="9.5" ry="10.5" fill="url(#g-skin)" stroke="#5a4a42" stroke-width="1.5"/>
+  <path d="M110 96 L114 112 L126 112 L130 96Z" fill="url(#g-skin)" stroke="#5a4a42" stroke-width="1.2"/>
+  <ellipse cx="120" cy="72" rx="30" ry="34" fill="url(#g-skin)" stroke="#5a4a42" stroke-width="1.6"/>
+  <path d="M90 80 C88 52 100 36 112 30 L110 66Z" fill="#1a1412"/>
+  <path d="M150 82 C152 54 140 38 128 32 L130 66Z" fill="#1a1412"/>
+  <path d="M98 68 C92 28 116 16 132 18 C152 20 156 44 148 64 C138 50 122 46 106 56Z" fill="#2a221e" stroke="#5a4a42" stroke-width="1.5"/>
+  <ellipse cx="111" cy="73" rx="5.6" ry="3.6" fill="#fff" stroke="#5a4a42"/><circle cx="111" cy="73.2" r="2.2" fill="#3a2a22"/><circle cx="111.8" cy="72.2" r="0.6" fill="#fff"/>
+  <ellipse cx="129" cy="73" rx="5.6" ry="3.6" fill="#fff" stroke="#5a4a42"/><circle cx="129" cy="73.2" r="2.2" fill="#3a2a22"/><circle cx="129.8" cy="72.2" r="0.6" fill="#fff"/>
+  <path d="M119.5 70 Q121.5 78 118.5 81" fill="none" stroke="#d9a088" stroke-width="1.35"/>
+  <path d="M113 87 Q120 93 127 87" fill="#e8a0a6" stroke="#c97a82" stroke-width="1.1"/>
 </svg>
