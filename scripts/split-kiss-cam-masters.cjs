@@ -58,33 +58,55 @@ async function matteAndCrop(inputPath) {
     .toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
 
-  // Key out flat gray (#8A8A8A) and near-gray backdrop from v2 masters
-  for (let i = 0; i < data.length; i += channels) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
+  const isBackdrop = (r, g, b, a) => {
+    if (a < 8) return true;
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     const sat = max - min;
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-    // flat gray backdrop ~138
     const grayDist = Math.sqrt((r - 138) ** 2 + (g - 138) ** 2 + (b - 138) ** 2);
-    if (grayDist < 28 && sat < 18) {
-      data[i + 3] = 0;
-      continue;
-    }
+    // Mid-gray studio only — do NOT key light whites (shirt/dress/veil)
+    if (grayDist < 40 && sat < 22) return true;
+    if (r > 248 && g > 248 && b > 248 && sat < 6) return true;
+    return false;
+  };
+
+  // Flood-fill key from corners so white shirt/dress interiors stay opaque
+  const seen = new Uint8Array(width * height);
+  const stack = [
+    [0, 0],
+    [width - 1, 0],
+    [0, height - 1],
+    [width - 1, height - 1],
+    [Math.floor(width / 2), 0],
+    [Math.floor(width / 2), height - 1],
+    [0, Math.floor(height / 2)],
+    [width - 1, Math.floor(height / 2)],
+  ];
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    if (x < 0 || y < 0 || x >= width || y >= height) continue;
+    const p = y * width + x;
+    if (seen[p]) continue;
+    seen[p] = 1;
+    const i = p * channels;
+    if (!isBackdrop(data[i], data[i + 1], data[i + 2], data[i + 3])) continue;
+    data[i + 3] = 0;
+    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+  }
+
+  // Soften leftover near-bg fringe
+  for (let i = 0; i < data.length; i += channels) {
+    if (data[i + 3] === 0) continue;
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const grayDist = Math.sqrt((r - 138) ** 2 + (g - 138) ** 2 + (b - 138) ** 2);
     if (grayDist < 42 && sat < 12) {
       data[i + 3] = Math.min(data[i + 3], Math.round(((grayDist - 28) / 14) * 255));
-      continue;
-    }
-    // residual near-white studio (v1 leftovers)
-    if (r > 248 && g > 248 && b > 248) {
-      data[i + 3] = 0;
-      continue;
-    }
-    if (r > 242 && g > 242 && b > 242 && sat < 8) {
-      data[i + 3] = 0;
+    } else if (sat < 10 && lum > 200 && lum < 248) {
+      // only if mostly surrounded by transparent — skip here; flood handles bg
     }
   }
 
@@ -169,8 +191,9 @@ async function placeOnCanvas(matted, role) {
   const srcW = meta.width;
   const srcH = meta.height;
 
-  const topMargin = 20;
-  const bottomMargin = 16;
+  const topMargin = Math.round(H * 0.05);
+  const bottomMargin = Math.round(H * 0.05);
+  const sideMargin = Math.round(W * 0.05);
   const targetH = H - topMargin - bottomMargin;
 
   // Scale so the BODY height fills the stage (veil can extend sideways)
@@ -178,7 +201,7 @@ async function placeOnCanvas(matted, role) {
   let scale = targetH / bodyH;
   let newW = Math.round(srcW * scale);
   let newH = Math.round(srcH * scale);
-  const maxW = W - 8;
+  const maxW = W - sideMargin * 2;
   if (newW > maxW) {
     scale = maxW / srcW;
     newW = Math.round(srcW * scale);
@@ -190,8 +213,8 @@ async function placeOnCanvas(matted, role) {
   const bodyTopScaled = Math.round(bodyTopInSrc * scale);
   let top = topMargin - bodyTopScaled;
   // Clamp: keep feet near bottom if possible
-  if (top + newH > H - 4) top = H - 4 - newH;
-  if (top < 4) top = 4;
+  if (top + newH > H - bottomMargin) top = H - bottomMargin - newH;
+  if (top < topMargin) top = topMargin;
 
   const left = Math.round((W - newW) / 2);
 
@@ -315,14 +338,18 @@ function groomMasks(g) {
         [30, 38],
         [2, 38],
       ]) + g.ellipse(16, 36, 7, 4),
+    // Forearm includes hand (baked) — separate hand ellipses are written for asset
+    // compatibility but puppet uses handMode="baked" so fingertips stay complete.
     "left-forearm":
       g.poly([
         [0, 34],
         [30, 34],
         [32, 52],
         [2, 54],
-      ]) + g.ellipse(16, 36, 7, 4),
-    "left-hand": g.ellipse(12, 54, 9, 6),
+      ]) +
+      g.ellipse(16, 36, 7, 4) +
+      g.ellipse(12, 56, 11, 8),
+    "left-hand": g.ellipse(12, 56, 11, 8),
     "right-upper-arm":
       g.poly([
         [68, 16],
@@ -336,8 +363,10 @@ function groomMasks(g) {
         [100, 34],
         [98, 54],
         [68, 52],
-      ]) + g.ellipse(84, 36, 7, 4),
-    "right-hand": g.ellipse(88, 54, 9, 6),
+      ]) +
+      g.ellipse(84, 36, 7, 4) +
+      g.ellipse(88, 56, 11, 8),
+    "right-hand": g.ellipse(88, 56, 11, 8),
     head: g.ellipse(50, 8.5, 15, 9) + g.ellipse(50, 15, 6, 3.5),
     hair:
       g.ellipse(50, 6, 17, 8) +
@@ -390,14 +419,17 @@ function brideMasks(g) {
         [34, 38],
         [4, 38],
       ]) + g.ellipse(18, 36, 6, 4),
+    // Forearm includes hand (baked) for lace-sleeve bride artwork
     "left-forearm":
       g.poly([
         [2, 34],
         [34, 34],
         [36, 52],
         [6, 54],
-      ]) + g.ellipse(18, 36, 6, 4),
-    "left-hand": g.ellipse(14, 54, 8, 5.5),
+      ]) +
+      g.ellipse(18, 36, 6, 4) +
+      g.ellipse(12, 56, 10, 8),
+    "left-hand": g.ellipse(12, 56, 10, 8),
     "right-upper-arm":
       g.poly([
         [64, 18],
@@ -411,8 +443,10 @@ function brideMasks(g) {
         [98, 34],
         [94, 54],
         [64, 52],
-      ]) + g.ellipse(82, 36, 6, 4),
-    "right-hand": g.ellipse(86, 54, 8, 5.5),
+      ]) +
+      g.ellipse(82, 36, 6, 4) +
+      g.ellipse(88, 56, 10, 8),
+    "right-hand": g.ellipse(88, 56, 10, 8),
     head: g.ellipse(50, 9, 13, 8.5) + g.ellipse(50, 15.5, 5.5, 3.2),
     hair:
       g.ellipse(50, 6.5, 16, 8.5) +

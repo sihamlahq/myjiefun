@@ -3,123 +3,142 @@
     "w": 720,
     "h": 1380
   },
-  "note": "Measured from photo-v3 layer PNGs",
   "groom": {
     "headPivot": {
       "x": 360,
-      "y": 238
-    },
-    "leftShoulder": {
-      "x": 205,
-      "y": 269
-    },
-    "rightShoulder": {
-      "x": 514,
-      "y": 268
-    },
-    "leftElbow": {
-      "x": 125,
-      "y": 433
-    },
-    "rightElbow": {
-      "x": 595,
-      "y": 432
-    },
-    "leftWrist": {
-      "x": 61,
-      "y": 612
-    },
-    "rightWrist": {
-      "x": 660,
-      "y": 612
-    },
-    "bodyPivot": {
-      "x": 359,
-      "y": 367
-    },
-    "hipPivot": {
-      "x": 362,
-      "y": 626
-    },
-    "handRest": {
-      "left": {
-        "x": 58,
-        "y": 627
-      },
-      "right": {
-        "x": 662,
-        "y": 627
-      }
+      "y": 247
     },
     "faceCenter": {
       "x": 360,
-      "y": 144
+      "y": 159
     },
-    "footY": 1219,
+    "bodyPivot": {
+      "x": 359,
+      "y": 365
+    },
+    "hipPivot": {
+      "x": 359,
+      "y": 613
+    },
+    "handRest": {
+      "left": {
+        "x": 93,
+        "y": 554
+      },
+      "right": {
+        "x": 627,
+        "y": 553
+      }
+    },
+    "leftShoulder": {
+      "x": 215,
+      "y": 307
+    },
+    "leftElbow": {
+      "x": 180,
+      "y": 447
+    },
+    "leftWrist": {
+      "x": 93,
+      "y": 530
+    },
+    "rightShoulder": {
+      "x": 504,
+      "y": 306
+    },
+    "rightElbow": {
+      "x": 539,
+      "y": 446
+    },
+    "rightWrist": {
+      "x": 627,
+      "y": 529
+    },
+    "footY": 1077,
     "innerHandHold": {
-      "x": 710,
-      "y": 624
+      "x": 663,
+      "y": 535
+    },
+    "neck": {
+      "x": 360,
+      "y": 247
+    },
+    "holdHandTarget": {
+      "x": 663,
+      "y": 535
     }
   },
   "bride": {
     "headPivot": {
-      "x": 363,
-      "y": 201
+      "x": 361,
+      "y": 207
     },
-    "leftShoulder": {
-      "x": 235,
-      "y": 261
-    },
-    "rightShoulder": {
-      "x": 482,
-      "y": 223
-    },
-    "leftElbow": {
-      "x": 181,
-      "y": 376
-    },
-    "rightElbow": {
-      "x": 543,
-      "y": 376
-    },
-    "leftWrist": {
-      "x": 126,
-      "y": 537
-    },
-    "rightWrist": {
-      "x": 600,
-      "y": 529
+    "faceCenter": {
+      "x": 361,
+      "y": 141
     },
     "bodyPivot": {
-      "x": 361,
-      "y": 287
+      "x": 360,
+      "y": 279
     },
     "hipPivot": {
-      "x": 359,
-      "y": 857
+      "x": 360,
+      "y": 422
     },
     "handRest": {
       "left": {
-        "x": 133,
-        "y": 579
+        "x": 160,
+        "y": 399
       },
       "right": {
-        "x": 593,
-        "y": 576
+        "x": 560,
+        "y": 398
       }
     },
-    "faceCenter": {
-      "x": 363,
-      "y": 126
-    },
-    "footY": 1025,
     "veilPivot": {
-      "x": 364,
-      "y": 66
+      "x": 361,
+      "y": 86
     },
+    "leftShoulder": {
+      "x": 239,
+      "y": 281
+    },
+    "leftElbow": {
+      "x": 216,
+      "y": 360
+    },
+    "leftWrist": {
+      "x": 160,
+      "y": 390
+    },
+    "rightShoulder": {
+      "x": 479,
+      "y": 275
+    },
+    "rightElbow": {
+      "x": 504,
+      "y": 360
+    },
+    "rightWrist": {
+      "x": 560,
+      "y": 389
+    },
+    "footY": 848,
     "innerHandHold": {
-      "x": 76,
-      "y": 600
+      "x": 124,
+      "y": 381
+    },
+    "neck": {
+      "x": 361,
+      "y": 207
+    },
+    "veilAttach": {
+      "x": 361,
+      "y": 86
+    },
+    "holdHandTarget": {
+      "x": 124,
+      "y": 381
     }
   }
 }
