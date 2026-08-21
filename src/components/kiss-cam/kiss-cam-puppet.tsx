@@ -50,9 +50,31 @@ function LayerImg({ src, className, style }: LayerImgProps) {
       src={src}
       alt=""
       draggable={false}
-      className={cn("pointer-events-none absolute inset-0 h-full w-full select-none object-fill", className)}
+      className={cn(
+        "pointer-events-none absolute inset-0 h-full w-full select-none object-fill",
+        className,
+      )}
       style={style}
     />
+  );
+}
+
+/** Dev-only: confirm bride arm DOM has one upper→forearm→hand chain per side. */
+function BrideLayerTreeDebug({ enabled }: { enabled: boolean }) {
+  if (!enabled) return null;
+  return (
+    <pre
+      className="pointer-events-none absolute left-1 top-1 z-[70] max-w-[min(100%,220px)] rounded bg-black/70 px-2 py-1 font-mono text-[9px] leading-tight text-emerald-200"
+      data-bride-layer-tree="1"
+    >
+      {`Bride
+ ├── leftUpperArm
+ │    └── leftForearm
+ │         └── leftHand (baked in forearm)
+ └── rightUpperArm
+      └── rightForearm
+           └── rightHand (baked in forearm)`}
+    </pre>
   );
 }
 
@@ -112,9 +134,14 @@ function ArmChain({
   const armClass = which === "left" ? "kiss-cam-arm-left" : "kiss-cam-arm-right";
   const handClass = which === "left" ? "kiss-cam-hand-left" : "kiss-cam-hand-right";
 
+  const upperLabel = which === "left" ? "leftUpperArm" : "rightUpperArm";
+  const foreLabel = which === "left" ? "leftForearm" : "rightForearm";
+  const handLabel = which === "left" ? "leftHand" : "rightHand";
+
   return (
     <div
-      className={cn("absolute inset-0", armClass)}
+      className={cn("absolute inset-0 overflow-visible", armClass)}
+      data-kiss-layer={upperLabel}
       style={{
         transformOrigin: originPct(shoulder),
         transform: `rotate(${angles.upper}deg)`,
@@ -122,7 +149,8 @@ function ArmChain({
     >
       <LayerImg src={`${base}/${which}-upper-arm.png`} />
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 overflow-visible"
+        data-kiss-layer={foreLabel}
         style={{
           transformOrigin: originPct(elbow),
           transform: `rotate(${angles.forearm}deg)`,
@@ -130,7 +158,9 @@ function ArmChain({
       >
         <LayerImg src={`${base}/${which}-forearm.png`} />
         <div
-          className={cn("absolute inset-0", handClass)}
+          className={cn("absolute inset-0 overflow-visible", handClass)}
+          data-kiss-layer={handLabel}
+          data-hand-mode={handMode}
           style={{
             transformOrigin: originPct(wrist),
             transform: `rotate(${angles.hand}deg)`,
@@ -237,10 +267,13 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
       }}
       aria-hidden
     >
-      <div className="relative h-[min(62vh,580px)] w-auto" style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}>
-        <div className="absolute inset-0 drop-shadow-[0_14px_28px_rgba(60,50,40,.22)]">
+      <div
+        className="relative h-[min(62vh,580px)] w-auto overflow-visible"
+        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}
+      >
+        <div className="absolute inset-0 overflow-visible drop-shadow-[0_14px_28px_rgba(60,50,40,.22)]">
           {/* Legs planted — do not take body lean */}
-          <div className="kiss-cam-legs absolute inset-0">
+          <div className="kiss-cam-legs absolute inset-0 overflow-visible">
             <LayerImg src={`${base}/shoes.png`} />
             <LayerImg src={`${base}/legs.png`} />
           </div>
@@ -304,11 +337,15 @@ export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps)
       }}
       aria-hidden
     >
-      <div className="relative h-[min(64vh,600px)] w-auto" style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}>
-        <div className="absolute inset-0 drop-shadow-[0_14px_28px_rgba(60,50,40,.18)]">
+      <div
+        className="relative h-[min(64vh,600px)] w-auto overflow-visible"
+        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}
+      >
+        <div className="absolute inset-0 overflow-visible drop-shadow-[0_14px_28px_rgba(60,50,40,.18)]">
+          <BrideLayerTreeDebug enabled={rigDebug} />
           {/* Veil behind, subtle secondary motion from head */}
           <div
-            className="kiss-cam-veil absolute inset-0"
+            className="kiss-cam-veil absolute inset-0 overflow-visible"
             style={{
               transformOrigin: originPct(veilPivot),
               transform: `rotate(${resolved.veilRot}deg)`,

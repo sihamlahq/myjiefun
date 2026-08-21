@@ -477,7 +477,11 @@ h3,
 .kiss-cam-body,
 .kiss-cam-hand-left,
 .kiss-cam-hand-right,
-.kiss-cam-veil {
+.kiss-cam-veil,
+.kiss-cam-figure,
+.kiss-cam-legs,
+.kiss-cam-dress {
+  overflow: visible;
   transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }

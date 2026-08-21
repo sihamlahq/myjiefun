@@ -45,48 +45,49 @@ export type CharacterRigJoints = {
  * Measured from photo-v3 A-pose layer PNGs on the 720×1380 canvas.
  * Re-measure after regenerating artwork — do not reuse SVG coords.
  */
+/** Joints after 4.5% canvas inset (safe transparent padding around artwork). */
 export const GROOM_RIG: CharacterRigJoints = {
-  headPivot: { x: 360, y: 238 },
-  leftShoulder: { x: 205, y: 269 },
-  leftElbow: { x: 125, y: 433 },
-  leftWrist: { x: 61, y: 612 },
-  rightShoulder: { x: 514, y: 268 },
-  rightElbow: { x: 595, y: 432 },
-  rightWrist: { x: 660, y: 612 },
-  bodyPivot: { x: 359, y: 367 },
-  hipPivot: { x: 362, y: 626 },
+  headPivot: { x: 360, y: 279 },
+  leftShoulder: { x: 219, y: 307 },
+  leftElbow: { x: 146, y: 456 },
+  leftWrist: { x: 88, y: 619 },
+  rightShoulder: { x: 500, y: 306 },
+  rightElbow: { x: 574, y: 455 },
+  rightWrist: { x: 633, y: 619 },
+  bodyPivot: { x: 359, y: 396 },
+  hipPivot: { x: 362, y: 632 },
   handRest: {
-    left: { x: 58, y: 627 },
-    right: { x: 662, y: 627 },
+    left: { x: 85, y: 633 },
+    right: { x: 635, y: 633 },
   },
-  faceCenter: { x: 360, y: 144 },
+  faceCenter: { x: 360, y: 193 },
   /** Inner (right) hand — toward bride / stage center */
-  innerHandHold: { x: 700, y: 600 },
+  innerHandHold: { x: 669, y: 608 },
 };
 
 export const BRIDE_RIG: CharacterRigJoints = {
-  headPivot: { x: 363, y: 201 },
-  veilPivot: { x: 364, y: 66 },
-  leftShoulder: { x: 235, y: 261 },
-  leftElbow: { x: 181, y: 376 },
-  leftWrist: { x: 126, y: 537 },
-  rightShoulder: { x: 482, y: 223 },
-  rightElbow: { x: 543, y: 376 },
-  rightWrist: { x: 600, y: 529 },
-  bodyPivot: { x: 361, y: 287 },
-  hipPivot: { x: 359, y: 520 },
+  headPivot: { x: 363, y: 245 },
+  veilPivot: { x: 364, y: 122 },
+  leftShoulder: { x: 246, y: 300 },
+  leftElbow: { x: 197, y: 404 },
+  leftWrist: { x: 147, y: 551 },
+  rightShoulder: { x: 471, y: 265 },
+  rightElbow: { x: 527, y: 404 },
+  rightWrist: { x: 578, y: 543 },
+  bodyPivot: { x: 361, y: 323 },
+  hipPivot: { x: 359, y: 535 },
   handRest: {
-    left: { x: 133, y: 579 },
-    right: { x: 593, y: 576 },
+    left: { x: 153, y: 589 },
+    right: { x: 572, y: 586 },
   },
-  faceCenter: { x: 363, y: 126 },
+  faceCenter: { x: 363, y: 177 },
   /** Inner (left) hand — toward groom / stage center */
-  innerHandHold: { x: 40, y: 600 },
+  innerHandHold: { x: 69, y: 608 },
 };
 
 /** Feet Y on canvas — used to align characters on the stage floor */
-export const GROOM_FOOT_Y = 1219;
-export const BRIDE_FOOT_Y = 1025;
+export const GROOM_FOOT_Y = 1171;
+export const BRIDE_FOOT_Y = 995;
 
 export function pct(value: number, axis: "x" | "y"): number {
   return axis === "x" ? (value / STAGE_W) * 100 : (value / STAGE_H) * 100;
