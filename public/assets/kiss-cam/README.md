@@ -10,11 +10,11 @@ Pose / animation logic (no artwork):
 
 | File | Purpose |
 |------|---------|
-| `groom.svg` | Groom reference — pompadour, double-breasted black suit |
-| `bride.svg` | Bride reference — updo, crystal tiara, lace ball gown |
+| `groom.svg` | Groom reference — premium semi-realistic double-breasted suit |
+| `bride.svg` | Bride reference — updo, tiara, lace ball gown, veil |
 | `balloons.svg` | Heart balloon |
 | `hearts.svg` | Celebration heart |
 | `background.svg` | Soft pastel blue stage |
 | `music/` | LED background music (see `music/README.md`) |
 
-Visual language: simple 2D wedding-invitation illustration — soft dark outlines, flat pastel fills, oversized heads, pink/pearl heart balloons. Couple look matches the venue photo (face, hairdo, attire). Not 3D, anime, or emoji.
+Visual language: premium semi-realistic 2D luxury wedding illustration — natural facial features, adult proportions, soft shading, detailed hair/attire. Live animation uses `kiss-cam-characters.tsx` with the same look.
