@@ -1,20 +1,35 @@
 # Kiss Cam artwork assets
 
-Replaceable static SVG references for the TableWedding Kiss Cam.
+## Live characters (layered puppets)
 
-Live animation uses modular React SVG component groups in:
-`src/components/kiss-cam/kiss-cam-characters.tsx`
+Animation uses PNG layers + CSS transforms in `kiss-cam-puppet.tsx`.
+Pose state machine stays in `kiss-cam-pose.ts`.
 
-Pose / animation logic (no artwork):
-`src/components/kiss-cam/kiss-cam-pose.ts`
+| Path | Purpose |
+|------|---------|
+| `groom/*.png` | Groom puppet layers (head, hair, torso, arms, hands, legs, shoes) |
+| `bride/*.png` | Bride puppet layers (+ tiara, veil, bodice, skirt) |
+| `masters/*-master-preview.png` | Overlaid reconstruction previews |
+
+Regenerate layers:
+
+```bash
+node scripts/generate-kiss-cam-layers.cjs
+```
+
+## Character Rig Debug (development only)
+
+In non-production builds, toggle **Character Rig Debug** in Kiss Cam Controls,
+or open with `?rigDebug=1`, or set `NEXT_PUBLIC_KISS_CAM_RIG_DEBUG=1`.
+
+Shows layer bounds, joint pivots, and hand-hold targets. **Never enabled in production.**
+
+## Legacy static SVG references
 
 | File | Purpose |
 |------|---------|
-| `groom.svg` | Groom reference — premium semi-realistic double-breasted suit |
-| `bride.svg` | Bride reference — updo, tiara, lace ball gown, veil |
-| `balloons.svg` | Heart balloon |
-| `hearts.svg` | Celebration heart |
-| `background.svg` | Soft pastel blue stage |
-| `music/` | LED background music (see `music/README.md`) |
+| `groom.svg` / `bride.svg` | Older static references (not used by the live puppet) |
+| `balloons.svg` / `hearts.svg` / `background.svg` | Atmosphere references |
+| `music/` | LED background music |
 
-Visual language: premium semi-realistic 2D luxury wedding illustration — natural facial features, adult proportions, soft shading, detailed hair/attire. Live animation uses `kiss-cam-characters.tsx` with the same look.
+Visual language: layered semi-realistic wedding illustration with adult proportions.

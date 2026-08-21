@@ -476,22 +476,23 @@ h3,
 .kiss-cam-head,
 .kiss-cam-body,
 .kiss-cam-hand-left,
-.kiss-cam-hand-right {
+.kiss-cam-hand-right,
+.kiss-cam-veil {
   transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
 }
 
 .kiss-cam-held-balloon {
   animation: kiss-cam-balloon-sway 3.6s ease-in-out infinite;
-  transform-box: fill-box;
 }
 
 @keyframes kiss-cam-balloon-sway {
   0%,
   100% {
-    transform: rotate(-5deg);
+    transform: translate(-50%, -100%) rotate(-5deg);
   }
   50% {
-    transform: rotate(6deg);
+    transform: translate(-50%, -100%) rotate(6deg);
   }
 }
 
@@ -513,7 +514,6 @@ h3,
 .kiss-cam-breathe {
   animation: kiss-cam-breathe 3.8s ease-in-out infinite;
   transform-origin: center top;
-  transform-box: fill-box;
 }
 
 @keyframes kiss-cam-breathe {

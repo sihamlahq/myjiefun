@@ -33,6 +33,8 @@ type KissCamDisplayProps = {
   showCharacters: boolean;
   /** Fill the parent completely (true fullscreen) — no 16:9 letterboxing. */
   fillViewport?: boolean;
+  /** Development-only character rig overlay (never in production). */
+  rigDebug?: boolean;
   className?: string;
 };
 
@@ -51,6 +53,7 @@ export function KissCamDisplay({
   loading = false,
   showCharacters,
   fillViewport = false,
+  rigDebug = false,
   className = "",
 }: KissCamDisplayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -166,8 +169,8 @@ export function KissCamDisplay({
 
       {showCharacters ? (
         <>
-          <GroomFigure phase={characterPhase} className="z-[3]" />
-          <BrideFigure phase={characterPhase} className="z-[4]" />
+          <GroomFigure phase={characterPhase} className="z-[3]" rigDebug={rigDebug} />
+          <BrideFigure phase={characterPhase} className="z-[4]" rigDebug={rigDebug} />
         </>
       ) : null}
 
