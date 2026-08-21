@@ -46,11 +46,20 @@ export type RigLayerBox = {
   color?: string;
 };
 
+export type RigBone = {
+  id: string;
+  /** Polyline in % coords: shoulder → elbow → wrist → hand */
+  points: Array<{ x: number; y: number }>;
+  color?: string;
+};
+
 type KissCamRigDebugOverlayProps = {
   enabled: boolean;
   pivots: RigPivot[];
   layers: RigLayerBox[];
+  bones?: RigBone[];
   handTargets?: RigPivot[];
+  kissTargets?: RigPivot[];
   title?: string;
 };
 
@@ -59,7 +68,9 @@ export function KissCamRigDebugOverlay({
   enabled,
   pivots,
   layers,
+  bones = [],
   handTargets = [],
+  kissTargets = [],
   title,
 }: KissCamRigDebugOverlayProps) {
   if (!enabled || process.env.NODE_ENV === "production") return null;
@@ -97,6 +108,25 @@ export function KissCamRigDebugOverlay({
         </div>
       ))}
 
+      <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
+        {bones.map((bone) => {
+          const d = bone.points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+          return (
+            <path
+              key={bone.id}
+              d={d}
+              fill="none"
+              stroke={bone.color || "#fbbf24"}
+              strokeWidth={0.45}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              opacity={0.9}
+            />
+          );
+        })}
+      </svg>
+
       {pivots.map((p) => (
         <div
           key={p.id}
@@ -107,10 +137,7 @@ export function KissCamRigDebugOverlay({
             transform: "translate(-50%, -50%)",
           }}
         >
-          <div
-            className="relative h-3 w-3"
-            style={{ color: p.color || "#fbbf24" }}
-          >
+          <div className="relative h-3 w-3" style={{ color: p.color || "#fbbf24" }}>
             <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-current" />
             <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-current" />
             <div className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-current" />
@@ -131,11 +158,25 @@ export function KissCamRigDebugOverlay({
             transform: "translate(-50%, -50%)",
           }}
         >
-          <div
-            className="h-4 w-4 rounded-full border-2 border-fuchsia-400 bg-fuchsia-400/25"
-            title={t.label}
-          />
+          <div className="h-4 w-4 rounded-full border-2 border-fuchsia-400 bg-fuchsia-400/25" title={t.label} />
           <span className="absolute left-4 top-0 whitespace-nowrap rounded bg-black/80 px-1 text-[8px] font-semibold text-fuchsia-200">
+            {t.label}
+          </span>
+        </div>
+      ))}
+
+      {kissTargets.map((t) => (
+        <div
+          key={t.id}
+          className="absolute"
+          style={{
+            left: `${t.x}%`,
+            top: `${t.y}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <div className="h-3.5 w-3.5 rotate-45 border-2 border-pink-400 bg-pink-400/30" title={t.label} />
+          <span className="absolute left-4 top-0 whitespace-nowrap rounded bg-black/80 px-1 text-[8px] font-semibold text-pink-200">
             {t.label}
           </span>
         </div>

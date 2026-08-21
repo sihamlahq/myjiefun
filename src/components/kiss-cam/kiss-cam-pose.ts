@@ -1,8 +1,10 @@
 import type { KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 
 /**
- * Animation pose — separated from artwork so SVG assets can be swapped
- * without rewriting the Kiss Cam state machine.
+ * Animation pose — INTENT ONLY.
+ *
+ * This module must not contain artwork pixel coordinates or SVG origins.
+ * Mapping to layer transforms happens in kiss-cam-rig.ts.
  */
 export type CharacterPose = {
   /** Horizontal offset from center, as % of stage width */
@@ -12,35 +14,43 @@ export type CharacterPose = {
   bodyRot: number;
   headRot: number;
   scale: number;
-  /** 0 = arms down/out with balloon, 1 = inner arm fully extended to hold hands */
+  /** 0 = arms idle, 1 = inner hands at hold target */
   holdProgress: number;
-  /** Outer arm holds balloon — slight sway */
+  /** Outer arm balloon sway 0–1+ */
   balloonSway: number;
-  /** Kiss lean (extra head/body toward partner) */
+  /**
+   * Kiss progress 0–1 — drives lean toward shared kiss target on the rig.
+   * Prefer this over legacy kissLean; kissLean kept as alias for compatibility.
+   */
+  kissProgress: number;
+  /** @deprecated use kissProgress — still accepted by the rig resolver */
   kissLean: number;
   /** Soft breathing amplitude 0–1 */
   breath: number;
-  /** Mouth: smile | soft | kiss */
   mouth: "smile" | "soft" | "kiss";
-  /** Eyes closed during kiss */
   eyesClosed: boolean;
 };
 
+/**
+ * Couple composition for A-pose masters — closer base spacing.
+ * Idle ~±12%. Hold ~±4.5%. Kiss ~±1.5%.
+ * Body lean kept small; heads do most of the kiss motion.
+ */
 export function poseForPhase(
   phase: KissCamAnimationPhase,
   side: "bride" | "groom",
 ): CharacterPose {
-  // Groom on the left (−), bride on the right (+) — classic wedding composition
   const dir = side === "groom" ? -1 : 1;
 
   const base: CharacterPose = {
-    x: dir * 34,
+    x: dir * 12,
     y: 0,
     bodyRot: 0,
     headRot: 0,
     scale: 1,
     holdProgress: 0,
     balloonSway: 0,
+    kissProgress: 0,
     kissLean: 0,
     breath: 1,
     mouth: "smile",
@@ -49,22 +59,22 @@ export function poseForPhase(
 
   switch (phase) {
     case "idle":
-      return { ...base, x: dir * 34, balloonSway: 1 };
+      return { ...base, x: dir * 12, balloonSway: 1 };
     case "approach":
       return {
         ...base,
-        x: dir * 16,
-        bodyRot: dir * 2,
-        headRot: dir * -4,
-        holdProgress: 0.25,
+        x: dir * 8,
+        bodyRot: dir * -0.8,
+        headRot: dir * -2.5,
+        holdProgress: 0.35,
         balloonSway: 1,
       };
     case "holdHands":
       return {
         ...base,
-        x: dir * 9,
-        bodyRot: dir * 3,
-        headRot: dir * -6,
+        x: dir * 4.5,
+        bodyRot: dir * -1.2,
+        headRot: dir * -3.5,
         holdProgress: 1,
         balloonSway: 0.85,
         mouth: "soft",
@@ -72,51 +82,54 @@ export function poseForPhase(
     case "romanticPause":
       return {
         ...base,
-        x: dir * 8.5,
-        bodyRot: dir * 4,
-        headRot: dir * -8,
+        x: dir * 4,
+        bodyRot: dir * -1.5,
+        headRot: dir * -4,
         holdProgress: 1,
         balloonSway: 0.8,
-        scale: 1.02,
+        scale: 1.008,
         mouth: "soft",
       };
     case "moveCloser":
       return {
         ...base,
-        x: dir * 5,
-        y: -1,
-        bodyRot: dir * 6,
-        headRot: dir * -12,
+        x: dir * 2.8,
+        y: -0.3,
+        bodyRot: dir * -2,
+        headRot: dir * -5.5,
         holdProgress: 1,
         balloonSway: 0.7,
+        kissProgress: 0.35,
         kissLean: 0.35,
-        scale: 1.03,
+        scale: 1.01,
         mouth: "soft",
       };
     case "countdown":
       return {
         ...base,
-        x: dir * 4,
-        y: -1.5,
-        bodyRot: dir * 7,
-        headRot: dir * -14,
+        x: dir * 2.1,
+        y: -0.6,
+        bodyRot: dir * -2.5,
+        headRot: dir * -7,
         holdProgress: 1,
         balloonSway: 0.55,
-        kissLean: 0.55,
-        scale: 1.04,
+        kissProgress: 0.6,
+        kissLean: 0.6,
+        scale: 1.014,
         mouth: "soft",
       };
     case "kiss":
       return {
         ...base,
-        x: dir * 1.8,
-        y: -2,
-        bodyRot: dir * 8,
-        headRot: dir * -10,
+        x: dir * 1.5,
+        y: -0.9,
+        bodyRot: dir * -3,
+        headRot: dir * -6,
         holdProgress: 1,
         balloonSway: 0.4,
+        kissProgress: 1,
         kissLean: 1,
-        scale: 1.05,
+        scale: 1.018,
         mouth: "kiss",
         eyesClosed: true,
       };
@@ -125,13 +138,14 @@ export function poseForPhase(
       return {
         ...base,
         x: dir * 3.5,
-        y: -1,
-        bodyRot: dir * 5,
-        headRot: dir * -6,
+        y: -0.3,
+        bodyRot: dir * -1.5,
+        headRot: dir * -2.5,
         holdProgress: 1,
         balloonSway: 1.1,
-        kissLean: 0.2,
-        scale: 1.04,
+        kissProgress: 0.1,
+        kissLean: 0.1,
+        scale: 1.01,
         mouth: "smile",
       };
     default:

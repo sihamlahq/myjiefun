@@ -5,70 +5,56 @@ import { cn } from "@/lib/utils";
 import type { KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 import { poseForPhase } from "@/components/kiss-cam/kiss-cam-pose";
 import {
+  STAGE_W,
+  STAGE_H,
+  GROOM_RIG,
+  BRIDE_RIG,
+  originPct,
+  pct,
+  resolveCharacterRig,
+  armBonePercents,
+  type CharacterRigJoints,
+  type ArmAngles,
+} from "@/components/kiss-cam/kiss-cam-rig";
+import {
   KissCamRigDebugOverlay,
   type RigLayerBox,
   type RigPivot,
+  type RigBone,
 } from "@/components/kiss-cam/kiss-cam-rig-debug";
 
 /**
- * Layered 2D puppet characters for Kiss Cam.
- * Artwork: /public/assets/kiss-cam/{groom|bride}/*.png (720×1380 canvas).
- * Layers are cut from premium painted masters (scripts/split-kiss-cam-masters.cjs).
- * Pose state machine: kiss-cam-pose.ts (unchanged).
+ * Layered 2D puppets — POSE → RIG → LAYER TRANSFORMS.
+ *
+ * Hierarchy (legs planted; lean around bodyPivot):
+ *   figure (x / scale / footAlign)
+ *     legs + shoes
+ *     [bride skirt — mostly planted]
+ *     upperBody @ bodyPivot (bodyRot)
+ *       torso / bodice
+ *       arms (shoulder → elbow → wrist)
+ *       head @ headPivot (headRot) + hair [/ tiara]
+ *     [bride veil @ veilPivot — secondary]
  */
-
-const STAGE_W = 720;
-const STAGE_H = 1380;
 
 type LayerImgProps = {
   src: string;
-  alt?: string;
   className?: string;
   style?: CSSProperties;
 };
 
-function LayerImg({ src, alt = "", className, style }: LayerImgProps) {
+function LayerImg({ src, className, style }: LayerImgProps) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
-      alt={alt}
+      alt=""
       draggable={false}
       className={cn("pointer-events-none absolute inset-0 h-full w-full select-none object-fill", className)}
       style={style}
     />
   );
 }
-
-/** Convert canvas px → % of stage */
-function pct(value: number, axis: "x" | "y") {
-  return axis === "x" ? (value / STAGE_W) * 100 : (value / STAGE_H) * 100;
-}
-
-// Joints in master canvas coordinates (from masters/joints.json)
-const GROOM_JOINTS = {
-  neck: { x: 361, y: 195 },
-  leftShoulder: { x: 266, y: 289 },
-  leftElbow: { x: 226, y: 504 },
-  leftWrist: { x: 218, y: 692 },
-  rightShoulder: { x: 455, y: 289 },
-  rightElbow: { x: 495, y: 504 },
-  rightWrist: { x: 503, y: 692 },
-  /** Target for inner hand when holdProgress = 1 (toward bride) */
-  holdHandTarget: { x: 542, y: 719 },
-};
-
-const BRIDE_JOINTS = {
-  neck: { x: 360, y: 155 },
-  veilAttach: { x: 360, y: 113 },
-  leftShoulder: { x: 191, y: 227 },
-  leftElbow: { x: 120, y: 393 },
-  leftWrist: { x: 106, y: 538 },
-  rightShoulder: { x: 528, y: 227 },
-  rightElbow: { x: 599, y: 393 },
-  rightWrist: { x: 613, y: 538 },
-  holdHandTarget: { x: 36, y: 558 },
-};
 
 function Balloon({ xPct, yPct, color }: { xPct: number; yPct: number; color: string }) {
   return (
@@ -77,8 +63,8 @@ function Balloon({ xPct, yPct, color }: { xPct: number; yPct: number; color: str
       style={{
         left: `${xPct}%`,
         top: `${yPct}%`,
-        width: "18%",
-        height: "22%",
+        width: "14%",
+        height: "17%",
         transform: "translate(-50%, -100%)",
         transformOrigin: "50% 100%",
       }}
@@ -100,35 +86,26 @@ function Balloon({ xPct, yPct, color }: { xPct: number; yPct: number; color: str
 type PuppetProps = {
   phase: KissCamAnimationPhase;
   className?: string;
-  /** Development-only rig overlay */
+  /** Dev-only rig overlay */
   rigDebug?: boolean;
 };
 
 function ArmChain({
   which,
-  upperSrc,
-  forearmSrc,
-  handSrc,
-  shoulder,
-  elbow,
-  wrist,
-  upperRot,
-  forearmRot,
-  handRot,
+  base,
+  rig,
+  angles,
   balloon,
 }: {
   which: "left" | "right";
-  upperSrc: string;
-  forearmSrc: string;
-  handSrc: string;
-  shoulder: { x: number; y: number };
-  elbow: { x: number; y: number };
-  wrist: { x: number; y: number };
-  upperRot: number;
-  forearmRot: number;
-  handRot: number;
+  base: string;
+  rig: CharacterRigJoints;
+  angles: ArmAngles;
   balloon?: { color: string };
 }) {
+  const shoulder = which === "left" ? rig.leftShoulder : rig.rightShoulder;
+  const elbow = which === "left" ? rig.leftElbow : rig.rightElbow;
+  const wrist = which === "left" ? rig.leftWrist : rig.rightWrist;
   const armClass = which === "left" ? "kiss-cam-arm-left" : "kiss-cam-arm-right";
   const handClass = which === "left" ? "kiss-cam-hand-left" : "kiss-cam-hand-right";
 
@@ -136,29 +113,33 @@ function ArmChain({
     <div
       className={cn("absolute inset-0", armClass)}
       style={{
-        transformOrigin: `${pct(shoulder.x, "x")}% ${pct(shoulder.y, "y")}%`,
-        transform: `rotate(${upperRot}deg)`,
+        transformOrigin: originPct(shoulder),
+        transform: `rotate(${angles.upper}deg)`,
       }}
     >
-      <LayerImg src={upperSrc} />
+      <LayerImg src={`${base}/${which}-upper-arm.png`} />
       <div
         className="absolute inset-0"
         style={{
-          transformOrigin: `${pct(elbow.x, "x")}% ${pct(elbow.y, "y")}%`,
-          transform: `rotate(${forearmRot}deg)`,
+          transformOrigin: originPct(elbow),
+          transform: `rotate(${angles.forearm}deg)`,
         }}
       >
-        <LayerImg src={forearmSrc} />
+        <LayerImg src={`${base}/${which}-forearm.png`} />
         <div
           className={cn("absolute inset-0", handClass)}
           style={{
-            transformOrigin: `${pct(wrist.x, "x")}% ${pct(wrist.y, "y")}%`,
-            transform: `rotate(${handRot}deg)`,
+            transformOrigin: originPct(wrist),
+            transform: `rotate(${angles.hand}deg)`,
           }}
         >
-          <LayerImg src={handSrc} />
+          <LayerImg src={`${base}/${which}-hand.png`} />
           {balloon ? (
-            <Balloon xPct={pct(wrist.x, "x")} yPct={pct(wrist.y, "y") - 2} color={balloon.color} />
+            <Balloon
+              xPct={pct(rig.handRest[which].x, "x")}
+              yPct={pct(rig.handRest[which].y, "y") - 1}
+              color={balloon.color}
+            />
           ) : null}
         </div>
       </div>
@@ -166,152 +147,137 @@ function ArmChain({
   );
 }
 
+function buildDebug(
+  side: "groom" | "bride",
+  rig: CharacterRigJoints,
+  holdTarget: { x: number; y: number },
+  kissTarget: { x: number; y: number },
+  showHold: boolean,
+) {
+  const pivots: RigPivot[] = [
+    { id: "head", label: "head", x: pct(rig.headPivot.x, "x"), y: pct(rig.headPivot.y, "y"), color: "#fbbf24" },
+    { id: "body", label: "body", x: pct(rig.bodyPivot.x, "x"), y: pct(rig.bodyPivot.y, "y"), color: "#67e8f9" },
+    { id: "hip", label: "hip", x: pct(rig.hipPivot.x, "x"), y: pct(rig.hipPivot.y, "y"), color: "#86efac" },
+    { id: "Lsh", label: "L sh", x: pct(rig.leftShoulder.x, "x"), y: pct(rig.leftShoulder.y, "y"), color: "#fb7185" },
+    { id: "Lel", label: "L el", x: pct(rig.leftElbow.x, "x"), y: pct(rig.leftElbow.y, "y"), color: "#fb7185" },
+    { id: "Lwr", label: "L wr", x: pct(rig.leftWrist.x, "x"), y: pct(rig.leftWrist.y, "y"), color: "#fb7185" },
+    { id: "Rsh", label: "R sh", x: pct(rig.rightShoulder.x, "x"), y: pct(rig.rightShoulder.y, "y"), color: "#a78bfa" },
+    { id: "Rel", label: "R el", x: pct(rig.rightElbow.x, "x"), y: pct(rig.rightElbow.y, "y"), color: "#a78bfa" },
+    { id: "Rwr", label: "R wr", x: pct(rig.rightWrist.x, "x"), y: pct(rig.rightWrist.y, "y"), color: "#a78bfa" },
+  ];
+  if (rig.veilPivot) {
+    pivots.push({
+      id: "veil",
+      label: "veil",
+      x: pct(rig.veilPivot.x, "x"),
+      y: pct(rig.veilPivot.y, "y"),
+      color: "#93c5fd",
+    });
+  }
+
+  const layers: RigLayerBox[] =
+    side === "groom"
+      ? [
+          { id: "torso", label: "torso", left: 30, top: 16, width: 40, height: 38, color: "#67e8f9" },
+          { id: "legs", label: "legs", left: 36, top: 48, width: 28, height: 45, color: "#86efac" },
+          { id: "head", label: "head", left: 38, top: 2, width: 24, height: 18, color: "#fde68a" },
+        ]
+      : [
+          { id: "skirt", label: "skirt", left: 8, top: 28, width: 84, height: 48, color: "#fbcfe8" },
+          { id: "bodice", label: "bodice", left: 28, top: 14, width: 44, height: 24, color: "#67e8f9" },
+          { id: "head", label: "head", left: 36, top: 2, width: 28, height: 14, color: "#fde68a" },
+        ];
+
+  const bones: RigBone[] = [
+    { id: "L-arm", points: armBonePercents(rig, "left"), color: "#fb7185" },
+    { id: "R-arm", points: armBonePercents(rig, "right"), color: "#a78bfa" },
+  ];
+
+  const handTargets: RigPivot[] = showHold
+    ? [
+        {
+          id: "hold",
+          label: "hand hold",
+          x: pct(holdTarget.x, "x"),
+          y: pct(holdTarget.y, "y"),
+          color: "#e879f9",
+        },
+      ]
+    : [];
+
+  const kissTargets: RigPivot[] = [
+    {
+      id: "kiss",
+      label: "kiss",
+      x: pct(kissTarget.x, "x"),
+      y: pct(kissTarget.y, "y"),
+      color: "#f472b6",
+    },
+  ];
+
+  return { pivots, layers, bones, handTargets, kissTargets };
+}
+
 export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps) {
   const pose = poseForPhase(phase, "groom");
-  const hold = pose.holdProgress;
-  // Outer arm (left) sways with balloon; inner arm (right) reaches to hold.
-  const leftUpper = 18 - pose.balloonSway * 4;
-  const leftFore = -6 - pose.balloonSway * 2;
-  const rightUpper = -25 + hold * 55;
-  const rightFore = 8 - hold * 18;
-  const rightHand = hold * -6;
-  const headRot = pose.headRot + pose.kissLean * -6;
-  const j = GROOM_JOINTS;
+  const resolved = resolveCharacterRig("groom", pose);
+  const rig = GROOM_RIG;
   const base = "/assets/kiss-cam/groom";
-
-  const debugLayers: RigLayerBox[] = [
-    { id: "torso", label: "torso", left: 28, top: 20, width: 44, height: 38, color: "#67e8f9" },
-    { id: "legs", label: "legs", left: 36, top: 55, width: 28, height: 32, color: "#86efac" },
-    { id: "head", label: "head", left: 36, top: 8, width: 28, height: 16, color: "#fde68a" },
-    { id: "L-arm", label: "left arm", left: 18, top: 24, width: 22, height: 36, color: "#fda4af" },
-    { id: "R-arm", label: "right arm", left: 58, top: 24, width: 22, height: 36, color: "#c4b5fd" },
-  ];
-  const debugPivots: RigPivot[] = [
-    { id: "neck", label: "neck", x: pct(j.neck.x, "x"), y: pct(j.neck.y, "y"), color: "#fbbf24" },
-    {
-      id: "Lsh",
-      label: "L shoulder",
-      x: pct(j.leftShoulder.x, "x"),
-      y: pct(j.leftShoulder.y, "y"),
-      color: "#fb7185",
-    },
-    {
-      id: "Lel",
-      label: "L elbow",
-      x: pct(j.leftElbow.x, "x"),
-      y: pct(j.leftElbow.y, "y"),
-      color: "#fb7185",
-    },
-    {
-      id: "Lwr",
-      label: "L wrist",
-      x: pct(j.leftWrist.x, "x"),
-      y: pct(j.leftWrist.y, "y"),
-      color: "#fb7185",
-    },
-    {
-      id: "Rsh",
-      label: "R shoulder",
-      x: pct(j.rightShoulder.x, "x"),
-      y: pct(j.rightShoulder.y, "y"),
-      color: "#a78bfa",
-    },
-    {
-      id: "Rel",
-      label: "R elbow",
-      x: pct(j.rightElbow.x, "x"),
-      y: pct(j.rightElbow.y, "y"),
-      color: "#a78bfa",
-    },
-    {
-      id: "Rwr",
-      label: "R wrist",
-      x: pct(j.rightWrist.x, "x"),
-      y: pct(j.rightWrist.y, "y"),
-      color: "#a78bfa",
-    },
-  ];
-  const handTargets: RigPivot[] =
-    hold > 0.5
-      ? [
-          {
-            id: "hold",
-            label: "hold target",
-            x: pct(j.holdHandTarget.x, "x"),
-            y: pct(j.holdHandTarget.y, "y"),
-            color: "#e879f9",
-          },
-        ]
-      : [];
+  const debug = buildDebug("groom", rig, resolved.holdTarget, resolved.kissTarget, pose.holdProgress > 0.45);
 
   return (
     <div
-      className={cn("kiss-cam-figure pointer-events-none absolute bottom-[4%] origin-bottom", className)}
+      className={cn("kiss-cam-figure pointer-events-none absolute bottom-[2%] origin-bottom", className)}
       style={{
-        left: `calc(50% + ${pose.x}%)`,
-        transform: `translateX(-50%) translateY(${pose.y}%) rotate(${pose.bodyRot}deg) scale(${pose.scale})`,
+        left: `calc(50% + ${resolved.xPct}%)`,
+        transform: `translateX(-50%) translateY(calc(${resolved.yPct}% + ${resolved.footAlignPct}%)) scale(${resolved.scale})`,
       }}
       aria-hidden
     >
-      <div
-        className="relative h-[min(64vh,600px)] w-auto"
-        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}
-      >
+      <div className="relative h-[min(62vh,580px)] w-auto" style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}>
         <div className="absolute inset-0 drop-shadow-[0_14px_28px_rgba(60,50,40,.22)]">
+          {/* Legs planted — do not take body lean */}
           <div className="kiss-cam-legs absolute inset-0">
             <LayerImg src={`${base}/shoes.png`} />
             <LayerImg src={`${base}/legs.png`} />
           </div>
 
-          <div className="kiss-cam-body kiss-cam-breathe absolute inset-0">
-            <LayerImg src={`${base}/torso.png`} />
-          </div>
-
-          <ArmChain
-            which="left"
-            upperSrc={`${base}/left-upper-arm.png`}
-            forearmSrc={`${base}/left-forearm.png`}
-            handSrc={`${base}/left-hand.png`}
-            shoulder={j.leftShoulder}
-            elbow={j.leftElbow}
-            wrist={j.leftWrist}
-            upperRot={leftUpper}
-            forearmRot={leftFore}
-            handRot={0}
-            balloon={{ color: "#f4b6c4" }}
-          />
-
-          <ArmChain
-            which="right"
-            upperSrc={`${base}/right-upper-arm.png`}
-            forearmSrc={`${base}/right-forearm.png`}
-            handSrc={`${base}/right-hand.png`}
-            shoulder={j.rightShoulder}
-            elbow={j.rightElbow}
-            wrist={j.rightWrist}
-            upperRot={rightUpper}
-            forearmRot={rightFore}
-            handRot={rightHand}
-          />
-
+          {/* Upper body leans around measured bodyPivot */}
           <div
-            className="kiss-cam-head absolute inset-0"
+            className="kiss-cam-body absolute inset-0"
             style={{
-              transformOrigin: `${pct(j.neck.x, "x")}% ${pct(j.neck.y, "y")}%`,
-              transform: `rotate(${headRot}deg)`,
+              transformOrigin: originPct(rig.bodyPivot),
+              transform: `rotate(${resolved.bodyRot}deg)`,
             }}
           >
-            <LayerImg src={`${base}/head.png`} className="kiss-cam-face" />
-            <LayerImg src={`${base}/hair.png`} />
+            <div className="kiss-cam-breathe absolute inset-0">
+              <LayerImg src={`${base}/torso.png`} />
+            </div>
+
+            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} />
+            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} />
+
+            <div
+              className="kiss-cam-head absolute inset-0"
+              style={{
+                transformOrigin: originPct(rig.headPivot),
+                transform: `rotate(${resolved.headRot}deg)`,
+              }}
+            >
+              <LayerImg src={`${base}/head.png`} className="kiss-cam-face" />
+              <LayerImg src={`${base}/hair.png`} />
+            </div>
           </div>
         </div>
 
         <KissCamRigDebugOverlay
           enabled={rigDebug}
           title="Groom rig"
-          layers={debugLayers}
-          pivots={debugPivots}
-          handTargets={handTargets}
+          layers={debug.layers}
+          pivots={debug.pivots}
+          bones={debug.bones}
+          handTargets={debug.handTargets}
+          kissTargets={debug.kissTargets}
         />
       </div>
     </div>
@@ -320,110 +286,29 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
 export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps) {
   const pose = poseForPhase(phase, "bride");
-  const hold = pose.holdProgress;
-  // Inner arm = left (toward groom); outer = right (balloon)
-  const leftUpper = 25 - hold * 55;
-  const leftFore = -8 + hold * 16;
-  const leftHand = hold * 6;
-  const rightUpper = -18 + pose.balloonSway * 4;
-  const rightFore = 6 + pose.balloonSway * 2;
-  const headRot = pose.headRot + pose.kissLean * 6;
-  const veilRot = pose.headRot * 0.35 + pose.balloonSway * 1.5;
-  const j = BRIDE_JOINTS;
+  const resolved = resolveCharacterRig("bride", pose);
+  const rig = BRIDE_RIG;
   const base = "/assets/kiss-cam/bride";
-
-  const debugLayers: RigLayerBox[] = [
-    { id: "veil", label: "veil", left: 28, top: 4, width: 44, height: 50, color: "#e0e7ff" },
-    { id: "skirt", label: "skirt", left: 22, top: 40, width: 56, height: 52, color: "#fbcfe8" },
-    { id: "bodice", label: "bodice", left: 36, top: 26, width: 28, height: 20, color: "#67e8f9" },
-    { id: "head", label: "head/hair/tiara", left: 36, top: 7, width: 28, height: 18, color: "#fde68a" },
-    { id: "L-arm", label: "left arm", left: 22, top: 26, width: 20, height: 36, color: "#fda4af" },
-    { id: "R-arm", label: "right arm", left: 58, top: 26, width: 20, height: 36, color: "#c4b5fd" },
-  ];
-  const debugPivots: RigPivot[] = [
-    { id: "neck", label: "neck", x: pct(j.neck.x, "x"), y: pct(j.neck.y, "y"), color: "#fbbf24" },
-    {
-      id: "veil",
-      label: "veil attach",
-      x: pct(j.veilAttach.x, "x"),
-      y: pct(j.veilAttach.y, "y"),
-      color: "#93c5fd",
-    },
-    {
-      id: "Lsh",
-      label: "L shoulder",
-      x: pct(j.leftShoulder.x, "x"),
-      y: pct(j.leftShoulder.y, "y"),
-      color: "#fb7185",
-    },
-    {
-      id: "Lel",
-      label: "L elbow",
-      x: pct(j.leftElbow.x, "x"),
-      y: pct(j.leftElbow.y, "y"),
-      color: "#fb7185",
-    },
-    {
-      id: "Lwr",
-      label: "L wrist",
-      x: pct(j.leftWrist.x, "x"),
-      y: pct(j.leftWrist.y, "y"),
-      color: "#fb7185",
-    },
-    {
-      id: "Rsh",
-      label: "R shoulder",
-      x: pct(j.rightShoulder.x, "x"),
-      y: pct(j.rightShoulder.y, "y"),
-      color: "#a78bfa",
-    },
-    {
-      id: "Rel",
-      label: "R elbow",
-      x: pct(j.rightElbow.x, "x"),
-      y: pct(j.rightElbow.y, "y"),
-      color: "#a78bfa",
-    },
-    {
-      id: "Rwr",
-      label: "R wrist",
-      x: pct(j.rightWrist.x, "x"),
-      y: pct(j.rightWrist.y, "y"),
-      color: "#a78bfa",
-    },
-  ];
-  const handTargets: RigPivot[] =
-    hold > 0.5
-      ? [
-          {
-            id: "hold",
-            label: "hold target",
-            x: pct(j.holdHandTarget.x, "x"),
-            y: pct(j.holdHandTarget.y, "y"),
-            color: "#e879f9",
-          },
-        ]
-      : [];
+  const debug = buildDebug("bride", rig, resolved.holdTarget, resolved.kissTarget, pose.holdProgress > 0.45);
+  const veilPivot = rig.veilPivot ?? rig.headPivot;
 
   return (
     <div
-      className={cn("kiss-cam-figure pointer-events-none absolute bottom-[4%] origin-bottom", className)}
+      className={cn("kiss-cam-figure pointer-events-none absolute bottom-[2%] origin-bottom", className)}
       style={{
-        left: `calc(50% + ${pose.x}%)`,
-        transform: `translateX(-50%) translateY(${pose.y}%) rotate(${pose.bodyRot}deg) scale(${pose.scale})`,
+        left: `calc(50% + ${resolved.xPct}%)`,
+        transform: `translateX(-50%) translateY(calc(${resolved.yPct}% + ${resolved.footAlignPct}%)) scale(${resolved.scale})`,
       }}
       aria-hidden
     >
-      <div
-        className="relative h-[min(66vh,620px)] w-auto"
-        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}
-      >
+      <div className="relative h-[min(64vh,600px)] w-auto" style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}>
         <div className="absolute inset-0 drop-shadow-[0_14px_28px_rgba(60,50,40,.18)]">
+          {/* Veil behind, subtle secondary motion from head */}
           <div
             className="kiss-cam-veil absolute inset-0"
             style={{
-              transformOrigin: `${pct(j.veilAttach.x, "x")}% ${pct(j.veilAttach.y, "y")}%`,
-              transform: `rotate(${veilRot}deg)`,
+              transformOrigin: originPct(veilPivot),
+              transform: `rotate(${resolved.veilRot}deg)`,
             }}
           >
             <LayerImg src={`${base}/veil.png`} />
@@ -434,60 +319,53 @@ export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps)
             <LayerImg src={`${base}/legs.png`} />
           </div>
 
-          <div className="kiss-cam-dress absolute inset-0">
+          {/* Skirt stays mostly planted; tiny follow of body lean */}
+          <div
+            className="kiss-cam-dress absolute inset-0"
+            style={{
+              transformOrigin: originPct(rig.hipPivot),
+              transform: `rotate(${resolved.bodyRot * 0.25}deg)`,
+            }}
+          >
             <LayerImg src={`${base}/skirt.png`} />
           </div>
 
-          <div className="kiss-cam-body kiss-cam-breathe absolute inset-0">
-            <LayerImg src={`${base}/bodice.png`} />
-          </div>
-
-          <ArmChain
-            which="left"
-            upperSrc={`${base}/left-upper-arm.png`}
-            forearmSrc={`${base}/left-forearm.png`}
-            handSrc={`${base}/left-hand.png`}
-            shoulder={j.leftShoulder}
-            elbow={j.leftElbow}
-            wrist={j.leftWrist}
-            upperRot={leftUpper}
-            forearmRot={leftFore}
-            handRot={leftHand}
-          />
-
-          <ArmChain
-            which="right"
-            upperSrc={`${base}/right-upper-arm.png`}
-            forearmSrc={`${base}/right-forearm.png`}
-            handSrc={`${base}/right-hand.png`}
-            shoulder={j.rightShoulder}
-            elbow={j.rightElbow}
-            wrist={j.rightWrist}
-            upperRot={rightUpper}
-            forearmRot={rightFore}
-            handRot={0}
-            balloon={{ color: "#f7d6de" }}
-          />
-
           <div
-            className="kiss-cam-head absolute inset-0"
+            className="kiss-cam-body absolute inset-0"
             style={{
-              transformOrigin: `${pct(j.neck.x, "x")}% ${pct(j.neck.y, "y")}%`,
-              transform: `rotate(${headRot}deg)`,
+              transformOrigin: originPct(rig.bodyPivot),
+              transform: `rotate(${resolved.bodyRot}deg)`,
             }}
           >
-            <LayerImg src={`${base}/head.png`} className="kiss-cam-face" />
-            <LayerImg src={`${base}/hair.png`} />
-            <LayerImg src={`${base}/tiara.png`} />
+            <div className="kiss-cam-breathe absolute inset-0">
+              <LayerImg src={`${base}/bodice.png`} />
+            </div>
+
+            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} />
+            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} balloon={{ color: "#f7d6de" }} />
+
+            <div
+              className="kiss-cam-head absolute inset-0"
+              style={{
+                transformOrigin: originPct(rig.headPivot),
+                transform: `rotate(${resolved.headRot}deg)`,
+              }}
+            >
+              <LayerImg src={`${base}/head.png`} className="kiss-cam-face" />
+              <LayerImg src={`${base}/hair.png`} />
+              <LayerImg src={`${base}/tiara.png`} />
+            </div>
           </div>
         </div>
 
         <KissCamRigDebugOverlay
           enabled={rigDebug}
           title="Bride rig"
-          layers={debugLayers}
-          pivots={debugPivots}
-          handTargets={handTargets}
+          layers={debug.layers}
+          pivots={debug.pivots}
+          bones={debug.bones}
+          handTargets={debug.handTargets}
+          kissTargets={debug.kissTargets}
         />
       </div>
     </div>
