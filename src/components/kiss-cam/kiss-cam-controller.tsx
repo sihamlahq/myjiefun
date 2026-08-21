@@ -35,6 +35,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [loadingScreen, setLoadingScreen] = useState(false);
   const [remoteCountdown, setRemoteCountdown] = useState<1 | 2 | 3 | null>(null);
   const [remoteCountdownTick, setRemoteCountdownTick] = useState(0);
+  const [sessionRefreshing, setSessionRefreshing] = useState(false);
   const connRef = useRef<KissCamConnection | null>(null);
   const rafRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
@@ -43,8 +44,6 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const resetAnimationRef = useRef<() => void>(() => undefined);
   const remoteCountdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const musicFileInputRef = useRef<HTMLInputElement | null>(null);
-  const cameraStateRef = useRef(state.cameraState);
-  cameraStateRef.current = state.cameraState;
 
   const music = useKissCamMusic();
   const musicPlayRef = useRef(music.play);
@@ -60,6 +59,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const refreshSession = useCallback(async () => {
     if (creatingSession.current) return;
     creatingSession.current = true;
+    setSessionRefreshing(true);
+    setError(null);
     try {
       const res = await fetch("/api/kiss-cam/session", { method: "POST" });
       const json = (await res.json()) as {
@@ -72,12 +73,14 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         sessionId: json.id,
         shortCode: json.shortCode,
         sessionExpiresAt: new Date(json.expiresAt).getTime() || Date.now() + SESSION_TTL_MS,
-        cameraState: s.cameraState === "connected" ? "connected" : "waiting",
+        // New QR = new pairing session; phone must scan again.
+        cameraState: "waiting",
       }));
     } catch {
-      setError("Unable to create a camera session. Retrying…");
+      setError("Unable to refresh the QR code. Please try again.");
     } finally {
       creatingSession.current = false;
+      setSessionRefreshing(false);
     }
   }, []);
 
@@ -371,16 +374,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           <KissCamQRCode
             sessionId={state.sessionId}
             shortCode={state.shortCode}
-            expiresAt={state.sessionExpiresAt}
-            onExpired={() => {
-              const cam = cameraStateRef.current;
-              if (cam === "connected" || cam === "connecting" || cam === "reconnecting") {
-                setState((s) => ({
-                  ...s,
-                  sessionExpiresAt: Date.now() + SESSION_TTL_MS,
-                }));
-                return;
-              }
+            refreshing={sessionRefreshing}
+            onRefresh={() => {
               void refreshSession();
             }}
           />
