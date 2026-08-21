@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { KissCamConnection } from "@/components/kiss-cam/kiss-cam-connection";
 import { KissCamDisplay } from "@/components/kiss-cam/kiss-cam-display";
+import { useKissCamMusic } from "@/components/kiss-cam/kiss-cam-music";
 import { KissCamQRCode } from "@/components/kiss-cam/kiss-cam-qr";
 import { CameraStatusDot, KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
 import { SESSION_TTL_MS } from "@/components/kiss-cam/kiss-cam-session";
@@ -41,8 +42,15 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const startAnimationRef = useRef<(mode: "running" | "preview") => void>(() => undefined);
   const resetAnimationRef = useRef<() => void>(() => undefined);
   const remoteCountdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const musicFileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraStateRef = useRef(state.cameraState);
   cameraStateRef.current = state.cameraState;
+
+  const music = useKissCamMusic();
+  const musicPlayRef = useRef(music.play);
+  const musicStopRef = useRef(music.stop);
+  musicPlayRef.current = music.play;
+  musicStopRef.current = music.stop;
 
   const tagline =
     weddingTitle && weddingTitle.trim() && weddingTitle !== coupleNames
@@ -203,11 +211,13 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       startedAt: Date.now(),
       countdownValue: null,
     }));
+    void musicPlayRef.current();
   }, []);
 
   const resetAnimation = useCallback(() => {
     startedAtRef.current = null;
     cancelAnimationFrame(rafRef.current);
+    musicStopRef.current(true);
     setState((s) => ({
       ...s,
       status: "standby",
@@ -241,6 +251,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       if (elapsed >= total) {
         if (state.autoReturn) {
           startedAtRef.current = null;
+          musicStopRef.current(true);
           setState((s) => ({
             ...s,
             status: "standby",
@@ -259,6 +270,17 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
   }, [state.status, state.countdownEnabled, state.autoReturn, state.durationScale]);
+
+  // Soft-pause music under the loading overlay; resume when cleared mid-show.
+  useEffect(() => {
+    if (loadingScreen) {
+      musicStopRef.current(true);
+      return;
+    }
+    if (state.status === "running" || state.status === "preview") {
+      void musicPlayRef.current();
+    }
+  }, [loadingScreen, state.status]);
 
   const toggleFullscreen = useCallback(async () => {
     const root = document.getElementById("kiss-cam-root");
@@ -416,6 +438,75 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                 on={state.autoReturn}
                 onToggle={() => setState((s) => ({ ...s, autoReturn: !s.autoReturn }))}
               />
+              <ToggleRow
+                label="Music"
+                on={music.enabled}
+                onToggle={() => music.setEnabled(!music.enabled)}
+              />
+              <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ffc9d4]/85">
+                  LED music
+                </p>
+                <p className="mt-1 truncate text-xs text-[#f7f1e8]/75" title={music.trackLabel ?? undefined}>
+                  {music.trackLabel
+                    ? music.usingDefault
+                      ? `Theme: ${music.trackLabel}`
+                      : music.trackLabel
+                    : "No track — choose a wedding song"}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-9"
+                    onClick={() => musicFileInputRef.current?.click()}
+                  >
+                    Choose music
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 border-white/20 text-[#f7f1e8]"
+                    disabled={!music.ready}
+                    onClick={() => music.clearTrack()}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <input
+                  ref={musicFileInputRef}
+                  type="file"
+                  accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    void music.chooseFile(file);
+                    e.target.value = "";
+                  }}
+                />
+                <label className="mt-2 flex items-center justify-between gap-2 text-xs">
+                  <span>Volume</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={music.volume}
+                    disabled={music.muted || !music.enabled}
+                    onChange={(e) => music.setVolume(Number(e.target.value))}
+                    className="w-[58%] accent-[#c45a78]"
+                    aria-label="Music volume"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="mt-1.5 text-xs font-semibold text-[#ffd6e0] underline-offset-2 hover:underline"
+                  onClick={() => music.setMuted(!music.muted)}
+                >
+                  {music.muted ? "Unmute speakers" : "Mute speakers"}
+                </button>
+                {music.error ? <p className="mt-1.5 text-xs text-amber-200/90">{music.error}</p> : null}
+              </div>
               <label className="flex items-center justify-between gap-2">
                 <span>Duration</span>
                 <select
@@ -459,6 +550,18 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             {error ? <p className="mt-2 text-xs text-rose-200">{error}</p> : null}
           </div>
         </aside>
+      ) : null}
+
+      {/* Always-reachable mute while fullscreen on the LED */}
+      {state.fullscreen && music.ready ? (
+        <button
+          type="button"
+          className="absolute bottom-4 left-4 z-50 rounded-full border border-white/20 bg-[#3a2f28]/85 px-4 py-2 text-sm font-semibold text-[#f7f1e8] shadow-lg backdrop-blur-md hover:bg-[#3a2f28]"
+          onClick={() => music.setMuted(!music.muted)}
+          aria-pressed={music.muted}
+        >
+          {music.muted ? "Unmute music" : "Mute music"}
+        </button>
       ) : null}
     </div>
   );
