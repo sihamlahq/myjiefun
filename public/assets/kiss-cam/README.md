@@ -15,5 +15,6 @@ Pose / animation logic (no artwork):
 | `balloons.svg` | Heart balloon |
 | `hearts.svg` | Celebration heart |
 | `background.svg` | Soft pastel blue stage |
+| `music/` | LED background music (see `music/README.md`) |
 
 Visual language: simple 2D wedding-invitation illustration — soft dark outlines, flat pastel fills, oversized heads, pink/pearl heart balloons. Not 3D, anime, or emoji.
