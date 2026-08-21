@@ -278,7 +278,10 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
             <LayerImg src={`${base}/legs.png`} />
           </div>
 
-          {/* Upper body leans around measured bodyPivot */}
+          {/* Upper body leans around measured bodyPivot.
+              Arms render UNDER the torso so jacket shoulders cover sleeve roots
+              and no stage background shows through the shoulder seam.
+              Breathing wraps arms+torso together so the suit never separates. */}
           <div
             className="kiss-cam-body absolute inset-0"
             style={{
@@ -287,14 +290,16 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
             }}
           >
             <div className="kiss-cam-breathe absolute inset-0">
-              <LayerImg src={`${base}/torso.png`} />
+              <ArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} handMode="separate" />
+              <ArmChain which="right" base={base} rig={rig} angles={resolved.right} handMode="separate" />
+
+              <div className="absolute inset-0 z-[1]">
+                <LayerImg src={`${base}/torso.png`} />
+              </div>
             </div>
 
-            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} handMode="separate" />
-            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} handMode="separate" />
-
             <div
-              className="kiss-cam-head absolute inset-0"
+              className="kiss-cam-head absolute inset-0 z-[2]"
               style={{
                 transformOrigin: originPct(rig.headPivot),
                 transform: `rotate(${resolved.headRot}deg)`,
@@ -377,16 +382,18 @@ export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps)
               transform: `rotate(${resolved.bodyRot}deg)`,
             }}
           >
+            {/* Arms under bodice; breathe moves sleeves+bodice together. */}
             <div className="kiss-cam-breathe absolute inset-0">
-              <LayerImg src={`${base}/bodice.png`} />
+              <ArmChain which="left" base={base} rig={rig} angles={resolved.left} handMode="baked" />
+              <ArmChain which="right" base={base} rig={rig} angles={resolved.right} balloon={{ color: "#f7d6de" }} handMode="baked" />
+
+              <div className="absolute inset-0 z-[1]">
+                <LayerImg src={`${base}/bodice.png`} />
+              </div>
             </div>
 
-            {/* Bride hand pixels are painted into the forearm masters; mounting *-hand.png duplicated them. */}
-            <ArmChain which="left" base={base} rig={rig} angles={resolved.left} handMode="baked" />
-            <ArmChain which="right" base={base} rig={rig} angles={resolved.right} balloon={{ color: "#f7d6de" }} handMode="baked" />
-
             <div
-              className="kiss-cam-head absolute inset-0"
+              className="kiss-cam-head absolute inset-0 z-[2]"
               style={{
                 transformOrigin: originPct(rig.headPivot),
                 transform: `rotate(${resolved.headRot}deg)`,
