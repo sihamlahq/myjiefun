@@ -52,25 +52,25 @@ export type CharacterRigJoints = {
 export const GROOM_RIG: CharacterRigJoints = {
   headPivot: { x: 360, y: 247 },
   /**
-   * Arm joints remeasured from current layered PNGs (not legacy SVG).
-   * Shoulder = top upper∩torso centroid; elbow/wrist = layer overlap centroids
-   * after underlap deepen — keeps sleeve→forearm→hand connected while rotating.
+   * Arm joints remeasured from master-cut layered PNGs (groom-master-placed).
+   * Regenerated via scripts/rebuild-groom-arms-from-master.cjs
+   * Shoulder = armscye hinge; elbow/wrist = overlap centroids after underlap trim.
    */
-  leftShoulder: { x: 271, y: 285 },
-  leftElbow: { x: 183, y: 445 },
-  leftWrist: { x: 112, y: 529 },
-  rightShoulder: { x: 450, y: 284 },
-  rightElbow: { x: 538, y: 445 },
-  rightWrist: { x: 609, y: 528 },
+  leftShoulder: { x: 248, y: 286 },
+  leftElbow: { x: 209, y: 422 },
+  leftWrist: { x: 118, y: 527 },
+  rightShoulder: { x: 473, y: 286 },
+  rightElbow: { x: 511, y: 422 },
+  rightWrist: { x: 603, y: 526 },
   bodyPivot: { x: 359, y: 365 },
   hipPivot: { x: 359, y: 613 },
   handRest: {
-    left: { x: 93, y: 554 },
-    right: { x: 627, y: 553 },
+    left: { x: 91, y: 551 },
+    right: { x: 630, y: 550 },
   },
   faceCenter: { x: 360, y: 159 },
   /** Inner (right) hand — toward bride / stage center */
-  innerHandHold: { x: 663, y: 535 },
+  innerHandHold: { x: 665, y: 550 },
 };
 
 export const BRIDE_RIG: CharacterRigJoints = {
