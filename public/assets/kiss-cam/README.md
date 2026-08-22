@@ -39,4 +39,5 @@ Toggle **Character Rig Debug** in Kiss Cam Controls, or `?rigDebug=1`, or
 
 ## Legacy static SVG references
 
-`groom.svg` / `bride.svg` are older cartoon references — not used by live puppets.
+Older `groom.svg` / `bride.svg` cartoon references were removed. Live puppets use
+only the layered PNGs under `groom/` and `bride/`.
