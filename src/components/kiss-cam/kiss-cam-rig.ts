@@ -51,12 +51,17 @@ export type CharacterRigJoints = {
  */
 export const GROOM_RIG: CharacterRigJoints = {
   headPivot: { x: 360, y: 247 },
-  leftShoulder: { x: 215, y: 307 },
-  leftElbow: { x: 180, y: 447 },
-  leftWrist: { x: 93, y: 530 },
-  rightShoulder: { x: 504, y: 306 },
-  rightElbow: { x: 539, y: 446 },
-  rightWrist: { x: 627, y: 529 },
+  /**
+   * Arm joints remeasured from current layered PNGs (not legacy SVG).
+   * Shoulder = top upper∩torso centroid; elbow/wrist = layer overlap centroids
+   * after underlap deepen — keeps sleeve→forearm→hand connected while rotating.
+   */
+  leftShoulder: { x: 271, y: 285 },
+  leftElbow: { x: 183, y: 445 },
+  leftWrist: { x: 112, y: 529 },
+  rightShoulder: { x: 450, y: 284 },
+  rightElbow: { x: 538, y: 445 },
+  rightWrist: { x: 609, y: 528 },
   bodyPivot: { x: 359, y: 365 },
   hipPivot: { x: 359, y: 613 },
   handRest: {
@@ -219,6 +224,7 @@ export function resolveCharacterRig(
   let right: ArmAngles;
 
   if (side === "groom") {
+    // Joint rotations (shoulder / elbow / wrist) — nested ArmChain applies them in order.
     // Artwork is already A-pose — keep idle near 0°. Small outer raise + hold reach.
     const outerIdle: ArmAngles = { upper: -8, forearm: 10, hand: -2 };
     const outerSway: ArmAngles = {

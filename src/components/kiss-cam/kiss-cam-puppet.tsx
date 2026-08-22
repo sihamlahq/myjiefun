@@ -113,6 +113,14 @@ type PuppetProps = {
   rigDebug?: boolean;
 };
 
+/**
+ * Nested 2D arm rig (full-canvas layers):
+ *   upperArm @ shoulder  →  forearm @ elbow  →  hand @ wrist
+ *
+ * All three joint wrappers share the same CSS transition so parent/child
+ * rotations ease together — mismatched transitions were splitting the arm.
+ * Only CSS `transform: rotate()` is applied here (no Framer / dual systems).
+ */
 function ArmChain({
   which,
   base,
@@ -133,6 +141,7 @@ function ArmChain({
   const elbow = which === "left" ? rig.leftElbow : rig.rightElbow;
   const wrist = which === "left" ? rig.leftWrist : rig.rightWrist;
   const armClass = which === "left" ? "kiss-cam-arm-left" : "kiss-cam-arm-right";
+  const forearmClass = which === "left" ? "kiss-cam-forearm-left" : "kiss-cam-forearm-right";
   const handClass = which === "left" ? "kiss-cam-hand-left" : "kiss-cam-hand-right";
 
   const upperLabel = which === "left" ? "leftUpperArm" : "rightUpperArm";
@@ -141,8 +150,9 @@ function ArmChain({
 
   return (
     <div
-      className={cn("absolute inset-0 overflow-visible", armClass)}
+      className={cn("kiss-cam-joint absolute inset-0 overflow-visible", armClass)}
       data-kiss-layer={upperLabel}
+      data-kiss-joint="shoulder"
       style={{
         transformOrigin: originPct(shoulder),
         transform: `rotate(${angles.upper}deg)`,
@@ -150,8 +160,9 @@ function ArmChain({
     >
       <LayerImg src={`${base}/${which}-upper-arm.png`} />
       <div
-        className="absolute inset-0 overflow-visible"
+        className={cn("kiss-cam-joint absolute inset-0 overflow-visible", forearmClass)}
         data-kiss-layer={foreLabel}
+        data-kiss-joint="elbow"
         style={{
           transformOrigin: originPct(elbow),
           transform: `rotate(${angles.forearm}deg)`,
@@ -159,8 +170,9 @@ function ArmChain({
       >
         <LayerImg src={`${base}/${which}-forearm.png`} />
         <div
-          className={cn("absolute inset-0 overflow-visible", handClass)}
+          className={cn("kiss-cam-joint absolute inset-0 overflow-visible", handClass)}
           data-kiss-layer={handLabel}
+          data-kiss-joint="wrist"
           data-hand-mode={handMode}
           style={{
             transformOrigin: originPct(wrist),
