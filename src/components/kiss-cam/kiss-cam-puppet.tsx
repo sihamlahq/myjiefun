@@ -437,6 +437,12 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
   const bodyRot = GROOM_STATIC_ARTWORK_DEBUG ? 0 : resolved.bodyRot;
   const headRot = GROOM_STATIC_ARTWORK_DEBUG ? 0 : resolved.headRot;
   const breatheClass = GROOM_STATIC_ARTWORK_DEBUG ? "absolute inset-0" : "kiss-cam-breathe absolute inset-0";
+  /**
+   * Shared waist/hip pivot — jacket and trousers must rotate/breathe together.
+   * Rotating the torso alone around bodyPivot (chest) flared the jacket hem
+   * away from planted legs; hipPivot keeps the waist geometrically fixed.
+   */
+  const waistOrigin = originPct(rig.hipPivot);
 
   return (
     <div
@@ -454,24 +460,23 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
         style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}`, containerType: "size" }}
       >
         <div className="absolute inset-0 overflow-visible drop-shadow-[0_14px_28px_rgba(60,50,40,.22)]">
-          {/* Legs planted — do not take body lean */}
-          <div className="kiss-cam-legs absolute inset-0 overflow-visible">
-            <LayerImg src={`${base}/shoes.png`} />
-            <LayerImg src={`${base}/legs.png`} />
-          </div>
-
-          {/* Upper body leans around measured bodyPivot.
-              Arms render UNDER the torso so jacket shoulders cover sleeve roots
-              and no stage background shows through the shoulder seam.
-              Breathing wraps arms+torso together so the suit never separates. */}
+          {/* One body root: lean + breathe apply to jacket AND trousers together
+              so the waist never separates. Arms keep their nested shoulder rig;
+              head keeps its subtle independent rotation on top of body lean. */}
           <div
             className="kiss-cam-body absolute inset-0"
             style={{
-              transformOrigin: originPct(rig.bodyPivot),
+              transformOrigin: waistOrigin,
               transform: `rotate(${bodyRot}deg)`,
             }}
           >
             <div className={breatheClass}>
+              <div className="kiss-cam-legs absolute inset-0 overflow-visible">
+                <LayerImg src={`${base}/shoes.png`} />
+                <LayerImg src={`${base}/legs.png`} />
+              </div>
+
+              {/* Arms under torso so jacket shoulders cover sleeve roots. */}
               <GroomLocalArmChain which="left" base={base} rig={rig} angles={leftAngles} balloon={{ color: "#f4b6c4" }} />
               <GroomLocalArmChain which="right" base={base} rig={rig} angles={rightAngles} />
 
