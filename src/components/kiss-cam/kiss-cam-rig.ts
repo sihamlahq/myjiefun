@@ -88,9 +88,57 @@ export const BRIDE_RIG: CharacterRigJoints = {
   innerHandHold: { x: 124, y: 381 },
 };
 
-/** Feet Y on canvas — used to align characters on the stage floor */
-export const GROOM_FOOT_Y = 1077;
-export const BRIDE_FOOT_Y = 848;
+/**
+ * Measured opaque bounds on the 720×1380 canvas (not transparent padding).
+ * Re-measure after regenerating artwork.
+ *
+ *   groom: hair top → shoes bottom  → visibleH 1003
+ *   bride: hair/tiara top → dress/feet bottom → visibleH 776
+ */
+export const GROOM_VISIBLE = { top: 75, bottom: 1077 } as const;
+export const BRIDE_VISIBLE = { top: 73, bottom: 848 } as const;
+
+/** Feet / dress hem Y on canvas — baseline alignment */
+export const GROOM_FOOT_Y = GROOM_VISIBLE.bottom;
+export const BRIDE_FOOT_Y = BRIDE_VISIBLE.bottom;
+
+/**
+ * Idle horizontal offsets returned by poseForPhase() — used only to derive
+ * animation deltas so base layout stays independent of the pose module.
+ * Do not edit poseForPhase; adjust CHARACTER_BASE instead.
+ */
+export const POSE_IDLE_X = { groom: -24, bride: 24 } as const;
+
+const GROOM_VISIBLE_H = GROOM_VISIBLE.bottom - GROOM_VISIBLE.top + 1; // 1003
+const BRIDE_VISIBLE_H = BRIDE_VISIBLE.bottom - BRIDE_VISIBLE.top + 1; // 776
+
+/**
+ * Base layout (idle size/placement) — independent of animation.
+ *
+ * finalScale = baseScale × pose.scale   (pose.scale is a small animation multiplier)
+ * finalX     = baseX + (pose.x − idleX)
+ * finalY     = baseY + pose.y
+ *
+ * Base scales equalize on-screen visual height:
+ *   baseScale × visibleHeight ≈ same for both characters.
+ */
+export const CHARACTER_BASE = {
+  groom: {
+    /** Reference height — matches existing stage fit */
+    scale: 1,
+    x: -24,
+    y: 0,
+  },
+  bride: {
+    /** Scale up so bride visibleH matches groom visibleH */
+    scale: GROOM_VISIBLE_H / BRIDE_VISIBLE_H,
+    x: 24,
+    y: 0,
+  },
+} as const;
+
+/** Shared CSS figure box — both characters use the same container height. */
+export const FIGURE_HEIGHT_CLASS = "h-[min(58vh,540px)]";
 
 export function pct(value: number, axis: "x" | "y"): number {
   return axis === "x" ? (value / STAGE_W) * 100 : (value / STAGE_H) * 100;
@@ -100,10 +148,18 @@ export function originPct(p: Vec2): string {
   return `${pct(p.x, "x")}% ${pct(p.y, "y")}%`;
 }
 
-/** Vertical nudge (%) so feet sit on the same ground line */
-export function footAlignY(side: "groom" | "bride"): number {
-  const foot = side === "groom" ? GROOM_FOOT_Y : BRIDE_FOOT_Y;
-  // Shift so foot Y maps to ~96% of stage height
+export function footY(side: "groom" | "bride"): number {
+  return side === "groom" ? GROOM_FOOT_Y : BRIDE_FOOT_Y;
+}
+
+/**
+ * Vertical nudge (%) so feet / dress hem sit on the same ground line.
+ * Scale uses transform-origin at the foot, so baseScale does not lift the baseline;
+ * this nudge only cancels different empty padding below each character's feet.
+ */
+export function footAlignY(side: "groom" | "bride", _scale = 1): number {
+  const foot = footY(side);
+  // Shift so foot Y maps to ~96% of the figure canvas (4% pad under feet).
   const target = 0.96;
   const current = foot / STAGE_H;
   return (target - current) * 100;
@@ -116,12 +172,17 @@ export type ArmAngles = {
 };
 
 export type ResolvedRigPose = {
-  /** Stage placement */
+  /** Stage placement (base layout + animation deltas) */
   xPct: number;
   yPct: number;
   bodyRot: number;
+  /** finalScale = baseScale × animationScale */
   scale: number;
+  baseScale: number;
+  animationScale: number;
   footAlignPct: number;
+  /** Foot Y as % of stage — use as transform-origin so scale keeps the baseline */
+  footOriginPct: number;
   /** Head */
   headRot: number;
   veilRot: number;
@@ -195,12 +256,24 @@ export function resolveCharacterRig(
     y: rig.faceCenter.y + kiss * 8,
   };
 
+  const base = CHARACTER_BASE[side];
+  const idleX = POSE_IDLE_X[side];
+  const animationScale = pose.scale;
+  const baseScale = base.scale;
+  const scale = baseScale * animationScale;
+  // pose.x / pose.y remain animation intent from poseForPhase(); base layout is additive.
+  const xPct = base.x + (pose.x - idleX);
+  const yPct = base.y + pose.y;
+
   return {
-    xPct: pose.x,
-    yPct: pose.y,
+    xPct,
+    yPct,
     bodyRot,
-    scale: pose.scale,
-    footAlignPct: footAlignY(side),
+    scale,
+    baseScale,
+    animationScale,
+    footAlignPct: footAlignY(side, scale),
+    footOriginPct: pct(footY(side), "y"),
     headRot,
     veilRot,
     left,
