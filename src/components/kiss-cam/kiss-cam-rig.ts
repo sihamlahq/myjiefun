@@ -55,21 +55,21 @@ export const GROOM_RIG: CharacterRigJoints = {
    * Arm joints remeasured after clean master rebuild
    * (scripts/rebuild-groom-arms-from-master.cjs).
    */
-  leftShoulder: { x: 273, y: 256 },
-  leftElbow: { x: 210, y: 414 },
-  leftWrist: { x: 121, y: 526 },
-  rightShoulder: { x: 448, y: 256 },
-  rightElbow: { x: 511, y: 413 },
-  rightWrist: { x: 600, y: 525 },
+  leftShoulder: { x: 298, y: 272 },
+  leftElbow: { x: 214, y: 405 },
+  leftWrist: { x: 133, y: 517 },
+  rightShoulder: { x: 422, y: 272 },
+  rightElbow: { x: 507, y: 405 },
+  rightWrist: { x: 589, y: 516 },
   bodyPivot: { x: 359, y: 365 },
   hipPivot: { x: 359, y: 613 },
   handRest: {
-    left: { x: 91, y: 551 },
-    right: { x: 630, y: 550 },
+    left: { x: 96, y: 548 },
+    right: { x: 625, y: 548 },
   },
   faceCenter: { x: 360, y: 159 },
   /** Inner (right) hand — toward bride / stage center */
-  innerHandHold: { x: 665, y: 550 },
+  innerHandHold: { x: 660, y: 548 },
 };
 
 export const BRIDE_RIG: CharacterRigJoints = {

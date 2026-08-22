@@ -29,6 +29,10 @@ import {
  * inspected as a static composite. Keep false for production animation.
  * Toggle only while debugging PNG layer cleanliness — do not use as a fix.
  */
+/**
+ * Set true to freeze groom pose (0° arms/body/head, no breathe) for artwork QC.
+ * Keep false in production — animation uses existing poseForPhase / resolveCharacterRig.
+ */
 const GROOM_STATIC_ARTWORK_DEBUG = false;
 
 type LayerImgProps = {
