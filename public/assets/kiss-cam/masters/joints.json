@@ -31,28 +31,28 @@
       }
     },
     "leftShoulder": {
-      "x": 248,
-      "y": 286
+      "x": 273,
+      "y": 256
     },
     "leftElbow": {
-      "x": 209,
-      "y": 422
+      "x": 210,
+      "y": 414
     },
     "leftWrist": {
-      "x": 118,
-      "y": 527
+      "x": 121,
+      "y": 526
     },
     "rightShoulder": {
-      "x": 473,
-      "y": 286
+      "x": 448,
+      "y": 256
     },
     "rightElbow": {
       "x": 511,
-      "y": 422
+      "y": 413
     },
     "rightWrist": {
-      "x": 603,
-      "y": 526
+      "x": 600,
+      "y": 525
     },
     "footY": 1077,
     "innerHandHold": {

@@ -52,16 +52,15 @@ export type CharacterRigJoints = {
 export const GROOM_RIG: CharacterRigJoints = {
   headPivot: { x: 360, y: 247 },
   /**
-   * Arm joints remeasured from master-cut layered PNGs (groom-master-placed).
-   * Regenerated via scripts/rebuild-groom-arms-from-master.cjs
-   * Shoulder = armscye hinge; elbow/wrist = overlap centroids after underlap trim.
+   * Arm joints remeasured after clean master rebuild
+   * (scripts/rebuild-groom-arms-from-master.cjs).
    */
-  leftShoulder: { x: 248, y: 286 },
-  leftElbow: { x: 209, y: 422 },
-  leftWrist: { x: 118, y: 527 },
-  rightShoulder: { x: 473, y: 286 },
-  rightElbow: { x: 511, y: 422 },
-  rightWrist: { x: 603, y: 526 },
+  leftShoulder: { x: 273, y: 256 },
+  leftElbow: { x: 210, y: 414 },
+  leftWrist: { x: 121, y: 526 },
+  rightShoulder: { x: 448, y: 256 },
+  rightElbow: { x: 511, y: 413 },
+  rightWrist: { x: 600, y: 525 },
   bodyPivot: { x: 359, y: 365 },
   hipPivot: { x: 359, y: 613 },
   handRest: {

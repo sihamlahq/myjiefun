@@ -25,18 +25,11 @@ import {
 } from "@/components/kiss-cam/kiss-cam-rig-debug";
 
 /**
- * Layered 2D puppets — POSE → RIG → LAYER TRANSFORMS.
- *
- * Hierarchy (legs planted; lean around bodyPivot):
- *   figure (x / scale / footAlign)
- *     legs + shoes
- *     [bride skirt — mostly planted]
- *     upperBody @ bodyPivot (bodyRot)
- *       torso / bodice
- *       arms (shoulder → elbow → wrist)
- *       head @ headPivot (headRot) + hair [/ tiara]
- *     [bride veil @ veilPivot — secondary]
+ * When true, GroomFigure ignores pose arm/body/head motion so artwork can be
+ * inspected as a static composite. Keep false for production animation.
+ * Toggle only while debugging PNG layer cleanliness — do not use as a fix.
  */
+const GROOM_STATIC_ARTWORK_DEBUG = false;
 
 type LayerImgProps = {
   src: string;
@@ -435,6 +428,12 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
   const base = "/assets/kiss-cam/groom";
   const debug = buildDebug("groom", rig, resolved.holdTarget, resolved.kissTarget, pose.holdProgress > 0.45);
 
+  const leftAngles = GROOM_STATIC_ARTWORK_DEBUG ? { upper: 0, forearm: 0, hand: 0 } : resolved.left;
+  const rightAngles = GROOM_STATIC_ARTWORK_DEBUG ? { upper: 0, forearm: 0, hand: 0 } : resolved.right;
+  const bodyRot = GROOM_STATIC_ARTWORK_DEBUG ? 0 : resolved.bodyRot;
+  const headRot = GROOM_STATIC_ARTWORK_DEBUG ? 0 : resolved.headRot;
+  const breatheClass = GROOM_STATIC_ARTWORK_DEBUG ? "absolute inset-0" : "kiss-cam-breathe absolute inset-0";
+
   return (
     <div
       className={cn("kiss-cam-figure pointer-events-none absolute bottom-[2%] origin-bottom", className)}
@@ -465,12 +464,12 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
             className="kiss-cam-body absolute inset-0"
             style={{
               transformOrigin: originPct(rig.bodyPivot),
-              transform: `rotate(${resolved.bodyRot}deg)`,
+              transform: `rotate(${bodyRot}deg)`,
             }}
           >
-            <div className="kiss-cam-breathe absolute inset-0">
-              <GroomLocalArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} />
-              <GroomLocalArmChain which="right" base={base} rig={rig} angles={resolved.right} />
+            <div className={breatheClass}>
+              <GroomLocalArmChain which="left" base={base} rig={rig} angles={leftAngles} balloon={{ color: "#f4b6c4" }} />
+              <GroomLocalArmChain which="right" base={base} rig={rig} angles={rightAngles} />
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
@@ -481,7 +480,7 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
               className="kiss-cam-head absolute inset-0 z-[2]"
               style={{
                 transformOrigin: originPct(rig.headPivot),
-                transform: `rotate(${resolved.headRot}deg)`,
+                transform: `rotate(${headRot}deg)`,
               }}
             >
               <LayerImg src={`${base}/head.png`} className="kiss-cam-face" />
