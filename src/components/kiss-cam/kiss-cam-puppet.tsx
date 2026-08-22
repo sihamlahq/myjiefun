@@ -193,6 +193,170 @@ function ArmChain({
   );
 }
 
+/** Stage-relative length → CSS container units (figure must set container-type: size). */
+function cqw(px: number): string {
+  return `calc(${px} / ${STAGE_W} * 100cqw)`;
+}
+function cqh(px: number): string {
+  return `calc(${px} / ${STAGE_H} * 100cqh)`;
+}
+
+/**
+ * Groom arm rig with LOCAL joint coordinates.
+ *
+ * Full-canvas PNGs keep their artwork, but each joint is a zero-size hinge in
+ * the parent joint's local space. Artwork is offset so the joint pixel sits at
+ * the hinge origin — children rotate about a true local origin.
+ *
+ *   ArmContainer
+ *     └── UpperArm @ shoulder (0,0)
+ *          └── Forearm @ elbow local
+ *               └── Hand @ wrist local
+ */
+function GroomLocalArmChain({
+  which,
+  base,
+  rig,
+  angles,
+  balloon,
+}: {
+  which: "left" | "right";
+  base: string;
+  rig: CharacterRigJoints;
+  angles: ArmAngles;
+  balloon?: { color: string };
+}) {
+  const shoulder = which === "left" ? rig.leftShoulder : rig.rightShoulder;
+  const elbow = which === "left" ? rig.leftElbow : rig.rightElbow;
+  const wrist = which === "left" ? rig.leftWrist : rig.rightWrist;
+
+  const elbowLocal = { x: elbow.x - shoulder.x, y: elbow.y - shoulder.y };
+  const wristLocal = { x: wrist.x - elbow.x, y: wrist.y - elbow.y };
+
+  const armClass = which === "left" ? "kiss-cam-arm-left" : "kiss-cam-arm-right";
+  const forearmClass = which === "left" ? "kiss-cam-forearm-left" : "kiss-cam-forearm-right";
+  const handClass = which === "left" ? "kiss-cam-hand-left" : "kiss-cam-hand-right";
+
+  const stageImgStyle: CSSProperties = {
+    position: "absolute",
+    width: cqw(STAGE_W),
+    height: cqh(STAGE_H),
+    maxWidth: "none",
+    pointerEvents: "none",
+    userSelect: "none",
+  };
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-visible" data-kiss-arm={which}>
+      <div
+        className={cn("kiss-cam-joint absolute overflow-visible", armClass)}
+        data-kiss-layer={which === "left" ? "leftUpperArm" : "rightUpperArm"}
+        data-kiss-joint="shoulder"
+        style={{
+          left: cqw(shoulder.x),
+          top: cqh(shoulder.y),
+          width: 0,
+          height: 0,
+          transformOrigin: "0 0",
+          transform: `rotate(${angles.upper}deg)`,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`${base}/${which}-upper-arm.png`}
+          alt=""
+          draggable={false}
+          className="select-none"
+          style={{
+            ...stageImgStyle,
+            left: cqw(-shoulder.x),
+            top: cqh(-shoulder.y),
+          }}
+        />
+
+        <div
+          className={cn("kiss-cam-joint absolute overflow-visible", forearmClass)}
+          data-kiss-layer={which === "left" ? "leftForearm" : "rightForearm"}
+          data-kiss-joint="elbow"
+          style={{
+            left: cqw(elbowLocal.x),
+            top: cqh(elbowLocal.y),
+            width: 0,
+            height: 0,
+            transformOrigin: "0 0",
+            transform: `rotate(${angles.forearm}deg)`,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`${base}/${which}-forearm.png`}
+            alt=""
+            draggable={false}
+            className="select-none"
+            style={{
+              ...stageImgStyle,
+              left: cqw(-elbow.x),
+              top: cqh(-elbow.y),
+            }}
+          />
+
+          <div
+            className={cn("kiss-cam-joint absolute overflow-visible", handClass)}
+            data-kiss-layer={which === "left" ? "leftHand" : "rightHand"}
+            data-kiss-joint="wrist"
+            data-hand-mode="separate"
+            style={{
+              left: cqw(wristLocal.x),
+              top: cqh(wristLocal.y),
+              width: 0,
+              height: 0,
+              transformOrigin: "0 0",
+              transform: `rotate(${angles.hand}deg)`,
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${base}/${which}-hand.png`}
+              alt=""
+              draggable={false}
+              className="select-none"
+              style={{
+                ...stageImgStyle,
+                left: cqw(-wrist.x),
+                top: cqh(-wrist.y),
+              }}
+            />
+            {balloon ? (
+              <div
+                className="kiss-cam-held-balloon pointer-events-none absolute"
+                style={{
+                  left: cqw(rig.handRest[which].x - wrist.x),
+                  top: cqh(rig.handRest[which].y - wrist.y),
+                  width: cqw(Math.round(STAGE_W * 0.14)),
+                  height: cqh(Math.round(STAGE_H * 0.17)),
+                  transform: "translate(-50%, -100%)",
+                  transformOrigin: "50% 100%",
+                }}
+              >
+                <svg viewBox="0 0 60 90" className="h-full w-full overflow-visible" aria-hidden>
+                  <line x1="30" y1="38" x2="30" y2="88" stroke="#9a8b82" strokeWidth="1.4" strokeLinecap="round" />
+                  <path
+                    d="M30 32 C50 12 56 -8 30 2 C4 -8 10 12 30 32Z"
+                    fill={balloon.color}
+                    stroke="#5a4a42"
+                    strokeWidth="1.5"
+                  />
+                  <ellipse cx="22" cy="12" rx="4" ry="6" fill="rgba(255,255,255,0.4)" />
+                </svg>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function buildDebug(
   side: "groom" | "bride",
   rig: CharacterRigJoints,
@@ -284,7 +448,7 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
     >
       <div
         className={cn("relative w-auto overflow-visible", FIGURE_HEIGHT_CLASS)}
-        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}
+        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}`, containerType: "size" }}
       >
         <div className="absolute inset-0 overflow-visible drop-shadow-[0_14px_28px_rgba(60,50,40,.22)]">
           {/* Legs planted — do not take body lean */}
@@ -305,8 +469,8 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
             }}
           >
             <div className="kiss-cam-breathe absolute inset-0">
-              <ArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} handMode="separate" />
-              <ArmChain which="right" base={base} rig={rig} angles={resolved.right} handMode="separate" />
+              <GroomLocalArmChain which="left" base={base} rig={rig} angles={resolved.left} balloon={{ color: "#f4b6c4" }} />
+              <GroomLocalArmChain which="right" base={base} rig={rig} angles={resolved.right} />
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
