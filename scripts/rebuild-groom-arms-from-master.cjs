@@ -24,10 +24,14 @@ const MASTER_CLEAN = path.join(ROOT, "masters/groom-master-clean.png");
 const JOINTS_PATH = path.join(ROOT, "masters/joints.json");
 const QC = "/opt/cursor/artifacts/kiss-cam-redesign";
 
-/** Jacket bottom edge (inclusive) — measured from master hem peak */
-const JACKET_HEM_Y = 604;
+/**
+ * Jacket hem highlight peaks ~604; cast shadow on trousers is ~605–607.
+ * Cutting at 604|605 puts max contrast on a layer seam (visible strip).
+ * Torso owns continuous master through the shadow band.
+ */
+const JACKET_HEM_Y = 607;
+const LEGS_EXCLUSIVE_Y = 608; // first row owned exclusively by legs
 const ARM_UNDERLAP = 12;
-const HEM_TUCK = 10; // trousers pixels copied onto torso under hem
 
 const LAYERS = [
   "shoes",
@@ -204,14 +208,14 @@ function classify(x, y, master) {
     if (y < 210) return lum < 110 ? "hair" : "head";
   }
 
-  // Legs: strictly below jacket hem — never jacket
-  if (y > JACKET_HEM_Y && y < 1045 && x >= 230 && x <= 490) return "legs";
+  // Legs: below jacket+shadow band — never jacket body
+  if (y >= LEGS_EXCLUSIVE_Y && y < 1045 && x >= 230 && x <= 490) return "legs";
 
-  // Torso / jacket: includes hem row
+  // Torso / jacket: includes hem + cast-shadow rows (continuous, no seam cut)
   if (y >= 210 && y <= JACKET_HEM_Y && x >= 240 && x <= 480) return "torso";
 
   // Fallbacks (still exclusive)
-  if (y > JACKET_HEM_Y) {
+  if (y >= LEGS_EXCLUSIVE_Y) {
     if (y >= 990) return "shoes";
     return "legs";
   }
@@ -255,30 +259,48 @@ function dilateUnderlap(dst, master, srcMask, radius) {
 }
 
 /**
- * Hem tuck: copy trousers pixels (legs exclusive) onto torso near the hem,
- * so breathing/lean never exposes a jacket strip sitting on the legs layer.
+ * Soften crushed near-black shadow trough under the jacket hem so the
+ * jacket→trousers transition does not read as a duplicate black/white strip.
  */
-function tuckTrousersUnderHem(torso, legs, master, pixelsUp) {
-  let n = 0;
-  for (let y = JACKET_HEM_Y + 1; y <= JACKET_HEM_Y + pixelsUp; y++) {
-    for (let x = 230; x <= 490; x++) {
-      if (!opaque(legs, x, y)) continue;
-      if (!opaque(master, x, y)) continue;
-      // Only tuck if directly under an opaque torso hem pixel above
-      let under = false;
-      for (let yy = JACKET_HEM_Y; yy >= JACKET_HEM_Y - 6; yy--) {
-        if (opaque(torso, x, yy)) {
-          under = true;
-          break;
-        }
+function softenWaistBand(layer, master, y0, y1, x0, x1) {
+  let fixed = 0;
+  for (let x = x0; x <= x1; x++) {
+    const iJack = idx(x, 600);
+    const iTrous = idx(x, 610);
+    if (master[iJack + 3] < 40 || master[iTrous + 3] < 40) continue;
+    const jR = master[iJack];
+    const jG = master[iJack + 1];
+    const jB = master[iJack + 2];
+    const tR = master[iTrous];
+    const tG = master[iTrous + 1];
+    const tB = master[iTrous + 2];
+    const jL = 0.2126 * jR + 0.7152 * jG + 0.0722 * jB;
+    const tL = 0.2126 * tR + 0.7152 * tG + 0.0722 * tB;
+    for (let y = y0; y <= y1; y++) {
+      const i = idx(y, x);
+      if (layer[i + 3] < 8) continue;
+      const L = 0.2126 * layer[i] + 0.7152 * layer[i + 1] + 0.0722 * layer[i + 2];
+      const t = (y - y0) / Math.max(1, y1 - y0);
+      const blendR = Math.round(jR * (1 - t) + tR * t);
+      const blendG = Math.round(jG * (1 - t) + tG * t);
+      const blendB = Math.round(jB * (1 - t) + tB * t);
+      const floor = Math.min(jL, tL) - 2;
+      if (L < floor - 8 || L < 12) {
+        const m = 0.75;
+        layer[i] = Math.round(layer[i] * (1 - m) + blendR * m);
+        layer[i + 1] = Math.round(layer[i + 1] * (1 - m) + blendG * m);
+        layer[i + 2] = Math.round(layer[i + 2] * (1 - m) + blendB * m);
+        fixed++;
       }
-      if (under) {
-        copyPx(torso, master, x, y);
-        n++;
+      if (L > 55 && L > jL + 15 && L > tL + 15) {
+        layer[i] = blendR;
+        layer[i + 1] = blendG;
+        layer[i + 2] = blendB;
+        fixed++;
       }
     }
   }
-  return n;
+  return fixed;
 }
 
 function centroid(pred) {
@@ -424,8 +446,17 @@ async function main() {
   // Sleeve roots tuck under jacket (arm dilates into torso pixels near seam)
   console.log("UL LU←torso", dilateUnderlap(buckets["left-upper-arm"], clean, buckets.torso, 10));
   console.log("UL RU←torso", dilateUnderlap(buckets["right-upper-arm"], clean, buckets.torso, 10));
-  // CRITICAL: trousers tuck onto torso — NEVER copy jacket onto legs
-  console.log("hem tuck torso←legs", tuckTrousersUnderHem(buckets.torso, buckets.legs, clean, HEM_TUCK));
+  // Legs underlap into jacket-shadow zone (identical master pixels) for breath cover
+  console.log("UL legs←torso hem", dilateUnderlap(buckets.legs, clean, buckets.torso, 4));
+  // Soften crushed shadow trough so hem does not read as a duplicate strip
+  console.log(
+    "soften waist torso",
+    softenWaistBand(buckets.torso, clean, 602, 607, 248, 470)
+  );
+  console.log(
+    "soften waist legs",
+    softenWaistBand(buckets.legs, clean, 605, 609, 248, 470)
+  );
 
   // 4) Fill any exclusive holes, strip extras — do NOT keepLargest after this
   console.log("hole fill", fillHolesFromNearest(buckets, clean));
@@ -471,14 +502,14 @@ async function main() {
   console.log("FINAL holes/extras", holes, extras);
   console.log("CC", ccs);
 
-  // Assert: legs must not own jacket-row pixels (y <= hem)
+  // Assert: legs must not own jacket-body pixels above the shadow band
   let legsJacketBleed = 0;
-  for (let y = 0; y <= JACKET_HEM_Y; y++) {
+  for (let y = 0; y < 600; y++) {
     for (let x = 0; x < W; x++) {
       if (opaque(buckets.legs, x, y)) legsJacketBleed++;
     }
   }
-  console.log("legsJacketBleed", legsJacketBleed);
+  console.log("legsJacketBleed(above600)", legsJacketBleed);
 
   // 8) Static composite on checker
   const order = [
