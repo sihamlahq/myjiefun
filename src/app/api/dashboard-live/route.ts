@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireAuthedDataClient } from "@/lib/supabase/data-client";
+import { isJwtClockSkewError, JWT_CLOCK_SKEW_HELP } from "@/lib/supabase/errors";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -7,13 +8,7 @@ export const revalidate = 0;
 /** Auth-protected live snapshot for the dashboard command center. */
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+    const { supabase } = await requireAuthedDataClient();
 
     const [guests, tables, checkInEvents] = await Promise.all([
       supabase
@@ -34,7 +29,13 @@ export async function GET() {
         .limit(20),
     ]);
 
-    if (guests.error) throw new Error(guests.error.message);
+    if (guests.error) {
+      throw new Error(
+        isJwtClockSkewError(guests.error.message)
+          ? JWT_CLOCK_SKEW_HELP
+          : guests.error.message,
+      );
+    }
     if (tables.error) throw new Error(tables.error.message);
     if (checkInEvents.error) throw new Error(checkInEvents.error.message);
 
@@ -53,12 +54,15 @@ export async function GET() {
       },
     );
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to load dashboard data";
+    const status = message === "Unauthorized" ? 401 : 500;
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Unable to load dashboard data",
+        error: message,
       },
-      { status: 500 },
+      { status },
     );
   }
 }

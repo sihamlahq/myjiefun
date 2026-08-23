@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { requireAuthedDataClient } from "@/lib/supabase/data-client";
 import { repairMojibakeText } from "@/lib/text-encoding";
 import type {
   AttendanceStatus,
@@ -10,16 +11,11 @@ import type {
 } from "@/types/wedding";
 
 async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  return { supabase, user };
+  return requireAuthedDataClient();
 }
 
 async function writeAudit(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   payload: {
     action: string;
     entity_type: string;
