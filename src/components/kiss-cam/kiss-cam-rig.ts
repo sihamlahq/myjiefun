@@ -261,7 +261,12 @@ export function resolveCharacterRig(
   const kissHeadExtra = kiss * towardPartner * 6;
   const headRot = pose.headRot + kissHeadExtra;
   const veilRot = headRot * 0.28 + sway * 0.8;
-  const bodyRot = pose.bodyRot + kiss * towardPartner * 1.5;
+  // Bride: small extra body lean into the kiss.
+  // Groom: do NOT add kiss body lean — his jacket hem is already wider than the
+  // torso shoulder line; extra bodyRot makes the waist read wider than shoulders.
+  // Head still leans via kissHeadExtra.
+  const bodyRot =
+    side === "groom" ? pose.bodyRot : pose.bodyRot + kiss * towardPartner * 1.5;
 
   const kissTarget: Vec2 = {
     x: rig.faceCenter.x + towardPartner * kiss * 28,
@@ -270,7 +275,9 @@ export function resolveCharacterRig(
 
   const base = CHARACTER_BASE[side];
   const idleX = POSE_IDLE_X[side];
-  const animationScale = pose.scale;
+  // Groom: lock animation scale to 1 (baseScale unchanged). Scale>1 around the
+  // foot origin exaggerates the already-wide jacket hem vs shoulders.
+  const animationScale = side === "groom" ? 1 : pose.scale;
   const baseScale = base.scale;
   const scale = baseScale * animationScale;
   // pose.x / pose.y remain animation intent from poseForPhase(); base layout is additive.

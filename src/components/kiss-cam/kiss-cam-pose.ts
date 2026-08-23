@@ -35,7 +35,37 @@ export type CharacterPose = {
  * Couple composition for A-pose masters — wide center gap.
  * Idle ~±24%. Hold ~±10%. Kiss ~±4%. Celebration ~±12%.
  * Body lean kept small; heads do most of the kiss motion.
+ *
+ * Groom body lean is capped separately (see applyGroomTorsoGuard): his jacket
+ * hem is wider than the torso shoulder line in the static PNG, so even modest
+ * bodyRot + animation scale reads as a waist wider than the shoulders.
  */
+/** Groom-only torso lean magnitudes (°). Head still carries the romantic lean. */
+const GROOM_BODY_LEAN_DEG: Partial<Record<KissCamAnimationPhase, number>> = {
+  approach: 0.3,
+  holdHands: 0.5,
+  romanticPause: 0.6,
+  moveCloser: 0.8,
+  countdown: 1.0,
+  kiss: 1.2,
+  celebration: 0.5,
+  final: 0.5,
+};
+
+function applyGroomTorsoGuard(
+  phase: KissCamAnimationPhase,
+  pose: CharacterPose,
+): CharacterPose {
+  const lean = GROOM_BODY_LEAN_DEG[phase];
+  return {
+    ...pose,
+    // Keep torso nearly upright; never amplify with animation scale.
+    // Positive = lean toward bride (same sign as previous `dir * -θ` with dir=-1).
+    bodyRot: lean != null ? lean : 0,
+    scale: 1,
+  };
+}
+
 export function poseForPhase(
   phase: KissCamAnimationPhase,
   side: "bride" | "groom",
@@ -57,11 +87,13 @@ export function poseForPhase(
     eyesClosed: false,
   };
 
+  let pose: CharacterPose;
   switch (phase) {
     case "idle":
-      return { ...base, x: dir * 24, balloonSway: 1 };
+      pose = { ...base, x: dir * 24, balloonSway: 1 };
+      break;
     case "approach":
-      return {
+      pose = {
         ...base,
         x: dir * 16,
         bodyRot: dir * -0.8,
@@ -69,8 +101,9 @@ export function poseForPhase(
         holdProgress: 0.35,
         balloonSway: 1,
       };
+      break;
     case "holdHands":
-      return {
+      pose = {
         ...base,
         x: dir * 10,
         bodyRot: dir * -1.2,
@@ -79,8 +112,9 @@ export function poseForPhase(
         balloonSway: 0.85,
         mouth: "soft",
       };
+      break;
     case "romanticPause":
-      return {
+      pose = {
         ...base,
         x: dir * 9,
         bodyRot: dir * -1.5,
@@ -90,8 +124,9 @@ export function poseForPhase(
         scale: 1.008,
         mouth: "soft",
       };
+      break;
     case "moveCloser":
-      return {
+      pose = {
         ...base,
         x: dir * 6.5,
         y: -0.3,
@@ -104,8 +139,9 @@ export function poseForPhase(
         scale: 1.01,
         mouth: "soft",
       };
+      break;
     case "countdown":
-      return {
+      pose = {
         ...base,
         x: dir * 5,
         y: -0.6,
@@ -118,8 +154,9 @@ export function poseForPhase(
         scale: 1.014,
         mouth: "soft",
       };
+      break;
     case "kiss":
-      return {
+      pose = {
         ...base,
         x: dir * 4,
         y: -0.9,
@@ -133,9 +170,10 @@ export function poseForPhase(
         mouth: "kiss",
         eyesClosed: true,
       };
+      break;
     case "celebration":
     case "final":
-      return {
+      pose = {
         ...base,
         x: dir * 12,
         y: -0.3,
@@ -148,7 +186,12 @@ export function poseForPhase(
         scale: 1.01,
         mouth: "smile",
       };
+      break;
     default:
-      return base;
+      pose = base;
+      break;
   }
+
+  // Bride unchanged. Groom: smaller bodyRot + no animation scale pulse.
+  return side === "groom" ? applyGroomTorsoGuard(phase, pose) : pose;
 }

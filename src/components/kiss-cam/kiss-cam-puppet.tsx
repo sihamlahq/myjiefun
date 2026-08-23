@@ -438,9 +438,10 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
   const headRot = GROOM_STATIC_ARTWORK_DEBUG ? 0 : resolved.headRot;
   const breatheClass = GROOM_STATIC_ARTWORK_DEBUG ? "absolute inset-0" : "kiss-cam-breathe absolute inset-0";
   /**
-   * Shared waist/hip pivot — jacket and trousers must rotate/breathe together.
-   * Rotating the torso alone around bodyPivot (chest) flared the jacket hem
-   * away from planted legs; hipPivot keeps the waist geometrically fixed.
+   * Shared hip pivot for the whole groom body (torso + legs + arms).
+   * Torso and legs share one transform — never scale/rotate them separately.
+   * Using bodyPivot (chest) for torso-only rotation made the jacket hem swing
+   * wider than the shoulders; hipPivot keeps proportions coherent.
    */
   const waistOrigin = originPct(rig.hipPivot);
 
