@@ -169,8 +169,9 @@ export function footY(side: "groom" | "bride"): number {
  */
 export function footAlignY(side: "groom" | "bride", _scale = 1): number {
   const foot = footY(side);
-  // Shift so foot Y maps to ~96% of the figure canvas (4% pad under feet).
-  const target = 0.96;
+  // Keep feet near the bottom of the figure box without a huge downward
+  // translate (large values pushed characters out of the safe area / clip).
+  const target = 0.9;
   const current = foot / STAGE_H;
   return (target - current) * 100;
 }
@@ -275,18 +276,23 @@ export function resolveCharacterRig(
   // pose.x / pose.y remain animation intent from poseForPhase(); base layout is additive.
   const xPct = base.x + (pose.x - idleX);
   const yPct = base.y + pose.y;
+  const footAlignPct = footAlignY(side, scale);
+  const footOriginPct = pct(footY(side), "y");
+
+  // Guard against invalid CSS transforms (NaN/Infinity make figures vanish).
+  const finite = (n: number, fallback: number) => (Number.isFinite(n) ? n : fallback);
 
   return {
-    xPct,
-    yPct,
-    bodyRot,
-    scale,
+    xPct: finite(xPct, base.x),
+    yPct: finite(yPct, base.y),
+    bodyRot: finite(bodyRot, 0),
+    scale: finite(scale, baseScale) || baseScale,
     baseScale,
     animationScale,
-    footAlignPct: footAlignY(side, scale),
-    footOriginPct: pct(footY(side), "y"),
-    headRot,
-    veilRot,
+    footAlignPct: finite(footAlignPct, 0),
+    footOriginPct: finite(footOriginPct, 90),
+    headRot: finite(headRot, 0),
+    veilRot: finite(veilRot, 0),
     left,
     right,
     holdTarget: rig.innerHandHold,

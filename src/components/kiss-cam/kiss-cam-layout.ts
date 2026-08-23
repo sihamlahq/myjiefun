@@ -16,27 +16,32 @@
  *   ├─────────────────────────────┤ 100% − BOTTOM_SAFE_PCT
  *   │      BOTTOM SAFE AREA       │  ← couple names / wedding title
  *   └─────────────────────────────┘ 100%
+ *
+ * CRITICAL: figure height must resolve to a real pixel height. Using
+ * `h-full` on a child of a height-less absolute wrapper collapses to 0
+ * and makes both characters invisible. The character stage provides an
+ * `absolute inset-0` containing block so `h-full` works.
  */
 
 /** Reserved band at the top for titles (keeps text above hair). */
-export const HEADER_SAFE_PCT = 22;
+export const HEADER_SAFE_PCT = 20;
 
 /** Reserved band at the bottom for couple / event text (keeps text below shoes). */
-export const BOTTOM_SAFE_PCT = 14;
+export const BOTTOM_SAFE_PCT = 12;
 
 /**
  * Character figure box height inside the character safe area.
- * Uses the safe-area container height (not the full viewport) so figures
- * cannot grow into the header or bottom text bands.
+ * Parent must be a sized box (see character stage `absolute inset-0`).
+ * Do NOT use viewport `vh` here — that ignored the safe-area bands.
  */
 export const FIGURE_HEIGHT_CLASS = "h-full max-h-full";
 
 /**
- * Extra uniform shrink so hair/shoes keep breathing room inside the
- * character safe area during the small animation scale pulse (~1.018).
+ * Uniform shrink so hair/shoes keep breathing room inside the character
+ * band (covers footAlign nudge + small animation scale pulse).
  * Bride scale remains GROOM_VISIBLE_H / BRIDE_VISIBLE_H relative to this.
  */
-export const GROOM_BASE_SCALE = 0.92;
+export const GROOM_BASE_SCALE = 0.88;
 
 /** CSS custom properties applied on `.kiss-cam-stage`. */
 export const STAGE_SAFE_AREA_STYLE = {

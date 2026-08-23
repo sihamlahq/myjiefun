@@ -446,7 +446,11 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
   return (
     <div
-      className={cn("kiss-cam-figure pointer-events-none absolute bottom-0 origin-bottom", className)}
+      className={cn(
+        // h-full requires a sized containing block (character stage is absolute inset-0).
+        "kiss-cam-figure pointer-events-none absolute bottom-0 h-full origin-bottom",
+        className,
+      )}
       style={{
         left: `calc(50% + ${resolved.xPct}%)`,
         // Scale around the feet so baseScale equalizes height without lifting the baseline.
@@ -454,6 +458,7 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
         transform: `translateX(-50%) translateY(calc(${resolved.yPct}% + ${resolved.footAlignPct}%)) scale(${resolved.scale})`,
       }}
       aria-hidden
+      data-kiss-figure="groom"
     >
       <div
         className={cn("relative w-auto overflow-visible", FIGURE_HEIGHT_CLASS)}
@@ -522,17 +527,22 @@ export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps)
 
   return (
     <div
-      className={cn("kiss-cam-figure pointer-events-none absolute bottom-0 origin-bottom", className)}
+      className={cn(
+        // h-full requires a sized containing block (character stage is absolute inset-0).
+        "kiss-cam-figure pointer-events-none absolute bottom-0 h-full origin-bottom",
+        className,
+      )}
       style={{
         left: `calc(50% + ${resolved.xPct}%)`,
         transformOrigin: `50% ${resolved.footOriginPct}%`,
         transform: `translateX(-50%) translateY(calc(${resolved.yPct}% + ${resolved.footAlignPct}%)) scale(${resolved.scale})`,
       }}
       aria-hidden
+      data-kiss-figure="bride"
     >
       <div
         className={cn("relative w-auto overflow-visible", FIGURE_HEIGHT_CLASS)}
-        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}
+        style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}`, containerType: "size" }}
       >
         <div className="absolute inset-0 overflow-visible drop-shadow-[0_14px_28px_rgba(60,50,40,.18)]">
           <BrideLayerTreeDebug enabled={rigDebug} />

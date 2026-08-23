@@ -204,17 +204,26 @@ export function KissCamDisplay({
         ) : null}
       </div>
 
-      {/* ── CHARACTER SAFE AREA ── full-body couple; animation stays here */}
+      {/* ── CHARACTER SAFE AREA ── full-body couple; animation stays here.
+          Must NOT use overflow-hidden: footAlign translateY would clip the
+          figures to invisibility. Sized `inset-0` stage gives h-full a real
+          height (h-full on a height-less absolute parent collapses to 0). */}
       <div
-        className="relative z-[3] min-h-0 w-full flex-1 overflow-hidden"
+        className="relative z-[3] min-h-0 w-full flex-1"
         data-kiss-safe="characters"
       >
-        {showCharacters ? (
-          <>
-            <GroomFigure phase={characterPhase} className="z-[3]" rigDebug={rigDebug} />
-            <BrideFigure phase={characterPhase} className="z-[4]" rigDebug={rigDebug} />
-          </>
-        ) : null}
+        <div
+          className="absolute inset-0 overflow-visible"
+          data-kiss-character-stage="1"
+          style={{ containerType: "size" }}
+        >
+          {showCharacters ? (
+            <>
+              <GroomFigure phase={characterPhase} className="z-[3]" rigDebug={rigDebug} />
+              <BrideFigure phase={characterPhase} className="z-[4]" rigDebug={rigDebug} />
+            </>
+          ) : null}
+        </div>
 
         <KissCamHearts active={!loading && (celebrate || showBigLove)} />
         <KissCamConfetti active={!loading && (celebrate || showBigLove)} />
