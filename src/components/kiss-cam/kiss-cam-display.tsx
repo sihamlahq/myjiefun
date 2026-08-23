@@ -12,6 +12,7 @@ import { KissCamCanvasCompositor } from "@/components/kiss-cam/kiss-cam-canvas-c
 import { KissCamKissEmoji } from "@/components/kiss-cam/kiss-cam-kiss-emoji";
 import { KissCamLoadingOverlay } from "@/components/kiss-cam/kiss-cam-loading";
 import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
+import { STAGE_SAFE_AREA_STYLE } from "@/components/kiss-cam/kiss-cam-layout";
 import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 
 type KissCamDisplayProps = {
@@ -69,11 +70,9 @@ export function KissCamDisplay({
     if (!video) return;
     setVideoEl(video);
     if (remoteStream) {
-      if (!hadStream.current) setFadeIn(true);
-      else setFadeIn(true);
       hadStream.current = true;
-      const sameObject = video.srcObject === remoteStream;
-      if (!sameObject) {
+      setFadeIn(true);
+      if (video.srcObject !== remoteStream) {
         video.srcObject = remoteStream;
       }
       // iOS / Chrome often need an explicit play after unmute or replaceTrack.
@@ -136,17 +135,24 @@ export function KissCamDisplay({
     remoteCountdown != null
       ? `remote-${remoteCountdown}-${remoteCountdownTick}`
       : `auto-${countdownValue}`;
+  const showIdleHeader = !loading && phase === "idle" && !remoteStream;
 
   return (
     <div
       className={
         fillViewport
-          ? `kiss-cam-stage relative h-full w-full overflow-hidden bg-[#3a2430] ${className}`
-          : `kiss-cam-stage relative aspect-video w-full overflow-hidden bg-[#3a2430] ${className}`
+          ? `kiss-cam-stage relative flex h-full w-full flex-col overflow-hidden bg-[#3a2430] ${className}`
+          : `kiss-cam-stage relative flex aspect-video w-full flex-col overflow-hidden bg-[#3a2430] ${className}`
       }
-      style={fillViewport ? undefined : { aspectRatio: "16 / 9" }}
+      style={{
+        ...(fillViewport ? {} : { aspectRatio: "16 / 9" }),
+        ...STAGE_SAFE_AREA_STYLE,
+      }}
     >
-      <KissCamBackground active lite={cameraLive} />
+      {/* Full-bleed atmosphere — behind the safe-area columns */}
+      <div className="pointer-events-none absolute inset-0 z-0">
+        <KissCamBackground active lite={cameraLive} />
+      </div>
 
       <video
         ref={videoRef}
@@ -158,74 +164,112 @@ export function KissCamDisplay({
         aria-hidden
       />
 
-      <KissCamCanvasCompositor
-        video={videoEl}
-        enabled={cameraLive}
-        layout={cameraLayout}
-        fadeIn={fadeIn}
-      />
+      <div className="pointer-events-none absolute inset-0 z-[1]">
+        <KissCamCanvasCompositor
+          video={videoEl}
+          enabled={cameraLive}
+          layout={cameraLayout}
+          fadeIn={fadeIn}
+        />
+      </div>
 
-      <KissCamBalloons active={!cameraLive || celebrate} celebrate={celebrate} />
+      <div className="pointer-events-none absolute inset-0 z-[2]">
+        <KissCamBalloons active={!cameraLive || celebrate} celebrate={celebrate} />
+      </div>
 
-      {showCharacters ? (
-        <>
-          <GroomFigure phase={characterPhase} className="z-[3]" rigDebug={rigDebug} />
-          <BrideFigure phase={characterPhase} className="z-[4]" rigDebug={rigDebug} />
-        </>
-      ) : null}
+      {/* ── HEADER SAFE AREA ── titles only; characters must not enter */}
+      <div
+        className="relative z-20 flex w-full shrink-0 flex-col items-center justify-end px-6 pb-1 pt-[max(0.35rem,env(safe-area-inset-top))] text-center"
+        style={{ flexBasis: "var(--kiss-header-safe)", minHeight: "var(--kiss-header-safe)" }}
+        data-kiss-safe="header"
+      >
+        {showIdleHeader ? (
+          <>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#c45a78]/80">
+              TableWedding
+            </p>
+            <h2 className="kiss-cam-love-title mt-1 text-[clamp(2.1rem,6.2vw,4.75rem)] leading-none">
+              <span className="kiss-cam-love-title-accent mr-1 text-[0.72em]" aria-hidden>
+                ♥
+              </span>
+              Kiss Cam
+              <span className="kiss-cam-love-title-accent ml-1 text-[0.72em]" aria-hidden>
+                ♥
+              </span>
+            </h2>
+            <p className="font-heading mt-1.5 text-lg italic tracking-wide text-[#5a2f38]/75 sm:text-xl md:text-2xl">
+              {coupleNames}
+            </p>
+          </>
+        ) : null}
+      </div>
 
-      <KissCamHearts active={!loading && (celebrate || showBigLove)} />
-      <KissCamConfetti active={!loading && (celebrate || showBigLove)} />
-      <KissCamLoveBurst active={!loading && showBigLove} burstId={autoLoveId} size="stage" word="LOVE" />
+      {/* ── CHARACTER SAFE AREA ── full-body couple; animation stays here */}
+      <div
+        className="relative z-[3] min-h-0 w-full flex-1 overflow-hidden"
+        data-kiss-safe="characters"
+      >
+        {showCharacters ? (
+          <>
+            <GroomFigure phase={characterPhase} className="z-[3]" rigDebug={rigDebug} />
+            <BrideFigure phase={characterPhase} className="z-[4]" rigDebug={rigDebug} />
+          </>
+        ) : null}
 
-      <KissCamLoadingOverlay active={loading} size="stage" />
+        <KissCamHearts active={!loading && (celebrate || showBigLove)} />
+        <KissCamConfetti active={!loading && (celebrate || showBigLove)} />
+        <KissCamLoveBurst
+          active={!loading && showBigLove}
+          burstId={autoLoveId}
+          size="stage"
+          word="LOVE"
+        />
 
-      {overlayCountdown != null ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <div key={countdownKey} className="kiss-cam-countdown-wrap relative flex items-center justify-center">
-            <span className="kiss-cam-countdown-ring" aria-hidden />
-            <span className="kiss-cam-countdown font-heading text-[min(30vw,240px)] font-semibold leading-none text-[#5a2f38]/92 drop-shadow-[0_10px_36px_rgba(90,40,50,.28)]">
-              {overlayCountdown}
-            </span>
+        {overlayCountdown != null ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+            <div
+              key={countdownKey}
+              className="kiss-cam-countdown-wrap relative flex items-center justify-center"
+            >
+              <span className="kiss-cam-countdown-ring" aria-hidden />
+              <span className="kiss-cam-countdown font-heading text-[min(28vw,200px)] font-semibold leading-none text-[#5a2f38]/92 drop-shadow-[0_10px_36px_rgba(90,40,50,.28)]">
+                {overlayCountdown}
+              </span>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {!loading && phase === "kiss" ? (
-        <>
-          <div className="pointer-events-none absolute inset-0 z-10 kiss-cam-kiss-glow" aria-hidden />
-          <KissCamKissEmoji />
-        </>
-      ) : null}
+        {!loading && phase === "kiss" ? (
+          <>
+            <div className="pointer-events-none absolute inset-0 z-10 kiss-cam-kiss-glow" aria-hidden />
+            <KissCamKissEmoji />
+          </>
+        ) : null}
 
-      {!loading && finalFrame ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[6%] z-30 flex flex-col items-center px-6 text-center">
-          <p className="font-heading text-[clamp(1.75rem,4.5vw,3.75rem)] font-semibold tracking-wide text-[#3a2430]">
-            {coupleNames}
-          </p>
-          <p className="mt-2 text-[clamp(0.75rem,1.6vw,1.15rem)] font-semibold uppercase tracking-[0.35em] text-[#8b3a55]/80">
+        <KissCamLoadingOverlay active={loading} size="stage" />
+      </div>
+
+      {/* ── BOTTOM SAFE AREA ── couple / event text; characters must not enter */}
+      <div
+        className="relative z-20 flex w-full shrink-0 flex-col items-center justify-start px-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 text-center"
+        style={{ flexBasis: "var(--kiss-bottom-safe)", minHeight: "var(--kiss-bottom-safe)" }}
+        data-kiss-safe="bottom"
+      >
+        {!loading && finalFrame ? (
+          <>
+            <p className="font-heading text-[clamp(1.5rem,4vw,3.25rem)] font-semibold tracking-wide text-[#3a2430]">
+              {coupleNames}
+            </p>
+            <p className="mt-1.5 text-[clamp(0.7rem,1.5vw,1.05rem)] font-semibold uppercase tracking-[0.35em] text-[#8b3a55]/80">
+              {tagline}
+            </p>
+          </>
+        ) : showIdleHeader ? (
+          <p className="text-[clamp(0.65rem,1.4vw,0.95rem)] font-semibold uppercase tracking-[0.32em] text-[#8b3a55]/70">
             {tagline}
           </p>
-        </div>
-      ) : !loading && phase === "idle" && !remoteStream ? (
-        <div className="pointer-events-none absolute inset-x-0 top-[7%] z-10 flex flex-col items-center px-6 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#c45a78]/80">
-            TableWedding
-          </p>
-          <h2 className="kiss-cam-love-title mt-1 text-[clamp(2.75rem,7vw,5.5rem)]">
-            <span className="kiss-cam-love-title-accent mr-1 text-[0.72em]" aria-hidden>
-              ♥
-            </span>
-            Kiss Cam
-            <span className="kiss-cam-love-title-accent ml-1 text-[0.72em]" aria-hidden>
-              ♥
-            </span>
-          </h2>
-          <p className="font-heading mt-2 text-xl italic tracking-wide text-[#5a2f38]/75 sm:text-2xl">
-            {coupleNames}
-          </p>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

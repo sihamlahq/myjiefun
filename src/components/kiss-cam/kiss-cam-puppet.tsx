@@ -446,7 +446,7 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
   return (
     <div
-      className={cn("kiss-cam-figure pointer-events-none absolute bottom-[2%] origin-bottom", className)}
+      className={cn("kiss-cam-figure pointer-events-none absolute bottom-0 origin-bottom", className)}
       style={{
         left: `calc(50% + ${resolved.xPct}%)`,
         // Scale around the feet so baseScale equalizes height without lifting the baseline.
@@ -522,7 +522,7 @@ export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps)
 
   return (
     <div
-      className={cn("kiss-cam-figure pointer-events-none absolute bottom-[2%] origin-bottom", className)}
+      className={cn("kiss-cam-figure pointer-events-none absolute bottom-0 origin-bottom", className)}
       style={{
         left: `calc(50% + ${resolved.xPct}%)`,
         transformOrigin: `50% ${resolved.footOriginPct}%`,

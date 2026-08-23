@@ -13,6 +13,10 @@
  */
 
 import type { CharacterPose } from "@/components/kiss-cam/kiss-cam-pose";
+import {
+  FIGURE_HEIGHT_CLASS as LAYOUT_FIGURE_HEIGHT_CLASS,
+  GROOM_BASE_SCALE,
+} from "@/components/kiss-cam/kiss-cam-layout";
 
 export const STAGE_W = 720;
 export const STAGE_H = 1380;
@@ -125,25 +129,27 @@ const BRIDE_VISIBLE_H = BRIDE_VISIBLE.bottom - BRIDE_VISIBLE.top + 1; // 776
  *
  * Base scales equalize on-screen visual height:
  *   baseScale × visibleHeight ≈ same for both characters.
+ *
+ * Safe-area geometry (header / character / bottom) lives in kiss-cam-layout.ts.
+ * Do not put characters into text bands by raising FIGURE_HEIGHT_CLASS back to vh.
  */
 export const CHARACTER_BASE = {
   groom: {
-    /** Reference height — matches existing stage fit */
-    scale: 1,
+    /** Reference height — fits character safe area with animation headroom */
+    scale: GROOM_BASE_SCALE,
     x: -24,
     y: 0,
   },
   bride: {
     /** Scale up so bride visibleH matches groom visibleH */
-    scale: GROOM_VISIBLE_H / BRIDE_VISIBLE_H,
+    scale: (GROOM_VISIBLE_H / BRIDE_VISIBLE_H) * GROOM_BASE_SCALE,
     x: 24,
     y: 0,
   },
 } as const;
 
-/** Shared CSS figure box — both characters use the same container height. */
-export const FIGURE_HEIGHT_CLASS = "h-[min(58vh,540px)]";
-
+/** Shared CSS figure box — height is 100% of the character safe area. */
+export const FIGURE_HEIGHT_CLASS = LAYOUT_FIGURE_HEIGHT_CLASS;
 export function pct(value: number, axis: "x" | "y"): number {
   return axis === "x" ? (value / STAGE_W) * 100 : (value / STAGE_H) * 100;
 }
