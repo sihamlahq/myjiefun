@@ -206,16 +206,25 @@ export function KissCamDisplay({
 
       {/* ── CHARACTER SAFE AREA ── full-body couple; animation stays here.
           Must NOT use overflow-hidden: footAlign translateY would clip the
-          figures to invisibility. Sized `inset-0` stage gives h-full a real
-          height (h-full on a height-less absolute parent collapses to 0). */}
+          figures to invisibility. flex-1 + min-h-0 yields a real band height;
+          the inset-0 stage is the definite containing block for h-full figures
+          and provides container-type:size for groom cqw/cqh arm chains. */}
       <div
         className="relative z-[3] min-h-0 w-full flex-1"
         data-kiss-safe="characters"
+        style={{ position: "relative", width: "100%", minHeight: 0 }}
       >
         <div
-          className="absolute inset-0 overflow-visible"
+          className="absolute inset-0 h-full w-full overflow-visible"
           data-kiss-character-stage="1"
-          style={{ containerType: "size" }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            minHeight: 0,
+            containerType: "size",
+          }}
         >
           {showCharacters ? (
             <>

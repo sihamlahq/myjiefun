@@ -452,6 +452,8 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
         className,
       )}
       style={{
+        height: "100%",
+        width: "auto",
         left: `calc(50% + ${resolved.xPct}%)`,
         // Scale around the feet so baseScale equalizes height without lifting the baseline.
         transformOrigin: `50% ${resolved.footOriginPct}%`,
@@ -533,6 +535,8 @@ export function BrideFigure({ phase, className, rigDebug = false }: PuppetProps)
         className,
       )}
       style={{
+        height: "100%",
+        width: "auto",
         left: `calc(50% + ${resolved.xPct}%)`,
         transformOrigin: `50% ${resolved.footOriginPct}%`,
         transform: `translateX(-50%) translateY(calc(${resolved.yPct}% + ${resolved.footAlignPct}%)) scale(${resolved.scale})`,
