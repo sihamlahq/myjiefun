@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { SetupCard } from "@/components/page-chrome";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { createClient } from "@/lib/supabase/server";
+import { resolveDataClient } from "@/lib/supabase/data-client";
 import type { AppRole, WeddingSettings } from "@/types/wedding";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +30,11 @@ export default async function AppLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const dataClient = await resolveDataClient(supabase);
+
   const [{ data: profile }, { data: weddingRow }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-    supabase.from("app_settings").select("value").eq("key", "wedding").maybeSingle(),
+    dataClient.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+    dataClient.from("app_settings").select("value").eq("key", "wedding").maybeSingle(),
   ]);
 
   const role = (profile?.role as AppRole) || "viewer";

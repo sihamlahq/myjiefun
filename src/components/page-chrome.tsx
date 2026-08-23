@@ -1,5 +1,12 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { isJwtClockSkewError } from "@/lib/supabase/errors";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
@@ -34,23 +41,64 @@ export function PageHeader({
 }
 
 export function SetupCard({ message }: { message?: string | null }) {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+  const clockSkew = isJwtClockSkewError(message);
+
+  async function signOutAndRetry() {
+    setSigningOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Still send the user to login so cookies can be cleared on next auth.
+    }
+    router.push("/login");
+    router.refresh();
+  }
+
   return (
     <Card className="border-[var(--accent)]/35 bg-white/85">
       <CardHeader>
-        <CardTitle>Connect Supabase to begin</CardTitle>
+        <CardTitle>{clockSkew ? "Session clock mismatch" : "Connect Supabase to begin"}</CardTitle>
         <CardDescription>
-          Add the wedding app environment variables, apply the Supabase migration, then refresh.
+          {clockSkew
+            ? "Supabase Auth accepted your login, but the database rejected the access token as “issued in the future.” This is almost always clock skew — not missing env vars."
+            : "Add the wedding app environment variables, apply the Supabase migration, then refresh."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-[var(--foreground)]/70">
         {message ? (
-          <p className="rounded-xl bg-[var(--muted)] px-3 py-2 font-mono text-xs">{message}</p>
+          <p className="rounded-xl bg-[var(--muted)] px-3 py-2 font-mono text-xs whitespace-pre-wrap">
+            {message}
+          </p>
         ) : null}
-        <ul className="list-disc space-y-1 pl-5">
-          <li>NEXT_PUBLIC_SUPABASE_URL</li>
-          <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
-          <li>SUPABASE_SERVICE_ROLE_KEY for optional seeding</li>
-        </ul>
+        {clockSkew ? (
+          <>
+            <ol className="list-decimal space-y-1 pl-5">
+              <li>Turn on automatic date &amp; time (and the correct time zone) on this device.</li>
+              <li>Sign out, then sign in again so Auth mints a fresh token against a synced clock.</li>
+              <li>
+                If you run local Supabase/Docker, restart Docker Desktop / sync the VM clock, then
+                retry.
+              </li>
+              <li>
+                Ensure <code className="text-xs">SUPABASE_SERVICE_ROLE_KEY</code> is set on the
+                host — the app can keep serving staff data while a brief Auth ↔ database skew
+                clears.
+              </li>
+            </ol>
+            <Button type="button" onClick={signOutAndRetry} disabled={signingOut}>
+              {signingOut ? "Signing out…" : "Sign out and try again"}
+            </Button>
+          </>
+        ) : (
+          <ul className="list-disc space-y-1 pl-5">
+            <li>NEXT_PUBLIC_SUPABASE_URL</li>
+            <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
+            <li>SUPABASE_SERVICE_ROLE_KEY for optional seeding</li>
+          </ul>
+        )}
       </CardContent>
     </Card>
   );

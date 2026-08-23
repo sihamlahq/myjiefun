@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { createDataClient } from "@/lib/supabase/data-client";
+import { isJwtClockSkewError, JWT_CLOCK_SKEW_HELP } from "@/lib/supabase/errors";
 import type {
   AttendanceSettings,
   CheckInEvent,
@@ -113,10 +114,16 @@ type SettingsRow = {
   value: unknown;
 };
 
+function friendlySetupError(message: string | null | undefined): string | null {
+  if (!message) return null;
+  if (isJwtClockSkewError(message)) return JWT_CLOCK_SKEW_HELP;
+  return message;
+}
+
 export async function loadWeddingData(): Promise<WeddingData> {
-  let supabase: Awaited<ReturnType<typeof createClient>>;
+  let supabase: Awaited<ReturnType<typeof createDataClient>>;
   try {
-    supabase = await createClient();
+    supabase = await createDataClient();
   } catch (error) {
     return {
       ...emptyWeddingData,
@@ -151,14 +158,15 @@ export async function loadWeddingData(): Promise<WeddingData> {
       supabase.from("app_settings").select("key, value"),
     ]);
 
-    const setupError =
+    const setupError = friendlySetupError(
       guests.error?.message ||
-      tables.error?.message ||
-      seats.error?.message ||
-      groups.error?.message ||
-      checkInEvents.error?.message ||
-      settings.error?.message ||
-      null;
+        tables.error?.message ||
+        seats.error?.message ||
+        groups.error?.message ||
+        checkInEvents.error?.message ||
+        settings.error?.message ||
+        null,
+    );
 
     return {
       guests: (guests.data ?? []) as GuestWithRelations[],
@@ -183,9 +191,9 @@ export async function loadGuestsAndTables(): Promise<{
   tables: ReceptionTable[];
   setupError: string | null;
 }> {
-  let supabase: Awaited<ReturnType<typeof createClient>>;
+  let supabase: Awaited<ReturnType<typeof createDataClient>>;
   try {
-    supabase = await createClient();
+    supabase = await createDataClient();
   } catch (error) {
     return {
       guests: [],
@@ -210,7 +218,7 @@ export async function loadGuestsAndTables(): Promise<{
     return {
       guests: (guests.data ?? []) as GuestWithRelations[],
       tables: (tables.data ?? []) as ReceptionTable[],
-      setupError: guests.error?.message || tables.error?.message || null,
+      setupError: friendlySetupError(guests.error?.message || tables.error?.message || null),
     };
   } catch (error) {
     return {
@@ -230,9 +238,9 @@ export async function loadGuestsPageData(): Promise<{
   dietaryCategories: string[];
   setupError: string | null;
 }> {
-  let supabase: Awaited<ReturnType<typeof createClient>>;
+  let supabase: Awaited<ReturnType<typeof createDataClient>>;
   try {
-    supabase = await createClient();
+    supabase = await createDataClient();
   } catch (error) {
     return {
       guests: [],
@@ -275,11 +283,12 @@ export async function loadGuestsPageData(): Promise<{
       dietaryCategories: guestSettings.dietaryCategories?.length
         ? guestSettings.dietaryCategories
         : defaultGuestSettings.dietaryCategories,
-      setupError:
+      setupError: friendlySetupError(
         guests.error?.message ||
-        tables.error?.message ||
-        guestSettingsRow.error?.message ||
-        null,
+          tables.error?.message ||
+          guestSettingsRow.error?.message ||
+          null,
+      ),
     };
   } catch (error) {
     return {
@@ -300,9 +309,9 @@ export async function loadRedPacketData(): Promise<{
   passcode: string;
   setupError: string | null;
 }> {
-  let supabase: Awaited<ReturnType<typeof createClient>>;
+  let supabase: Awaited<ReturnType<typeof createDataClient>>;
   try {
-    supabase = await createClient();
+    supabase = await createDataClient();
   } catch (error) {
     return {
       guests: [],
@@ -336,7 +345,9 @@ export async function loadRedPacketData(): Promise<{
       guests: (guests.data ?? []) as GuestWithRelations[],
       tables: (tables.data ?? []) as ReceptionTable[],
       passcode: /^\d{4}$/.test(passcode) ? passcode : "0000",
-      setupError: guests.error?.message || tables.error?.message || settings.error?.message || null,
+      setupError: friendlySetupError(
+        guests.error?.message || tables.error?.message || settings.error?.message || null,
+      ),
     };
   } catch (error) {
     return {
@@ -367,9 +378,9 @@ export async function loadAuditLogs(limit = 150): Promise<{
   logs: import("@/types/wedding").AuditLog[];
   setupError: string | null;
 }> {
-  let supabase: Awaited<ReturnType<typeof createClient>>;
+  let supabase: Awaited<ReturnType<typeof createDataClient>>;
   try {
-    supabase = await createClient();
+    supabase = await createDataClient();
   } catch (error) {
     return {
       logs: [],
@@ -386,7 +397,7 @@ export async function loadAuditLogs(limit = 150): Promise<{
 
     return {
       logs: (data ?? []) as import("@/types/wedding").AuditLog[],
-      setupError: error?.message || null,
+      setupError: friendlySetupError(error?.message || null),
     };
   } catch (error) {
     return {
