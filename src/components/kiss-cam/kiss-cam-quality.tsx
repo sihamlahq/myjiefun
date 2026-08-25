@@ -43,7 +43,27 @@ export function KissCamSignalBars({
 
 function qualityLabel(quality: ConnectionQuality | null) {
   if (!quality || quality.label === "unknown") return "No signal";
-  return quality.label;
+  const base =
+    quality.label === "excellent"
+      ? "Excellent"
+      : quality.label === "good"
+        ? "Good"
+        : quality.label === "fair"
+          ? "Fair"
+          : "Weak";
+  // Prefer measured receive/send resolution when present.
+  if (quality.frameHeight != null && quality.frameHeight > 0) {
+    const fps =
+      quality.framesPerSecond != null && quality.framesPerSecond > 0
+        ? Math.round(quality.framesPerSecond)
+        : null;
+    return fps != null ? `${base} · ${quality.frameHeight}p${fps}` : `${base} · ${quality.frameHeight}p`;
+  }
+  if (quality.profile === "ultra") return `${base} · 1080p30`;
+  if (quality.profile === "high") return `${base} · 720p30`;
+  if (quality.profile === "medium") return `${base} · 540p24`;
+  if (quality.profile === "low") return `${base} · 360p20`;
+  return base;
 }
 
 export function CameraStatusDot({

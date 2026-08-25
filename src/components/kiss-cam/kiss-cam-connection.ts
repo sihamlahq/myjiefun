@@ -4,6 +4,14 @@ import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { fetchIceServers } from "@/components/kiss-cam/kiss-cam-ice";
 import { signalingChannelName } from "@/components/kiss-cam/kiss-cam-session";
 import type { ConnectionQuality } from "@/components/kiss-cam/kiss-cam-types";
+import {
+  AdaptiveVideoQualityController,
+  VIDEO_ENCODING_PROFILES,
+  classifyNetworkBand,
+  scoreFromNetwork,
+  type NetworkSample,
+  type VideoQualityProfile,
+} from "@/components/kiss-cam/kiss-cam-video-quality";
 
 export type KissCamControlAction =
   | "start"
@@ -49,6 +57,18 @@ export class KissCamConnection {
   private lastPeerBeat = 0;
   private localStream: MediaStream | null = null;
   private disposed = false;
+  /** Adaptive encode profile — camera role only; changes via setParameters. */
+  private qualityController = new AdaptiveVideoQualityController({
+    initialProfile: "high",
+    downgradeHoldSamples: 3,
+    upgradeHoldSamples: 6,
+  });
+  private contentHintApplied = false;
+  private prevOutboundBytes: { bytes: number; ts: number } | null = null;
+  private prevInboundBytes: { bytes: number; ts: number } | null = null;
+  private prevPacketsLost = 0;
+  private prevPacketsSent = 0;
+  private prevPacketsReceived = 0;
 
   constructor(
     private supabase: SupabaseClient,
@@ -155,24 +175,23 @@ export class KissCamConnection {
 
   async attachLocalStream(stream: MediaStream) {
     this.localStream = stream;
+    this.contentHintApplied = false;
     if (!this.pc) return;
     for (const track of stream.getTracks()) {
       if (track.kind === "video") {
-        try {
-          // Motion keeps LED playback smoother on venue Wi‑Fi.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (track as any).contentHint = "motion";
-        } catch {
-          // ignore unsupported
-        }
+        this.applyContentHintOnce(track);
       }
       const existing = this.pc.getSenders().find((s) => s.track?.kind === track.kind);
       if (existing) {
         await existing.replaceTrack(track);
-        if (track.kind === "video") await this.tuneVideoSender(existing);
+        if (track.kind === "video") {
+          await this.applyVideoProfile(existing, this.qualityController.current);
+        }
       } else {
         const sender = this.pc.addTrack(track, stream);
-        if (track.kind === "video") await this.tuneVideoSender(sender);
+        if (track.kind === "video") {
+          await this.applyVideoProfile(sender, this.qualityController.current);
+        }
       }
     }
     if (this.role === "camera") {
@@ -188,15 +207,12 @@ export class KissCamConnection {
   async replaceVideoTrack(track: MediaStreamTrack | null, opts?: { renegotiate?: boolean }) {
     if (!this.pc) return;
     if (track) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (track as any).contentHint = "motion";
-      } catch {
-        // ignore
-      }
+      this.contentHintApplied = false;
+      this.applyContentHintOnce(track);
       this.localStream = new MediaStream([track]);
     } else {
       this.localStream = null;
+      this.contentHintApplied = false;
     }
 
     const videoSender =
@@ -212,7 +228,7 @@ export class KissCamConnection {
     if (videoSender) {
       await videoSender.replaceTrack(track);
       if (track) {
-        await this.tuneVideoSender(videoSender);
+        await this.applyVideoProfile(videoSender, this.qualityController.current);
         const shouldRenegotiate =
           this.role === "camera" && (opts?.renegotiate === true || needIceRestart);
         if (shouldRenegotiate) {
@@ -224,52 +240,49 @@ export class KissCamConnection {
 
     if (track) {
       const newSender = this.pc.addTrack(track, this.localStream ?? new MediaStream([track]));
-      await this.tuneVideoSender(newSender);
+      await this.applyVideoProfile(newSender, this.qualityController.current);
       if (this.role === "camera") await this.createAndSendOffer(needIceRestart);
     }
   }
 
-  /** Match flagship capture: 1080p60 when available, else 1080p30 — keep it smooth. */
-  private async tuneVideoSender(sender: RTCRtpSender) {
+  /** Apply contentHint once per track identity — not every stats tick. */
+  private applyContentHintOnce(track: MediaStreamTrack) {
+    if (this.contentHintApplied && track === this.localStream?.getVideoTracks()[0]) return;
+    try {
+      // Motion keeps LED playback smoother on venue Wi‑Fi.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (track as any).contentHint = "motion";
+      this.contentHintApplied = true;
+    } catch {
+      // ignore unsupported
+    }
+  }
+
+  /**
+   * Adaptive encode profile via setParameters only — never reconnects / renegotiates
+   * solely for quality changes.
+   */
+  private async applyVideoProfile(sender: RTCRtpSender, profileId: VideoQualityProfile) {
     try {
       await this.preferEfficientCodecs(sender);
 
+      const profile = VIDEO_ENCODING_PROFILES[profileId];
       const params = sender.getParameters();
       if (!params.encodings || params.encodings.length === 0) {
         params.encodings = [{}];
       }
-      const settings = sender.track?.getSettings?.() ?? {};
-      const w = typeof settings.width === "number" ? settings.width : 1920;
-      const h = typeof settings.height === "number" ? settings.height : 1080;
-      const fps =
-        typeof settings.frameRate === "number" && settings.frameRate > 0
-          ? settings.frameRate
-          : 30;
-      const smoothFps = fps >= 45 ? 60 : 30;
-      const pixels = w * h;
-      // Bitrate ceilings sized for modern phone HW encode (iPhone 11+ / S23 Ultra+).
-      const maxBitrate =
-        pixels >= 1920 * 1080
-          ? smoothFps >= 60
-            ? 10_000_000
-            : 7_500_000
-          : pixels >= 1280 * 720
-            ? smoothFps >= 60
-              ? 6_500_000
-              : 5_000_000
-            : 3_500_000;
 
       for (const encoding of params.encodings) {
-        encoding.maxBitrate = maxBitrate;
-        encoding.maxFramerate = smoothFps;
-        encoding.scaleResolutionDownBy = 1;
+        encoding.maxBitrate = profile.maxBitrate;
+        encoding.maxFramerate = profile.maxFramerate;
+        encoding.scaleResolutionDownBy = profile.scaleResolutionDownBy;
         Object.assign(encoding, { priority: "high", networkPriority: "high" });
       }
-      // Prefer smooth motion over locking resolution when bandwidth dips.
+      // Prefer smooth motion when bandwidth dips — resolution steps via scaleResolutionDownBy.
       Object.assign(params, { degradationPreference: "maintain-framerate" });
       await sender.setParameters(params);
     } catch (error) {
-      console.warn("[kiss-cam] could not set HD sender params", error);
+      console.warn("[kiss-cam] could not set adaptive sender params", error);
     }
   }
 
@@ -419,9 +432,10 @@ export class KissCamConnection {
 
   private startStats() {
     this.stopStats();
+    // ~1s polls — enough for adaptation, cheap for phones.
     this.statsTimer = setInterval(() => {
       void this.sampleQuality();
-    }, 2000);
+    }, 1000);
   }
 
   private stopStats() {
@@ -435,68 +449,212 @@ export class KissCamConnection {
     if (!this.pc) return;
     try {
       const stats = await this.pc.getStats();
-      let bitrateKbps: number | null = null;
-      let packetLoss: number | null = null;
-      let packetsLost = 0;
-      let packetsReceived = 0;
+      const sample = this.parseNetworkSample(stats);
+      const band = classifyNetworkBand(sample);
 
-      stats.forEach((report) => {
-        if (report.type === "inbound-rtp" && report.kind === "video") {
-          if (typeof report.bytesReceived === "number" && typeof report.timestamp === "number") {
-            const key = "_prev";
-            const prev = (this as unknown as { [k: string]: { bytes: number; ts: number } })[key];
-            if (prev) {
-              const dt = (report.timestamp - prev.ts) / 1000;
-              if (dt > 0) {
-                bitrateKbps = Math.round(((report.bytesReceived - prev.bytes) * 8) / dt / 1000);
-              }
-            }
-            (this as unknown as { [k: string]: { bytes: number; ts: number } })[key] = {
-              bytes: report.bytesReceived,
-              ts: report.timestamp,
-            };
-          }
-          if (typeof report.packetsLost === "number") packetsLost = report.packetsLost;
-          if (typeof report.packetsReceived === "number") packetsReceived = report.packetsReceived;
+      // Camera: adapt outbound encode profile (setParameters only — no reconnect).
+      if (this.role === "camera") {
+        const changed = this.qualityController.observe(sample);
+        if (changed) {
+          const sender = this.pc.getSenders().find((s) => s.track?.kind === "video");
+          if (sender) await this.applyVideoProfile(sender, changed);
         }
+      }
+
+      const profile =
+        this.role === "camera"
+          ? this.qualityController.current
+          : this.inferReceiveProfile(sample);
+
+      const { score, label } = scoreFromNetwork(band, profile, sample);
+      const bitrateKbps =
+        sample.mediaBitrateBps != null
+          ? Math.round(sample.mediaBitrateBps / 1000)
+          : sample.availableBitrateBps != null
+            ? Math.round(sample.availableBitrateBps / 1000)
+            : null;
+
+      this.handlers.onQuality?.({
+        score,
+        label,
+        bitrateKbps,
+        packetLoss: sample.packetLoss,
+        profile,
+        frameWidth: sample.frameWidth,
+        frameHeight: sample.frameHeight,
+        framesPerSecond: sample.framesPerSecond,
+        rttMs: sample.rttMs,
       });
-
-      if (packetsReceived + packetsLost > 0) {
-        packetLoss = packetsLost / (packetsReceived + packetsLost);
-      }
-
-      let score = 70;
-      if (bitrateKbps != null) {
-        if (bitrateKbps > 5000) score = 98;
-        else if (bitrateKbps > 3200) score = 93;
-        else if (bitrateKbps > 2000) score = 85;
-        else if (bitrateKbps > 1000) score = 70;
-        else if (bitrateKbps > 400) score = 55;
-        else score = 30;
-      }
-      if (packetLoss != null) {
-        if (packetLoss > 0.08) score = Math.min(score, 25);
-        else if (packetLoss > 0.03) score = Math.min(score, 50);
-      }
-
-      const label =
-        score >= 85 ? "excellent" : score >= 70 ? "good" : score >= 45 ? "fair" : "poor";
-
-      this.handlers.onQuality?.({ score, label, bitrateKbps, packetLoss });
     } catch {
       this.handlers.onQuality?.({
         score: 0,
         label: "unknown",
         bitrateKbps: null,
         packetLoss: null,
+        profile: null,
+        frameWidth: null,
+        frameHeight: null,
+        framesPerSecond: null,
+        rttMs: null,
       });
     }
+  }
+
+  private parseNetworkSample(stats: RTCStatsReport): NetworkSample {
+    let rttMs: number | null = null;
+    let availableBitrateBps: number | null = null;
+    let mediaBitrateBps: number | null = null;
+    let packetLoss: number | null = null;
+    let qualityLimitationReason: string | null = null;
+    let frameWidth: number | null = null;
+    let frameHeight: number | null = null;
+    let framesPerSecond: number | null = null;
+
+    stats.forEach((report) => {
+      if (report.type === "candidate-pair" && (report as { state?: string }).state === "succeeded") {
+        const pair = report as {
+          currentRoundTripTime?: number;
+          availableOutgoingBitrate?: number;
+          nominated?: boolean;
+        };
+        if (pair.nominated !== false) {
+          if (typeof pair.currentRoundTripTime === "number") {
+            rttMs = Math.round(pair.currentRoundTripTime * 1000);
+          }
+          if (typeof pair.availableOutgoingBitrate === "number") {
+            availableBitrateBps = pair.availableOutgoingBitrate;
+          }
+        }
+      }
+
+      if (report.type === "outbound-rtp" && (report as { kind?: string }).kind === "video") {
+        const out = report as {
+          bytesSent?: number;
+          timestamp?: number;
+          packetsSent?: number;
+          frameWidth?: number;
+          frameHeight?: number;
+          framesPerSecond?: number;
+          qualityLimitationReason?: string;
+        };
+        if (typeof out.bytesSent === "number" && typeof out.timestamp === "number") {
+          const prev = this.prevOutboundBytes;
+          if (prev) {
+            const dt = (out.timestamp - prev.ts) / 1000;
+            if (dt > 0) {
+              mediaBitrateBps = ((out.bytesSent - prev.bytes) * 8) / dt;
+            }
+          }
+          this.prevOutboundBytes = { bytes: out.bytesSent, ts: out.timestamp };
+        }
+        if (typeof out.packetsSent === "number") {
+          this.prevPacketsSent = out.packetsSent;
+        }
+        if (typeof out.frameWidth === "number") frameWidth = out.frameWidth;
+        if (typeof out.frameHeight === "number") frameHeight = out.frameHeight;
+        if (typeof out.framesPerSecond === "number") framesPerSecond = out.framesPerSecond;
+        if (typeof out.qualityLimitationReason === "string") {
+          qualityLimitationReason = out.qualityLimitationReason;
+        }
+      }
+
+      // Camera-side loss is reported on remote-inbound-rtp (RTCP feedback).
+      if (report.type === "remote-inbound-rtp" && (report as { kind?: string }).kind === "video") {
+        const remote = report as {
+          packetsLost?: number;
+          roundTripTime?: number;
+          fractionLost?: number;
+        };
+        if (typeof remote.fractionLost === "number") {
+          packetLoss = remote.fractionLost;
+        } else if (typeof remote.packetsLost === "number" && this.prevPacketsSent > 0) {
+          const lostDelta = remote.packetsLost - this.prevPacketsLost;
+          // Approximate loss rate over the interval using cumulative counters.
+          if (lostDelta >= 0) {
+            packetLoss = Math.min(1, lostDelta / Math.max(1, this.prevPacketsSent));
+          }
+          this.prevPacketsLost = remote.packetsLost;
+        }
+        if (rttMs == null && typeof remote.roundTripTime === "number") {
+          rttMs = Math.round(remote.roundTripTime * 1000);
+        }
+      }
+
+      if (report.type === "inbound-rtp" && (report as { kind?: string }).kind === "video") {
+        const inn = report as {
+          bytesReceived?: number;
+          timestamp?: number;
+          packetsLost?: number;
+          packetsReceived?: number;
+          frameWidth?: number;
+          frameHeight?: number;
+          framesPerSecond?: number;
+          jitter?: number;
+        };
+        if (typeof inn.bytesReceived === "number" && typeof inn.timestamp === "number") {
+          const prev = this.prevInboundBytes;
+          if (prev) {
+            const dt = (inn.timestamp - prev.ts) / 1000;
+            if (dt > 0) {
+              // Prefer outbound bitrate when camera; inbound fills display role.
+              if (this.role === "display" || mediaBitrateBps == null) {
+                mediaBitrateBps = ((inn.bytesReceived - prev.bytes) * 8) / dt;
+              }
+            }
+          }
+          this.prevInboundBytes = { bytes: inn.bytesReceived, ts: inn.timestamp };
+        }
+        if (
+          typeof inn.packetsReceived === "number" &&
+          typeof inn.packetsLost === "number" &&
+          this.role === "display"
+        ) {
+          const recvDelta = inn.packetsReceived - this.prevPacketsReceived;
+          const lostDelta = inn.packetsLost - this.prevPacketsLost;
+          if (recvDelta + lostDelta > 0) {
+            packetLoss = Math.max(0, lostDelta) / (recvDelta + Math.max(0, lostDelta));
+          }
+          this.prevPacketsReceived = inn.packetsReceived;
+          this.prevPacketsLost = inn.packetsLost;
+        }
+        if (typeof inn.frameWidth === "number") frameWidth = inn.frameWidth;
+        if (typeof inn.frameHeight === "number") frameHeight = inn.frameHeight;
+        if (typeof inn.framesPerSecond === "number") framesPerSecond = inn.framesPerSecond;
+      }
+    });
+
+    return {
+      rttMs,
+      packetLoss,
+      availableBitrateBps,
+      mediaBitrateBps,
+      qualityLimitationReason,
+      frameWidth,
+      frameHeight,
+      framesPerSecond,
+    };
+  }
+
+  /** Map received resolution to a profile class for display-side UI labels. */
+  private inferReceiveProfile(sample: NetworkSample): VideoQualityProfile {
+    const h = sample.frameHeight;
+    if (h != null) {
+      if (h >= 1000) return "ultra";
+      if (h >= 700) return "high";
+      if (h >= 500) return "medium";
+      return "low";
+    }
+    return "high";
   }
 
   async dispose() {
     this.disposed = true;
     this.stopHeartbeat();
     this.stopStats();
+    this.qualityController.reset("high");
+    this.contentHintApplied = false;
+    this.prevOutboundBytes = null;
+    this.prevInboundBytes = null;
     try {
       await this.send({ type: "bye" });
     } catch {

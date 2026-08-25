@@ -159,8 +159,9 @@ function readActiveLensFactor(track: MediaStreamTrack | null, lenses: LensOption
 
 /**
  * Flagship phone profile (iPhone 11+ / Galaxy S23 Ultra class):
- * open quickly with ideal constraints, then upgrade toward 1080p60.
+ * open quickly with ideal 1080p30 constraints, then refine.
  * Avoid long cascades of exact constraints that fail and delay Start Camera.
+ * Prefer 30fps — adaptive WebRTC encode handles weak networks.
  */
 async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStream> {
   let preferredDeviceId = deviceId;
@@ -178,9 +179,9 @@ async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStrea
   }
 
   const softHd: MediaTrackConstraints = {
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
-    frameRate: { ideal: 30 },
+    width: { ideal: 1920, max: 1920 },
+    height: { ideal: 1080, max: 1080 },
+    frameRate: { ideal: 30, max: 30 },
   };
 
   const attempts: MediaStreamConstraints[] = [];
@@ -248,12 +249,12 @@ async function tuneCaptureTrack(stream: MediaStream) {
     // ignore
   }
 
-  // Nudge toward flagship 1080p60 when the device allows it.
+  // Prefer stable 1080p30 capture — WebRTC adapts encode quality to the network.
   const upgrades: MediaTrackConstraints[] = [
     {
       width: { ideal: 1920, max: 1920 },
       height: { ideal: 1080, max: 1080 },
-      frameRate: { ideal: 60, max: 60 },
+      frameRate: { ideal: 30, max: 30 },
     },
     {
       width: { ideal: 1920, max: 1920 },

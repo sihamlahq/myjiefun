@@ -20,6 +20,12 @@ export type ConnectionQuality = {
   label: "excellent" | "good" | "fair" | "poor" | "unknown";
   bitrateKbps: number | null;
   packetLoss: number | null;
+  /** Active adaptive encode profile (camera) or inferred receive class (display). */
+  profile?: "ultra" | "high" | "medium" | "low" | null;
+  frameWidth?: number | null;
+  frameHeight?: number | null;
+  framesPerSecond?: number | null;
+  rttMs?: number | null;
 };
 
 export type KissCamState = {
