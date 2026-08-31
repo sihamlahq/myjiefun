@@ -185,9 +185,7 @@ export function GuestsManager({
   const [guests, setGuests] = useState(() => serverGuests.map((guest) => repairGuestNameFields(guest)));
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const [rsvp, setRsvp] = useState("all");
   const [attendance, setAttendance] = useState("all");
-  const [vip, setVip] = useState("all");
   const [table, setTable] = useState("all");
   const [category, setCategory] = useState("all");
   const [dietary, setDietary] = useState("all");
@@ -208,7 +206,7 @@ export function GuestsManager({
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [deferredQuery, rsvp, attendance, vip, table, category, dietary]);
+  }, [deferredQuery, attendance, table, category, dietary]);
 
   useEffect(() => {
     if (!recordMenuOpen) return;
@@ -273,9 +271,7 @@ export function GuestsManager({
       }
     }
     return searched.filter((guest) => {
-      if (rsvp !== "all" && guest.rsvp_status !== rsvp) return false;
       if (attendance !== "all" && guest.attendance_status !== attendance) return false;
-      if (vip !== "all" && guest.is_vip !== (vip === "yes")) return false;
       if (table === "unassigned" && guest.table_id) return false;
       if (table !== "all" && table !== "unassigned" && guest.table_id !== table) return false;
       if (category === "uncategorized" && guest.category?.trim()) return false;
@@ -292,7 +288,7 @@ export function GuestsManager({
       }
       return true;
     });
-  }, [attendance, category, dietary, fuse, guests, deferredQuery, rsvp, table, vip]);
+  }, [attendance, category, dietary, fuse, guests, deferredQuery, table]);
 
   const visibleGuests = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
@@ -624,7 +620,7 @@ export function GuestsManager({
       ) : null}
 
       <Card>
-        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(6,minmax(120px,auto))]">
+        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(120px,auto))]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
             <Input
@@ -634,18 +630,9 @@ export function GuestsManager({
               className="pl-9"
             />
           </div>
-          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={rsvp} onChange={(event) => setRsvp(event.target.value)}>
-            <option value="all">All RSVP</option>
-            {rsvpOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
           <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={attendance} onChange={(event) => setAttendance(event.target.value)}>
             <option value="all">All attendance</option>
             {attendanceOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={vip} onChange={(event) => setVip(event.target.value)}>
-            <option value="all">VIP all</option>
-            <option value="yes">VIP only</option>
-            <option value="no">Non-VIP</option>
           </select>
           <select className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm" value={table} onChange={(event) => setTable(event.target.value)}>
             <option value="all">All tables</option>
