@@ -56,6 +56,7 @@ function guestMatchesQuery(guest: GuestWithRelations, query: string) {
     guest.phone,
     guest.email,
     guest.category,
+    guest.dietary,
     guest.guest_code,
     guest.reception_tables?.table_number,
   ]
@@ -189,6 +190,7 @@ export function GuestsManager({
   const [vip, setVip] = useState("all");
   const [table, setTable] = useState("all");
   const [category, setCategory] = useState("all");
+  const [dietary, setDietary] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<GuestDraft | null>(null);
   const [customFieldsText, setCustomFieldsText] = useState("{}");
@@ -206,7 +208,7 @@ export function GuestsManager({
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [deferredQuery, rsvp, attendance, vip, table, category]);
+  }, [deferredQuery, rsvp, attendance, vip, table, category, dietary]);
 
   useEffect(() => {
     if (!recordMenuOpen) return;
@@ -236,12 +238,23 @@ export function GuestsManager({
         "phone",
         "email",
         "category",
+        "dietary",
         "reception_tables.table_number",
       ],
       threshold: 0.32,
       ignoreLocation: true,
     });
   }, [deferredQuery, guests]);
+
+  const dietaryOptions = useMemo(() => {
+    const fromSettings = dietaryCategories.map((option) => option.trim()).filter(Boolean);
+    const fromGuests = guests
+      .map((guest) => guest.dietary?.trim())
+      .filter((value): value is string => Boolean(value));
+    return Array.from(new Set([...fromSettings, ...fromGuests])).sort((a, b) =>
+      a.localeCompare(b),
+    );
+  }, [dietaryCategories, guests]);
 
   const filtered = useMemo(() => {
     const query = deferredQuery.trim();
@@ -273,9 +286,13 @@ export function GuestsManager({
       ) {
         return false;
       }
+      if (dietary === "none" && guest.dietary?.trim()) return false;
+      if (dietary !== "all" && dietary !== "none" && guest.dietary !== dietary) {
+        return false;
+      }
       return true;
     });
-  }, [attendance, category, fuse, guests, deferredQuery, rsvp, table, vip]);
+  }, [attendance, category, dietary, fuse, guests, deferredQuery, rsvp, table, vip]);
 
   const visibleGuests = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
@@ -607,7 +624,7 @@ export function GuestsManager({
       ) : null}
 
       <Card>
-        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(120px,auto))]">
+        <CardContent className="grid gap-3 p-4 lg:grid-cols-[minmax(220px,1fr)_repeat(6,minmax(120px,auto))]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black/40" />
             <Input
@@ -643,6 +660,20 @@ export function GuestsManager({
             <option value="all">All categories</option>
             <option value="uncategorized">Uncategorized</option>
             {categories.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <select
+            className="rounded-xl border border-black/10 bg-white/80 px-3 text-sm"
+            value={dietary}
+            onChange={(event) => setDietary(event.target.value)}
+            aria-label="Dietary filter"
+          >
+            <option value="all">All dietary</option>
+            <option value="none">No dietary noted</option>
+            {dietaryOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
