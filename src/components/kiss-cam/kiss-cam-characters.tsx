@@ -46,17 +46,20 @@ export function GroomFigure({ className, ...props }: GroomFigureProps) {
 
         /*
          * The jacket/trouser masters have a tiny transparent-edge mismatch at
-         * the waist. The bridge must live INSIDE the animated body root.
+         * the waist. The bridge must move with every transform applied to the
+         * actual groom artwork.
          *
-         * The previous bridge was on the outer figure, so it did not receive
-         * kiss-cam-body's bodyRot transform. As the groom leaned, the real
-         * torso/trousers rotated but the bridge stayed horizontal, making the
-         * waist visibly pinch/shrink during animation.
+         * The torso and arms live inside .kiss-cam-breathe. The old bridge was
+         * attached to .kiss-cam-body, so the 2px breathing translation could
+         * separate the bridge from the real jacket/waist pixels during motion,
+         * making the upper waist visibly pinch/shrink for part of the cycle.
+         * Attach the bridge to the same animated wrapper so its position is
+         * identical to the torso on every frame.
          *
          * Keep this bridge narrow and use the real torso pixels — never a black
-         * gradient — so it follows the exact same body rotation as the artwork.
+         * gradient — so it only closes the generated-PNG seam.
          */
-        #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"] .kiss-cam-body::after {
+        #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"] .kiss-cam-breathe::after {
           content: "";
           position: absolute;
           inset: 0;
