@@ -17,15 +17,61 @@ jobs:
         with:
           ref: replace-kisscam-couple-art
           fetch-depth: 0
-      - name: Restore complete known-good puppet
+      - name: Patch groom waist seam without replacing puppet
         shell: bash
         run: |
           set -e
-          git checkout 4083c03381f61c98bf454537d465972813d30a0f -- src/components/kiss-cam/kiss-cam-puppet.tsx
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('src/components/kiss-cam/kiss-cam-puppet.tsx')
+          s = p.read_text()
+          start = s.index('export function GroomFigure')
+          end = s.index('export function BrideFigure')
+          groom = s[start:end]
+
+          legs_pattern = r'''(<div className="kiss-cam-legs absolute inset-0 overflow-visible">\s*<LayerImg src=\{`\$\{base\}/shoes\.png`\} />\s*)<LayerImg src=\{`\$\{base\}/legs\.png`\} />'''
+          legs_replacement = r'''\1{/* Hide the trouser waistband behind the jacket hem. */}
+                <LayerImg
+                  src={`${base}/legs.png`}
+                  style={{ clipPath: "inset(53% 0 0 0)" }}
+                />'''
+          groom, n = re.subn(legs_pattern, legs_replacement, groom, count=1)
+          if n != 1:
+              raise SystemExit(f'legs patch expected 1 match, got {n}')
+
+          torso_pattern = r'''(<div className="absolute inset-0 z-\[1\">\s*<LayerImg src=\{`\$\{base\}/torso\.png`\} />)'''
+          torso_replacement = r'''\1
+                {/* Extend the lower jacket over the trouser waistband so the generated-PNG join is hidden. */}
+                <div
+                  className="pointer-events-none absolute inset-0 overflow-visible"
+                  style={{ clipPath: "inset(40% 0 38% 0)" }}
+                  aria-hidden
+                >
+                  <LayerImg
+                    src={`${base}/torso.png`}
+                    style={{
+                      transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
+                      transform: "translateY(1.2%) scaleY(1.015)",
+                    }}
+                  />
+                </div>'''
+          groom, n = re.subn(torso_pattern, torso_replacement, groom, count=1)
+          if n != 1:
+              raise SystemExit(f'torso patch expected 1 match, got {n}')
+
+          s = s[:start] + groom + s[end:]
+          p.write_text(s)
+          PY
+
+          grep -q 'clipPath: "inset(53% 0 0 0)"' src/components/kiss-cam/kiss-cam-puppet.tsx
+          grep -q 'translateY(1.2%) scaleY(1.015)' src/components/kiss-cam/kiss-cam-puppet.tsx
           test "$(grep -c 'function BrideFigure' src/components/kiss-cam/kiss-cam-puppet.tsx)" -ge 1
           test "$(wc -l < src/components/kiss-cam/kiss-cam-puppet.tsx)" -gt 500
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/components/kiss-cam/kiss-cam-puppet.tsx
-          git diff --cached --quiet || git commit -m 'Restore complete KissCam puppet implementation'
+          git diff --cached --quiet || git commit -m 'Fix groom jacket trouser seam'
           git push origin HEAD:replace-kisscam-couple-art
