@@ -481,7 +481,11 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
             <div className={breatheClass}>
               <div className="kiss-cam-legs absolute inset-0 overflow-visible">
                 <LayerImg src={`${base}/shoes.png`} />
-                <LayerImg src={`${base}/legs.png`} />
+                {/* Hide the trouser waistband behind the jacket hem. */}
+      <LayerImg
+        src={`${base}/legs.png`}
+        style={{ clipPath: "inset(53% 0 0 0)" }}
+      />
               </div>
 
               {/* Arms under torso so jacket shoulders cover sleeve roots. */}
@@ -490,6 +494,20 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
+      {/* Extend the lower jacket over the trouser waistband so the generated-PNG join is hidden. */}
+      <div
+        className="pointer-events-none absolute inset-0 overflow-visible"
+        style={{ clipPath: "inset(40% 0 38% 0)" }}
+        aria-hidden
+      >
+        <LayerImg
+          src={`${base}/torso.png`}
+          style={{
+            transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
+            transform: "translateY(1.2%) scaleY(1.015)",
+          }}
+        />
+      </div>
               </div>
             </div>
 
