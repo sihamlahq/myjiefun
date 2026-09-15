@@ -17,13 +17,12 @@ jobs:
         with:
           ref: replace-kisscam-couple-art
           fetch-depth: 0
-      - name: Patch groom waist seam without replacing puppet
+      - name: Patch groom waist seam deterministically
         shell: bash
         run: |
           set -e
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           p = Path('src/components/kiss-cam/kiss-cam-puppet.tsx')
           s = p.read_text()
@@ -31,18 +30,25 @@ jobs:
           end = s.index('export function BrideFigure')
           groom = s[start:end]
 
-          legs_pattern = r'''(<div className="kiss-cam-legs absolute inset-0 overflow-visible">\s*<LayerImg src=\{`\$\{base\}/shoes\.png`\} />\s*)<LayerImg src=\{`\$\{base\}/legs\.png`\} />'''
-          legs_replacement = r'''\1{/* Hide the trouser waistband behind the jacket hem. */}
+          old_legs = '<LayerImg src={`${base}/legs.png`} />'
+          if old_legs not in groom:
+              raise SystemExit('groom legs image not found')
+          groom = groom.replace(
+              old_legs,
+              '''{/* Hide the trouser waistband behind the jacket hem. */}
                 <LayerImg
                   src={`${base}/legs.png`}
                   style={{ clipPath: "inset(53% 0 0 0)" }}
-                />'''
-          groom, n = re.subn(legs_pattern, legs_replacement, groom, count=1)
-          if n != 1:
-              raise SystemExit(f'legs patch expected 1 match, got {n}')
+                />''',
+              1,
+          )
 
-          torso_pattern = r'''(<div className="absolute inset-0 z-\[1\">\s*<LayerImg src=\{`\$\{base\}/torso\.png`\} />)'''
-          torso_replacement = r'''\1
+          old_torso = '<LayerImg src={`${base}/torso.png`} />'
+          if old_torso not in groom:
+              raise SystemExit('groom torso image not found')
+          groom = groom.replace(
+              old_torso,
+              '''<LayerImg src={`${base}/torso.png`} />
                 {/* Extend the lower jacket over the trouser waistband so the generated-PNG join is hidden. */}
                 <div
                   className="pointer-events-none absolute inset-0 overflow-visible"
@@ -56,10 +62,9 @@ jobs:
                       transform: "translateY(1.2%) scaleY(1.015)",
                     }}
                   />
-                </div>'''
-          groom, n = re.subn(torso_pattern, torso_replacement, groom, count=1)
-          if n != 1:
-              raise SystemExit(f'torso patch expected 1 match, got {n}')
+                </div>''',
+              1,
+          )
 
           s = s[:start] + groom + s[end:]
           p.write_text(s)
