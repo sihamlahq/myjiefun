@@ -8,16 +8,13 @@ import {
 } from "@/components/kiss-cam/kiss-cam-puppet";
 
 /**
- * Kiss Cam characters — layered PNG puppets only.
+ * Presentation guard for the groom puppet.
  *
- * The production build previously added a pseudo-element waist gradient to the
- * groom. That gradient is the dark horizontal bar visible when the groom
- * canvas collapses. It is not part of the artwork and must never be rendered.
- *
- * The groom puppet also contains full-canvas absolutely-positioned PNGs. Its
- * canvas therefore needs explicit dimensions and must not use CSS size
- * containment, otherwise the browser can resolve the canvas as a collapsed
- * box and only a stray seam/pseudo layer remains visible.
+ * The puppet artwork uses cqw/cqh inside its 720x1380 canvas, so that canvas
+ * MUST remain a size container. We give both levels definite dimensions here
+ * instead of disabling the container. We also suppress the old generated-PNG
+ * seam patch and the temporary trouser clip; the base artwork already has the
+ * correct full-body composition.
  */
 const GROOM_PRESENTATION_FIX =
   "!h-full !w-[calc(100cqh*0.5217391304)] !max-w-none !visible !opacity-100";
@@ -33,6 +30,7 @@ export function GroomFigure({ className, ...props }: GroomFigureProps) {
           height: 100% !important;
           min-width: calc(100cqh * 0.5217391304) !important;
           min-height: 100% !important;
+          max-width: none !important;
           aspect-ratio: 720 / 1380 !important;
           contain: none !important;
         }
@@ -42,9 +40,21 @@ export function GroomFigure({ className, ...props }: GroomFigureProps) {
           height: 100% !important;
           min-width: 100% !important;
           min-height: 100% !important;
+          max-width: none !important;
           aspect-ratio: 720 / 1380 !important;
-          container-type: normal !important;
+          container-type: size !important;
           contain: none !important;
+        }
+
+        /* Remove the old artificial torso-over-waist patch. It was being
+           transformed with the groom body and became the huge black wedge. */
+        #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"] [aria-hidden="true"][style*="clip-path"] {
+          display: none !important;
+        }
+
+        /* Restore the original full legs layer; no CSS seam mask is needed. */
+        #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"] .kiss-cam-legs img[src$="/legs.png"] {
+          clip-path: none !important;
         }
       `}</style>
       <BaseGroomFigure
