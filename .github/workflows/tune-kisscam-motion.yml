@@ -1,0 +1,37 @@
+name: Tune KissCam motion
+
+on:
+  push:
+    branches:
+      - replace-kisscam-couple-art
+
+permissions:
+  contents: write
+
+jobs:
+  tune:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: replace-kisscam-couple-art
+          fetch-depth: 1
+      - name: Smooth character transforms
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/app/globals.css')
+          s = p.read_text()
+          old = '''  /* Same easing on every nested arm joint — mismatched transitions split sleeves. */\n  transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);\n  will-change: transform;'''
+          new = '''  /* Shorter interpolation keeps phase changes responsive instead of visibly lagging. */\n  transition: transform 0.46s cubic-bezier(0.22, 1, 0.36, 1);\n  /* Do not force every full-canvas PNG into its own GPU layer; that can cause mobile jank. */\n  backface-visibility: hidden;\n  -webkit-backface-visibility: hidden;'''
+          if old not in s:
+              raise SystemExit('expected KissCam transform rule not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/globals.css
+          git diff --cached --quiet || git commit -m 'Smooth KissCam character motion'
+          git push origin HEAD:replace-kisscam-couple-art
