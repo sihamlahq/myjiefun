@@ -44,11 +44,19 @@ export function GroomFigure({ className, ...props }: GroomFigureProps) {
           contain: none !important;
         }
 
-        /* The torso and trouser masters have a tiny transparent/edge mismatch
-           at the jacket hem. Bridge only the waist band with the real torso
-           pixels. Keep the bridge narrow so it cannot become the old giant
-           black wedge. */
-        #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"]::after {
+        /*
+         * The jacket/trouser masters have a tiny transparent-edge mismatch at
+         * the waist. The bridge must live INSIDE the animated body root.
+         *
+         * The previous bridge was on the outer figure, so it did not receive
+         * kiss-cam-body's bodyRot transform. As the groom leaned, the real
+         * torso/trousers rotated but the bridge stayed horizontal, making the
+         * waist visibly pinch/shrink during animation.
+         *
+         * Keep this bridge narrow and use the real torso pixels — never a black
+         * gradient — so it follows the exact same body rotation as the artwork.
+         */
+        #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"] .kiss-cam-body::after {
           content: "";
           position: absolute;
           inset: 0;
