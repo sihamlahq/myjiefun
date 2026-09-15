@@ -1,0 +1,1 @@
+Binary reference artwork supplied by the user is staged in the working container for the Kiss Cam rebuild. The repo asset pipeline should receive the actual PNG through the generated rebuild workflow rather than a text placeholder.
