@@ -2,68 +2,42 @@ import type { KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types
 
 /**
  * Animation pose — INTENT ONLY.
- *
- * This module must not contain artwork pixel coordinates or SVG origins.
  * Mapping to layer transforms happens in kiss-cam-rig.ts.
  */
 export type CharacterPose = {
-  /** Horizontal offset from center, as % of stage width */
   x: number;
-  /** Vertical nudge in % */
   y: number;
   bodyRot: number;
   headRot: number;
   scale: number;
-  /** 0 = arms idle, 1 = inner hands at hold target */
   holdProgress: number;
-  /** Outer arm balloon sway 0–1+ */
   balloonSway: number;
-  /**
-   * Kiss progress 0–1 — drives lean toward shared kiss target on the rig.
-   * Prefer this over legacy kissLean; kissLean kept as alias for compatibility.
-   */
   kissProgress: number;
-  /** @deprecated use kissProgress — still accepted by the rig resolver */
+  /** @deprecated use kissProgress */
   kissLean: number;
-  /** Soft breathing amplitude 0–1 */
   breath: number;
   mouth: "smile" | "soft" | "kiss";
   eyesClosed: boolean;
 };
 
-/**
- * Couple composition for A-pose masters — wide center gap.
- * Idle ~±24%. Hold ~±10%. Kiss ~±4%. Celebration ~±12%.
- * Body lean kept small; heads do most of the kiss motion.
- *
- * Groom body lean is capped separately (see applyGroomTorsoGuard): his jacket
- * hem is wider than the torso shoulder line in the static PNG, so even modest
- * bodyRot + animation scale reads as a waist wider than the shoulders.
- */
-/** Groom-only torso lean magnitudes (°). Head still carries the romantic lean. */
+/** Groom torso stays nearly upright; the head carries most of the romantic lean. */
 const GROOM_BODY_LEAN_DEG: Partial<Record<KissCamAnimationPhase, number>> = {
-  approach: 0.3,
+  approach: 0.25,
+  approachClose: 0.4,
   holdHands: 0.5,
+  holdHandsSettle: 0.55,
   romanticPause: 0.6,
-  moveCloser: 0.8,
+  moveCloser: 0.75,
+  kissPrep: 0.9,
   countdown: 1.0,
   kiss: 1.2,
   celebration: 0.5,
   final: 0.5,
 };
 
-function applyGroomTorsoGuard(
-  phase: KissCamAnimationPhase,
-  pose: CharacterPose,
-): CharacterPose {
+function applyGroomTorsoGuard(phase: KissCamAnimationPhase, pose: CharacterPose): CharacterPose {
   const lean = GROOM_BODY_LEAN_DEG[phase];
-  return {
-    ...pose,
-    // Keep torso nearly upright; never amplify with animation scale.
-    // Positive = lean toward bride (same sign as previous `dir * -θ` with dir=-1).
-    bodyRot: lean != null ? lean : 0,
-    scale: 1,
-  };
+  return { ...pose, bodyRot: lean != null ? lean : 0, scale: 1 };
 }
 
 export function poseForPhase(
@@ -92,106 +66,153 @@ export function poseForPhase(
     case "idle":
       pose = { ...base, x: dir * 24, balloonSway: 1 };
       break;
+
     case "approach":
       pose = {
         ...base,
-        x: dir * 16,
-        bodyRot: dir * -0.8,
-        headRot: dir * -2.5,
-        holdProgress: 0.35,
+        x: dir * 19,
+        bodyRot: dir * -0.6,
+        headRot: dir * -1.8,
+        holdProgress: 0.2,
         balloonSway: 1,
       };
       break;
-    case "holdHands":
+
+    case "approachClose":
       pose = {
         ...base,
-        x: dir * 10,
-        bodyRot: dir * -1.2,
-        headRot: dir * -3.5,
-        holdProgress: 1,
-        balloonSway: 0.85,
+        x: dir * 14,
+        bodyRot: dir * -0.9,
+        headRot: dir * -2.8,
+        holdProgress: 0.55,
+        balloonSway: 0.95,
         mouth: "soft",
       };
       break;
+
+    case "holdHands":
+      pose = {
+        ...base,
+        x: dir * 10.5,
+        bodyRot: dir * -1.1,
+        headRot: dir * -3.4,
+        holdProgress: 0.9,
+        balloonSway: 0.88,
+        mouth: "soft",
+      };
+      break;
+
+    case "holdHandsSettle":
+      pose = {
+        ...base,
+        x: dir * 9.7,
+        bodyRot: dir * -1.25,
+        headRot: dir * -3.7,
+        holdProgress: 1,
+        balloonSway: 0.82,
+        mouth: "soft",
+      };
+      break;
+
     case "romanticPause":
       pose = {
         ...base,
-        x: dir * 9,
-        bodyRot: dir * -1.5,
-        headRot: dir * -4,
+        x: dir * 8.8,
+        bodyRot: dir * -1.35,
+        headRot: dir * -4.2,
         holdProgress: 1,
-        balloonSway: 0.8,
+        balloonSway: 0.78,
+        scale: 1.006,
+        mouth: "soft",
+      };
+      break;
+
+    case "moveCloser":
+      pose = {
+        ...base,
+        x: dir * 7,
+        y: -0.15,
+        bodyRot: dir * -1.7,
+        headRot: dir * -5,
+        holdProgress: 1,
+        balloonSway: 0.68,
+        kissProgress: 0.25,
+        kissLean: 0.25,
         scale: 1.008,
         mouth: "soft",
       };
       break;
-    case "moveCloser":
+
+    case "kissPrep":
       pose = {
         ...base,
-        x: dir * 6.5,
-        y: -0.3,
+        x: dir * 5.2,
+        y: -0.35,
         bodyRot: dir * -2,
-        headRot: dir * -5.5,
+        headRot: dir * -6.2,
         holdProgress: 1,
-        balloonSway: 0.7,
-        kissProgress: 0.35,
-        kissLean: 0.35,
+        balloonSway: 0.58,
+        kissProgress: 0.55,
+        kissLean: 0.55,
         scale: 1.01,
         mouth: "soft",
       };
       break;
+
     case "countdown":
       pose = {
         ...base,
-        x: dir * 5,
-        y: -0.6,
-        bodyRot: dir * -2.5,
-        headRot: dir * -7,
+        x: dir * 4.5,
+        y: -0.5,
+        bodyRot: dir * -2.2,
+        headRot: dir * -6.8,
         holdProgress: 1,
-        balloonSway: 0.55,
-        kissProgress: 0.6,
-        kissLean: 0.6,
-        scale: 1.014,
+        balloonSway: 0.5,
+        kissProgress: 0.7,
+        kissLean: 0.7,
+        scale: 1.012,
         mouth: "soft",
       };
       break;
+
     case "kiss":
       pose = {
         ...base,
         x: dir * 4,
-        y: -0.9,
-        bodyRot: dir * -3,
-        headRot: dir * -6,
+        y: -0.75,
+        bodyRot: dir * -2.5,
+        headRot: dir * -6.2,
         holdProgress: 1,
-        balloonSway: 0.4,
+        balloonSway: 0.35,
         kissProgress: 1,
         kissLean: 1,
-        scale: 1.018,
+        scale: 1.015,
         mouth: "kiss",
         eyesClosed: true,
       };
       break;
+
     case "celebration":
     case "final":
       pose = {
         ...base,
         x: dir * 12,
-        y: -0.3,
-        bodyRot: dir * -1.5,
-        headRot: dir * -2.5,
+        y: -0.25,
+        bodyRot: dir * -1.3,
+        headRot: dir * -2.3,
         holdProgress: 1,
-        balloonSway: 1.1,
+        balloonSway: 1.05,
         kissProgress: 0.1,
         kissLean: 0.1,
-        scale: 1.01,
+        scale: 1.008,
         mouth: "smile",
       };
       break;
+
     default:
       pose = base;
       break;
   }
 
-  // Bride unchanged. Groom: smaller bodyRot + no animation scale pulse.
   return side === "groom" ? applyGroomTorsoGuard(phase, pose) : pose;
 }
