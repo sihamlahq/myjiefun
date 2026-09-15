@@ -10,11 +10,9 @@ import {
 /**
  * Presentation guard for the groom puppet.
  *
- * The puppet artwork uses cqw/cqh inside its 720x1380 canvas, so that canvas
- * MUST remain a size container. We give both levels definite dimensions here
- * instead of disabling the container. We also suppress the old generated-PNG
- * seam patch and the temporary trouser clip; the base artwork already has the
- * correct full-body composition.
+ * The groom is assembled from separate generated PNG layers. The artwork is
+ * correctly sized as a 720x1380 cqw/cqh container, while this presentation
+ * layer handles the small jacket/trouser overlap at the waist.
  */
 const GROOM_PRESENTATION_FIX =
   "!h-full !w-[calc(100cqh*0.5217391304)] !max-w-none !visible !opacity-100";
@@ -46,13 +44,26 @@ export function GroomFigure({ className, ...props }: GroomFigureProps) {
           contain: none !important;
         }
 
-        /* Remove the old artificial torso-over-waist patch. It was being
-           transformed with the groom body and became the huge black wedge. */
+        /* The torso and trouser masters have a tiny transparent/edge mismatch
+           at the jacket hem. Bridge only the waist band with the real torso
+           pixels. Keep the bridge narrow so it cannot become the old giant
+           black wedge. */
+        #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"]::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          z-index: 10;
+          background: url("/assets/kiss-cam/groom/torso.png") center / 100% 100% no-repeat;
+          clip-path: inset(42.5% 22% 51.5% 22%);
+          transform-origin: 50% 44.4%;
+          transform: translateY(0.7%) scaleY(1.02);
+        }
+
+        /* No legacy seam mask or trouser clip. */
         #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"] [aria-hidden="true"][style*="clip-path"] {
           display: none !important;
         }
-
-        /* Restore the original full legs layer; no CSS seam mask is needed. */
         #kiss-cam-root .kiss-cam-figure[data-kiss-figure="groom"] .kiss-cam-legs img[src$="/legs.png"] {
           clip-path: none !important;
         }
