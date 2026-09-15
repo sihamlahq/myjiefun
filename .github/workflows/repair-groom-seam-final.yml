@@ -17,82 +17,15 @@ jobs:
         with:
           ref: replace-kisscam-couple-art
           fetch-depth: 0
-      - name: Restore known-good puppet and patch seam
+      - name: Restore complete known-good puppet
         shell: bash
         run: |
           set -e
-          # Restore the complete puppet implementation from the last known-good commit.
           git checkout 4083c03381f61c98bf454537d465972813d30a0f -- src/components/kiss-cam/kiss-cam-puppet.tsx
-
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('src/components/kiss-cam/kiss-cam-puppet.tsx')
-          s = p.read_text()
-
-          old_legs = '''              <div className="kiss-cam-legs absolute inset-0 overflow-visible">
-                <LayerImg src={`${base}/shoes.png`} />
-                <LayerImg src={`${base}/legs.png`} />
-              </div>'''
-          new_legs = '''              <div className="kiss-cam-legs absolute inset-0 overflow-visible">
-                <LayerImg src={`${base}/shoes.png`} />
-                {/* Hide the trouser waistband behind the jacket hem. */}
-                <LayerImg
-                  src={`${base}/legs.png`}
-                  style={{ clipPath: "inset(53.5% 0 0 0)" }}
-                />
-              </div>'''
-          if old_legs not in s:
-              raise SystemExit('expected groom legs block not found')
-          s = s.replace(old_legs, new_legs, 1)
-
-          old_torso = '''              <div className="absolute inset-0 z-[1]">
-                <LayerImg src={`${base}/torso.png`} />
-                {/*
-                 * Seam correction for the photo-real groom artwork. The generated
-                 * torso and trouser masters meet at slightly different silhouettes
-                 * around the lower jacket/waist. A narrow duplicate of the lower
-                 * jacket is scaled only in its seam zone so the jacket overlaps the
-                 * trouser waistband cleanly without moving the shoulders or neck.
-                 */
-                <div
-                  className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(35.5% 0 48.5% 0)" }}
-                  aria-hidden
-                >
-                  <LayerImg
-                    src={`${base}/torso.png`}
-                    style={{
-                      transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
-                      transform: "scaleY(1.018)",
-                    }}
-                  />
-                </div>
-              </div>'''
-          new_torso = '''              <div className="absolute inset-0 z-[1]">
-                <LayerImg src={`${base}/torso.png`} />
-                {/* Extend the jacket hem past the trouser waistband to remove the visible generated-PNG seam. */}
-                <div
-                  className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(42% 0 42% 0)" }}
-                  aria-hidden
-                >
-                  <LayerImg
-                    src={`${base}/torso.png`}
-                    style={{
-                      transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
-                      transform: "scaleY(1.012)",
-                    }}
-                  />
-                </div>
-              </div>'''
-          if old_torso not in s:
-              raise SystemExit('expected previous seam patch not found')
-          s = s.replace(old_torso, new_torso, 1)
-          p.write_text(s)
-          PY
-
+          test "$(grep -c 'function BrideFigure' src/components/kiss-cam/kiss-cam-puppet.tsx)" -ge 1
+          test "$(wc -l < src/components/kiss-cam/kiss-cam-puppet.tsx)" -gt 500
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/components/kiss-cam/kiss-cam-puppet.tsx
-          git diff --cached --quiet || git commit -m 'Fix groom jacket trouser seam'
+          git diff --cached --quiet || git commit -m 'Restore complete KissCam puppet implementation'
           git push origin HEAD:replace-kisscam-couple-art
