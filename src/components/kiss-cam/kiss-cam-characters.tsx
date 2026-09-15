@@ -1,5 +1,6 @@
 "use client";
 
+import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 import {
   GroomFigure as BaseGroomFigure,
@@ -14,14 +15,13 @@ import {
  * narrow/mobile layouts, width:auto can otherwise collapse/shrink and make
  * the full-canvas groom layers disappear or stretch.
  *
- * The old groom seam patch is also disabled at the presentation boundary;
- * the jacket and trouser layers must meet naturally rather than rendering a
- * duplicated rectangular torso over them.
+ * The old artificial groom seam patch is hidden at the presentation boundary;
+ * the jacket and trouser layers should meet naturally.
  */
 const GROOM_PRESENTATION_FIX =
   "!h-full !w-[calc(100cqh*0.5217391304)] !max-w-none !visible !opacity-100 [&_[aria-hidden=\"true\"][style*='clip-path']]:hidden";
 
-type GroomFigureProps = React.ComponentProps<typeof BaseGroomFigure>;
+type GroomFigureProps = ComponentProps<typeof BaseGroomFigure>;
 
 export function GroomFigure({ className, ...props }: GroomFigureProps) {
   return (
