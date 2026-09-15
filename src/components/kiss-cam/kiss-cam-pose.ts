@@ -20,19 +20,27 @@ export type CharacterPose = {
   eyesClosed: boolean;
 };
 
-/** Groom torso stays nearly upright; the head carries most of the romantic lean. */
+/**
+ * The groom torso is deliberately kept rigid during the animation.
+ *
+ * The groom artwork is built from separate torso/trouser PNG masters. Rotating
+ * that composite around the hip changes the jacket hem geometry relative to
+ * the trouser waistband and exposes the asset seam. The romantic movement is
+ * already carried naturally by the groom's head and arms, so the torso itself
+ * should stay upright.
+ */
 const GROOM_BODY_LEAN_DEG: Partial<Record<KissCamAnimationPhase, number>> = {
-  approach: 0.25,
-  approachClose: 0.4,
-  holdHands: 0.5,
-  holdHandsSettle: 0.55,
-  romanticPause: 0.6,
-  moveCloser: 0.75,
-  kissPrep: 0.9,
-  countdown: 1.0,
-  kiss: 1.2,
-  celebration: 0.5,
-  final: 0.5,
+  approach: 0,
+  approachClose: 0,
+  holdHands: 0,
+  holdHandsSettle: 0,
+  romanticPause: 0,
+  moveCloser: 0,
+  kissPrep: 0,
+  countdown: 0,
+  kiss: 0,
+  celebration: 0,
+  final: 0,
 };
 
 function applyGroomTorsoGuard(phase: KissCamAnimationPhase, pose: CharacterPose): CharacterPose {
