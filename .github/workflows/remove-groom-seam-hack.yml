@@ -1,0 +1,67 @@
+name: Remove groom seam rendering hack
+
+on:
+  push:
+    branches:
+      - replace-kisscam-couple-art
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: replace-kisscam-couple-art
+          fetch-depth: 0
+      - name: Remove artificial waist layers
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/kiss-cam/kiss-cam-puppet.tsx')
+          s = p.read_text()
+
+          old_legs = '''      <LayerImg
+        src={`${base}/legs.png`}
+        style={{ clipPath: "inset(53% 0 0 0)" }}
+      />'''
+          if old_legs not in s:
+              raise SystemExit('expected groom legs seam clip not found')
+          s = s.replace(old_legs, '''                <LayerImg src={`${base}/legs.png`} />''', 1)
+
+          old_patch = '''      {/* Extend the lower jacket over the trouser waistband so the generated-PNG join is hidden. */}
+      <div
+        className="pointer-events-none absolute inset-0 overflow-visible"
+        style={{ clipPath: "inset(40% 0 38% 0)" }}
+        aria-hidden
+      >
+        <LayerImg
+          src={`${base}/torso.png`}
+          style={{
+            transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
+            transform: "translateY(1.2%) scaleY(1.015)",
+          }}
+        />
+      </div>'''
+          if old_patch not in s:
+              raise SystemExit('expected duplicate torso seam patch not found')
+          s = s.replace(old_patch, '', 1)
+
+          p.write_text(s)
+          PY
+
+          test "$(grep -c 'style={{ clipPath: \"inset(53%' src/components/kiss-cam/kiss-cam-puppet.tsx)" -eq 0
+          test "$(grep -c 'Extend the lower jacket' src/components/kiss-cam/kiss-cam-puppet.tsx)" -eq 0
+          test "$(grep -c 'function BrideFigure' src/components/kiss-cam/kiss-cam-puppet.tsx)" -ge 1
+
+          rm -f .github/workflows/remove-groom-seam-hack.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/kiss-cam/kiss-cam-puppet.tsx .github/workflows/remove-groom-seam-hack.yml
+          git commit -m 'Remove artificial groom waist layers'
+          git push origin HEAD:replace-kisscam-couple-art
