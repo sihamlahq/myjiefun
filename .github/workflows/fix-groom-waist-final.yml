@@ -1,0 +1,87 @@
+name: Fix groom waist layering
+
+on:
+  push:
+    branches:
+      - replace-kisscam-couple-art
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: replace-kisscam-couple-art
+          fetch-depth: 0
+
+      - name: Repair waist layer
+        shell: bash
+        run: |
+          set -e
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/components/kiss-cam/kiss-cam-puppet.tsx')
+          s = p.read_text()
+
+          old_legs = '''<LayerImg
+        src={`${base}/legs.png`}
+        style={{ clipPath: "inset(53% 0 0 0)" }}
+      />'''
+          new_legs = '''<LayerImg
+                  src={`${base}/legs.png`}
+                  // Keep the trouser waistband fully behind the jacket hem.
+                  style={{ clipPath: "inset(56% 0 0 0)" }}
+                />'''
+          if old_legs not in s:
+              raise SystemExit('expected groom legs seam patch not found')
+          s = s.replace(old_legs, new_legs, 1)
+
+          old_patch = '''<div
+        className="pointer-events-none absolute inset-0 overflow-visible"
+        style={{ clipPath: "inset(40% 0 38% 0)" }}
+        aria-hidden
+      >
+        <LayerImg
+          src={`${base}/torso.png`}
+          style={{
+            transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
+            transform: "translateY(1.2%) scaleY(1.015)",
+          }}
+        />
+      </div>'''
+          new_patch = '''<div
+                  className="pointer-events-none absolute inset-0 overflow-visible"
+                  // Only the lower jacket is duplicated; this creates a clean continuous hem
+                  // over the trouser layer without changing the face, arms, or body rig.
+                  style={{ clipPath: "inset(48% 0 39% 0)" }}
+                  aria-hidden
+                >
+                  <LayerImg
+                    src={`${base}/torso.png`}
+                    style={{
+                      transformOrigin: "50% 50%",
+                      transform: "translateY(1.6%) scaleY(1.08)",
+                    }}
+                  />
+                </div>'''
+          if old_patch not in s:
+              raise SystemExit('expected groom torso seam patch not found')
+          s = s.replace(old_patch, new_patch, 1)
+
+          p.write_text(s)
+          PY
+
+          grep -q 'clipPath: "inset(56% 0 0 0)"' src/components/kiss-cam/kiss-cam-puppet.tsx
+          grep -q 'translateY(1.6%) scaleY(1.08)' src/components/kiss-cam/kiss-cam-puppet.tsx
+          grep -q 'export function BrideFigure' src/components/kiss-cam/kiss-cam-puppet.tsx
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/kiss-cam/kiss-cam-puppet.tsx
+          git commit -m 'Fix groom jacket hem over trousers'
+          git push origin HEAD:replace-kisscam-couple-art
