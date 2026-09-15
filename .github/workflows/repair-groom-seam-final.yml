@@ -17,13 +17,12 @@ jobs:
         with:
           ref: replace-kisscam-couple-art
           fetch-depth: 0
-      - name: Restore complete puppet file and patch seam
+      - name: Restore known-good puppet and patch seam
         shell: bash
         run: |
           set -e
-          # The immediately preceding manual commit accidentally truncated the file.
-          # Revert it first so the full GroomFigure + BrideFigure implementation is restored.
-          git revert --no-edit 9a5b6e55b8afbe29fb3f1446fb8f85e6a3325e11
+          # Restore the complete puppet implementation from the last known-good commit.
+          git checkout 4083c03381f61c98bf454537d465972813d30a0f -- src/components/kiss-cam/kiss-cam-puppet.tsx
 
           python3 - <<'PY'
           from pathlib import Path
@@ -36,14 +35,14 @@ jobs:
               </div>'''
           new_legs = '''              <div className="kiss-cam-legs absolute inset-0 overflow-visible">
                 <LayerImg src={`${base}/shoes.png`} />
-                {/* Keep the trouser waistband hidden behind the jacket hem. */}
+                {/* Hide the trouser waistband behind the jacket hem. */}
                 <LayerImg
                   src={`${base}/legs.png`}
                   style={{ clipPath: "inset(53.5% 0 0 0)" }}
                 />
               </div>'''
           if old_legs not in s:
-              raise SystemExit('expected groom legs block not found after restore')
+              raise SystemExit('expected groom legs block not found')
           s = s.replace(old_legs, new_legs, 1)
 
           old_torso = '''              <div className="absolute inset-0 z-[1]">
@@ -71,7 +70,7 @@ jobs:
               </div>'''
           new_torso = '''              <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
-                {/* Extend the jacket hem just past the trouser waistband to remove the generated-PNG seam. */}
+                {/* Extend the jacket hem past the trouser waistband to remove the visible generated-PNG seam. */}
                 <div
                   className="pointer-events-none absolute inset-0 overflow-visible"
                   style={{ clipPath: "inset(42% 0 42% 0)" }}
@@ -87,7 +86,7 @@ jobs:
                 </div>
               </div>'''
           if old_torso not in s:
-              raise SystemExit('expected previous seam patch not found after restore')
+              raise SystemExit('expected previous seam patch not found')
           s = s.replace(old_torso, new_torso, 1)
           p.write_text(s)
           PY
@@ -95,5 +94,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/components/kiss-cam/kiss-cam-puppet.tsx
-          git diff --cached --quiet || git commit -m 'Hide groom trouser waistband behind jacket'
+          git diff --cached --quiet || git commit -m 'Fix groom jacket trouser seam'
           git push origin HEAD:replace-kisscam-couple-art
