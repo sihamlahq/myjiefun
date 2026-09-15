@@ -490,6 +490,26 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
+                {/*
+                 * Seam correction for the photo-real groom artwork. The generated
+                 * torso and trouser masters meet at slightly different silhouettes
+                 * around the lower jacket/waist. A narrow duplicate of the lower
+                 * jacket is scaled only in its seam zone so the jacket overlaps the
+                 * trouser waistband cleanly without moving the shoulders or neck.
+                 */}
+                <div
+                  className="pointer-events-none absolute inset-0 overflow-visible"
+                  style={{ clipPath: "inset(35.5% 0 48.5% 0)" }}
+                  aria-hidden
+                >
+                  <LayerImg
+                    src={`${base}/torso.png`}
+                    style={{
+                      transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
+                      transform: "scaleY(1.018)",
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
