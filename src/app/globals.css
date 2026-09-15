@@ -485,9 +485,11 @@ h3,
 .kiss-cam-legs,
 .kiss-cam-dress {
   overflow: visible;
-  /* Same easing on every nested arm joint — mismatched transitions split sleeves. */
-  transition: transform 0.85s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
+  /* Shorter interpolation keeps phase changes responsive instead of visibly lagging. */
+  transition: transform 0.46s cubic-bezier(0.22, 1, 0.36, 1);
+  /* Do not force every full-canvas PNG into its own GPU layer; that can cause mobile jank. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .kiss-cam-held-balloon {
