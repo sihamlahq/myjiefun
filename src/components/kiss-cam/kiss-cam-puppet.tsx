@@ -517,14 +517,14 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
                     the exact same animation transform. */}
                 <div
                   className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(40% 50% 38% 0)" }}
+                  style={{ clipPath: "inset(48% 46% 43% 0)" }}
                   aria-hidden
                 >
                   <LayerImg
                     src={`${base}/torso.png`}
                     style={{
                       transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
-                      transform: "translate(-0.35%, 1.2%) scaleX(1.025) scaleY(1.015)",
+                      transform: "translate(-1.15%, 1.2%) scaleX(1.06) scaleY(1.015)",
                     }}
                   />
                 </div>
