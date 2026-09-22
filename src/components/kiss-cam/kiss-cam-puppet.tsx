@@ -494,37 +494,37 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
-                {/* Deterministic waist bridge stays inside the breathe wrapper
-                    so it follows the exact same animation as the torso. */}
+                {/* Waist repair: keep every repair pixel inside the same breathe
+                    wrapper as the jacket and trousers. The left edge is the side
+                    that opens during the animated lean, so extend the jacket
+                    outward/downward from its RIGHT edge instead of moving the
+                    whole torso. This keeps the jacket hem locked to the body. */}
                 <div
                   className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(40% 0 38% 0)" }}
+                  style={{ clipPath: "inset(47% 46% 39% 0)" }}
                   aria-hidden
                 >
                   <LayerImg
                     src={`${base}/torso.png`}
                     style={{
-                      transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
-                      transform: "translateY(1.2%) scaleY(1.015)",
+                      transformOrigin: "100% 50%",
+                      transform: "translate(-0.15%, 1.4%) scaleX(1.09) scaleY(1.06)",
                     }}
                   />
                 </div>
 
-                {/* The viewer-left waist has a slightly wider transparent edge in
-                    the generated trouser/torso masters. Reinforce only that side
-                    with the same torso pixels so the right-side repair is not
-                    changed. This overlay stays in the breathe wrapper and follows
-                    the exact same animation transform. */}
+                {/* A narrow outer-left reinforcement closes the last transparent
+                    edge without changing the center/right side of the jacket. */}
                 <div
                   className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(48% 46% 43% 0)" }}
+                  style={{ clipPath: "inset(49% 58% 40% 0)" }}
                   aria-hidden
                 >
                   <LayerImg
                     src={`${base}/torso.png`}
                     style={{
-                      transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
-                      transform: "translate(-1.15%, 1.2%) scaleX(1.06) scaleY(1.015)",
+                      transformOrigin: "100% 50%",
+                      transform: "translate(-0.45%, 1.7%) scaleX(1.13) scaleY(1.05)",
                     }}
                   />
                 </div>
