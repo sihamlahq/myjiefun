@@ -516,7 +516,16 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
               <GroomLocalArmChain which="right" base={base} rig={rig} angles={rightAngles} />
 
               <div className="absolute inset-0 z-[1]">
-                <LayerImg src={`${base}/torso.png`} />
+                <LayerImg
+                  src={`${base}/torso.png`}
+                  style={{
+                    // Preserve the jacket waist width symmetrically on both sides.
+                    // Do not add a one-sided patch: that makes the opposite edge
+                    // appear compressed during the motion interpolation.
+                    transformOrigin: "50% 50%",
+                    transform: "scaleX(1.018)",
+                  }}
+                />
                 {/* Keep the trouser layer overlapping the jacket hem. */}
                 {/* The trouser layer overlaps the jacket hem slightly. Both layers
                     live in the SAME breathe/body transform, so the overlap cannot
