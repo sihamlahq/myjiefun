@@ -494,6 +494,26 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
+                {/* Viewer-left jacket/arm junction repair.
+                    The visible split is ABOVE the trouser hem: the outer left arm
+                    rotates away from the jacket at the shoulder/side seam. Extend
+                    only the left half of the torso over that moving arm root.
+                    This overlay stays inside the same breathe/body wrapper. */}
+                <div
+                  className="pointer-events-none absolute inset-0 overflow-visible"
+                  style={{ clipPath: "inset(27% 51% 44% 0)" }}
+                  aria-hidden
+                >
+                  <LayerImg
+                    src={`${base}/torso.png`}
+                    style={{
+                      transformOrigin: "100% 50%",
+                      transform: "translate(-1.8%, 0.5%) scaleX(1.08) scaleY(1.01)",
+                    }}
+                  />
+                </div>
+
+                {/* Keep the trouser layer overlapping the jacket hem. */}
                 {/* The trouser layer overlaps the jacket hem slightly. Both layers
                     live in the SAME breathe/body transform, so the overlap cannot
                     drift apart when the groom animates. Do not add a separately
