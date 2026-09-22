@@ -33,15 +33,20 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path.startsWith("/login");
 
-  // Guest phone camera stays public (QR). LED Kiss Cam controller requires staff login.
+  // Guest phone camera and the QR-launched mobile controller stay public.
+  // The session ID embedded in each QR acts as the pairing secret.
   const isKissCamCamera = path.startsWith("/reception/kiss-cam/camera");
+  const isKissCamMobileController = path.startsWith("/reception/kiss-cam/controller");
   const isKissCamLed =
     path === "/reception/kiss-cam" ||
-    (path.startsWith("/reception/kiss-cam/") && !isKissCamCamera);
+    (path.startsWith("/reception/kiss-cam/") &&
+      !isKissCamCamera &&
+      !isKissCamMobileController);
 
   const isPublic =
     isAuthPage ||
     isKissCamCamera ||
+    isKissCamMobileController ||
     (path.startsWith("/reception") && !isKissCamLed) ||
     path.startsWith("/api/health") ||
     path.startsWith("/api/kiss-cam");
