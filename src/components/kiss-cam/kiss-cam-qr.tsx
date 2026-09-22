@@ -30,13 +30,17 @@ export function KissCamQRCode({
     [sessionId],
   );
 
-  const controllerUrl = useMemo(
-    () =>
-      typeof window !== "undefined"
-        ? new URL("/reception/kiss-cam", window.location.origin).toString()
-        : "/reception/kiss-cam",
-    [],
-  );
+  const controllerUrl = useMemo(() => {
+    if (!sessionId) return "/reception/kiss-cam/controller";
+    const url = new URL(
+      "/reception/kiss-cam/controller",
+      typeof window !== "undefined" ? window.location.origin : "http://localhost",
+    );
+    url.searchParams.set("session", sessionId);
+    return typeof window !== "undefined"
+      ? url.toString()
+      : `/reception/kiss-cam/controller?session=${encodeURIComponent(sessionId)}`;
+  }, [sessionId]);
 
   const codeUrl = useMemo(() => {
     if (!sessionId) return "/reception/kiss-cam/camera";
