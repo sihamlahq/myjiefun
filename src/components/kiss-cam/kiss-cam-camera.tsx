@@ -338,7 +338,6 @@ export function KissCamCameraClient() {
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lensesRef = useRef<LensOption[]>([]);
-  const cameraDevicesRef = useRef<CameraDeviceOption[]>([]);
   const startingRef = useRef(false);
   const loadingBusyRef = useRef(false);
   const placeholderTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -437,7 +436,6 @@ export function KissCamCameraClient() {
       facing: facingFromDeviceLabel(device.label || ""),
     }));
 
-    cameraDevicesRef.current = cameraOptions;
     setCameraDevices(cameraOptions);
     setActiveDeviceId(currentDeviceId);
 
@@ -761,7 +759,10 @@ export function KissCamCameraClient() {
           // Mobile devices may refuse two camera tracks at once. In that case,
           // release the current camera and retry the exact selected device.
           stopTracksOnly();
-          stream = await openCamera(device.facing, device.deviceId);
+          stream = await openCamera(
+            device.facing === "unknown" ? facingRef.current : device.facing,
+            device.deviceId,
+          );
         }
 
         await bindPreview(stream);
