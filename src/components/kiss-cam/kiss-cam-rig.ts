@@ -232,9 +232,14 @@ export function resolveCharacterRig(
   if (side === "groom") {
     // Joint rotations (shoulder / elbow / wrist) — nested ArmChain applies them in order.
     // Artwork is already A-pose — keep idle near 0°. Small outer raise + hold reach.
-    const outerIdle: ArmAngles = { upper: -8, forearm: 10, hand: -2 };
+    // Keep the upper-arm root locked to the jacket seam. The viewer-left
+    // shoulder artwork is already painted in the correct attached position;
+    // rotating this segment is what opens the triangular waist/armpit gap.
+    // Let the forearm provide the animation instead of pulling the sleeve root
+    // away from the torso.
+    const outerIdle: ArmAngles = { upper: 0, forearm: 10, hand: -2 };
     const outerSway: ArmAngles = {
-      upper: outerIdle.upper - sway * 3,
+      upper: 0,
       forearm: outerIdle.forearm + sway * 2,
       hand: outerIdle.hand,
     };
