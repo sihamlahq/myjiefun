@@ -490,29 +490,33 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
               {/* Arms under torso so jacket shoulders cover sleeve roots. */}
               <GroomLocalArmChain which="left" base={base} rig={rig} angles={leftAngles} balloon={{ color: "#f4b6c4" }} />
+              
+              {/* Left armpit/waist junction: the sleeve master has a transparent
+                  wedge at its inner root. Put a second, tightly clipped copy of
+                  the same animated upper-arm layer above the jacket so that the
+                  sleeve root physically meets the jacket instead of exposing the
+                  stage background. It uses the exact same local shoulder transform. */}
+              <div
+                className="pointer-events-none absolute inset-0 overflow-visible z-[2]"
+                style={{
+                  clipPath: "inset(24% 51% 58% 20%)",
+                }}
+                aria-hidden
+              >
+                <div
+                  className="absolute inset-0 overflow-visible"
+                  style={{
+                    transformOrigin: originPct(rig.leftShoulder),
+                    transform: `rotate(${leftAngles.upper}deg)`,
+                  }}
+                >
+                  <LayerImg src={`${base}/left-upper-arm.png`} />
+                </div>
+              </div>
               <GroomLocalArmChain which="right" base={base} rig={rig} angles={rightAngles} />
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
-                {/* Viewer-left jacket/arm junction repair.
-                    The visible split is ABOVE the trouser hem: the outer left arm
-                    rotates away from the jacket at the shoulder/side seam. Extend
-                    only the left half of the torso over that moving arm root.
-                    This overlay stays inside the same breathe/body wrapper. */}
-                <div
-                  className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(27% 51% 44% 0)" }}
-                  aria-hidden
-                >
-                  <LayerImg
-                    src={`${base}/torso.png`}
-                    style={{
-                      transformOrigin: "100% 50%",
-                      transform: "translate(-1.8%, 0.5%) scaleX(1.08) scaleY(1.01)",
-                    }}
-                  />
-                </div>
-
                 {/* Keep the trouser layer overlapping the jacket hem. */}
                 {/* The trouser layer overlaps the jacket hem slightly. Both layers
                     live in the SAME breathe/body transform, so the overlap cannot
