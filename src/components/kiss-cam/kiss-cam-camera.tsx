@@ -43,6 +43,12 @@ type TrackZoomSettings = MediaTrackSettings & {
   deviceId?: string;
 };
 
+type CameraDeviceOption = {
+  deviceId: string;
+  label: string;
+  facing: Facing | "unknown";
+};
+
 function labelMatchesFacing(label: string, facing: Facing) {
   const l = label.toLowerCase();
   if (facing === "user") {
@@ -53,6 +59,15 @@ function labelMatchesFacing(label: string, facing: Facing) {
 
 function isFrontLabel(label: string) {
   return /front|user|face|selfie/.test(label.toLowerCase());
+}
+
+function facingFromDeviceLabel(label: string): CameraDeviceOption["facing"] {
+  const l = label.toLowerCase();
+  if (isFrontLabel(l)) return "user";
+  if (/back|rear|environment|world|main|triple|dual|wide|tele|ultra/.test(l)) {
+    return "environment";
+  }
+  return "unknown";
 }
 
 /** Guess stock zoom factor from a camera label (Samsung / Pixel / iOS naming). */
@@ -186,14 +201,20 @@ async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStrea
 
   const attempts: MediaStreamConstraints[] = [];
 
-  // Fast path first — ideals usually succeed on the first try.
+  // An explicitly selected camera must be opened by exact deviceId.
+  // Do not silently fall back to another camera — that makes a multi-camera
+  // switcher appear to work while actually keeping the previous device.
   if (preferredDeviceId) {
     attempts.push({
       audio: false,
-      video: { deviceId: { ideal: preferredDeviceId }, ...softHd },
+      video: { deviceId: { exact: preferredDeviceId }, ...softHd },
     });
-  }
-  attempts.push({
+    attempts.push({
+      audio: false,
+      video: { deviceId: { exact: preferredDeviceId }, frameRate: { ideal: 30 } },
+    });
+  } else {
+    attempts.push({
     audio: false,
     video: { facingMode: { ideal: facing }, ...softHd },
   });
@@ -201,7 +222,8 @@ async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStrea
     audio: false,
     video: { facingMode: { ideal: facing }, frameRate: { ideal: 30 } },
   });
-  attempts.push({ audio: false, video: true });
+    attempts.push({ audio: false, video: true });
+  }
 
   let lastError: unknown;
   for (const constraints of attempts) {
@@ -300,6 +322,8 @@ export function KissCamCameraClient() {
   const [countdownBusy, setCountdownBusy] = useState<1 | 2 | 3 | null>(null);
   const [lenses, setLenses] = useState<LensOption[]>([]);
   const [activeLens, setActiveLens] = useState(1);
+  const [cameraDevices, setCameraDevices] = useState<CameraDeviceOption[]>([]);
+  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -314,6 +338,7 @@ export function KissCamCameraClient() {
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lensesRef = useRef<LensOption[]>([]);
+  const cameraDevicesRef = useRef<CameraDeviceOption[]>([]);
   const startingRef = useRef(false);
   const loadingBusyRef = useRef(false);
   const placeholderTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -401,6 +426,21 @@ export function KissCamCameraClient() {
     } catch {
       devices = [];
     }
+
+    const videoDevices = devices.filter((d) => d.kind === "videoinput");
+    const currentDeviceId =
+      (track?.getSettings?.() as TrackZoomSettings | undefined)?.deviceId ?? null;
+
+    const cameraOptions: CameraDeviceOption[] = videoDevices.map((device, index) => ({
+      deviceId: device.deviceId,
+      label: device.label || `Camera ${index + 1}`,
+      facing: facingFromDeviceLabel(device.label || ""),
+    }));
+
+    cameraDevicesRef.current = cameraOptions;
+    setCameraDevices(cameraOptions);
+    setActiveDeviceId(currentDeviceId);
+
     const options = buildLensOptions(devices, track, facingRef.current);
     lensesRef.current = options;
     setLenses(options);
@@ -436,6 +476,7 @@ export function KissCamCameraClient() {
     lensesRef.current = [];
     setLenses([]);
     setActiveLens(1);
+    setActiveDeviceId(null);
   }, []);
 
   const stopCamera = useCallback(async () => {
@@ -698,6 +739,69 @@ export function KissCamCameraClient() {
       setSwitching(false);
     }
   }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
+
+  const switchToDevice = useCallback(
+    async (device: CameraDeviceOption) => {
+      if (!cameraOn || switchingRef.current || device.deviceId === activeDeviceId) return;
+
+      switchingRef.current = true;
+      setSwitching(true);
+      setMessage(null);
+
+      const previousStream = streamRef.current;
+      const previousDeviceId = activeDeviceId;
+
+      try {
+        // First try opening the selected camera while the current camera stays
+        // alive. This gives a seamless swap for USB / desktop multi-camera setups.
+        let stream: MediaStream;
+        try {
+          stream = await openCamera(facingRef.current, device.deviceId);
+        } catch {
+          // Mobile devices may refuse two camera tracks at once. In that case,
+          // release the current camera and retry the exact selected device.
+          stopTracksOnly();
+          stream = await openCamera(device.facing, device.deviceId);
+        }
+
+        await bindPreview(stream);
+        setActiveDeviceId(device.deviceId);
+        if (device.facing !== "unknown") {
+          facingRef.current = device.facing;
+          setFacingMode(device.facing);
+        }
+
+        await connRef.current?.replaceVideoTrack(stream.getVideoTracks()[0] ?? null);
+        await requestWakeLock();
+
+        // Only stop the old stream after the new stream is successfully bound.
+        if (previousStream && previousStream !== stream) {
+          previousStream.getTracks().forEach((t) => {
+            try {
+              t.stop();
+            } catch {
+              // ignore
+            }
+          });
+        }
+      } catch {
+        setActiveDeviceId(previousDeviceId);
+        setMessage("Could not switch to that camera. Staying on the current camera.");
+        if (!streamRef.current && previousStream) {
+          streamRef.current = previousStream;
+          setCameraOn(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = previousStream;
+            await videoRef.current.play().catch(() => undefined);
+          }
+        }
+      } finally {
+        switchingRef.current = false;
+        setSwitching(false);
+      }
+    },
+    [activeDeviceId, bindPreview, cameraOn, requestWakeLock, stopTracksOnly],
+  );
 
   const selectLens = useCallback(
     async (lens: LensOption) => {
@@ -1031,6 +1135,46 @@ export function KissCamCameraClient() {
             </p>
           )}
         </div>
+
+        {cameraOn && cameraDevices.length > 1 ? (
+          <div className="rounded-2xl border border-rose-200/20 bg-[#3a2430]/65 px-3 py-2.5">
+            <div className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-[#ffc9d4]/75">
+              <span>Camera</span>
+              <span className="text-[#fff5f7]/65">
+                {cameraDevices.length} connected
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {cameraDevices.map((device, index) => {
+                const selected = device.deviceId === activeDeviceId;
+                const label =
+                  device.label && !/^camera \d+$/i.test(device.label)
+                    ? device.label
+                    : `Camera ${index + 1}`;
+                return (
+                  <button
+                    key={device.deviceId}
+                    type="button"
+                    className={`min-h-11 max-w-full touch-manipulation rounded-xl px-3 text-sm font-semibold transition-[transform,background-color,color] active:scale-95 ${
+                      selected
+                        ? "bg-[#ff8fab] text-white shadow-[0_6px_16px_rgba(255,143,171,0.35)]"
+                        : "bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/18"
+                    }`}
+                    disabled={switching}
+                    aria-pressed={selected}
+                    aria-label={`Switch to ${label}`}
+                    onClick={() => void switchToDevice(device)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-center text-[10px] text-[#ffc9d4]/50">
+              Switch between connected cameras without restarting the Kiss Cam.
+            </p>
+          </div>
+        ) : null}
 
         {primaryAction === "loading" ? (
           <Button
