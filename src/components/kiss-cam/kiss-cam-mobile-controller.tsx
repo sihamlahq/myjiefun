@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import {
-  signalingChannelName,
-  type KissCamControlAction,
-} from "@/components/kiss-cam/kiss-cam-session";
+import { signalingChannelName } from "@/components/kiss-cam/kiss-cam-session";
+import type { KissCamControlAction } from "@/components/kiss-cam/kiss-cam-connection";
 
 type Props = {
   sessionId: string | null;
