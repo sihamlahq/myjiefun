@@ -484,7 +484,7 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
                 {/* Hide the trouser waistband behind the jacket hem. */}
       <LayerImg
         src={`${base}/legs.png`}
-        style={{ clipPath: "inset(53% 0 0 0)" }}
+        style={{ clipPath: "inset(50.5% 0 0 0)" }}
       />
               </div>
 
@@ -494,40 +494,10 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
 
               <div className="absolute inset-0 z-[1]">
                 <LayerImg src={`${base}/torso.png`} />
-                {/* Waist repair: keep every repair pixel inside the same breathe
-                    wrapper as the jacket and trousers. The left edge is the side
-                    that opens during the animated lean, so extend the jacket
-                    outward/downward from its RIGHT edge instead of moving the
-                    whole torso. This keeps the jacket hem locked to the body. */}
-                <div
-                  className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(47% 46% 39% 0)" }}
-                  aria-hidden
-                >
-                  <LayerImg
-                    src={`${base}/torso.png`}
-                    style={{
-                      transformOrigin: "100% 50%",
-                      transform: "translate(-0.15%, 1.4%) scaleX(1.09) scaleY(1.06)",
-                    }}
-                  />
-                </div>
-
-                {/* A narrow outer-left reinforcement closes the last transparent
-                    edge without changing the center/right side of the jacket. */}
-                <div
-                  className="pointer-events-none absolute inset-0 overflow-visible"
-                  style={{ clipPath: "inset(49% 58% 40% 0)" }}
-                  aria-hidden
-                >
-                  <LayerImg
-                    src={`${base}/torso.png`}
-                    style={{
-                      transformOrigin: "100% 50%",
-                      transform: "translate(-0.45%, 1.7%) scaleX(1.13) scaleY(1.05)",
-                    }}
-                  />
-                </div>
+                {/* The trouser layer overlaps the jacket hem slightly. Both layers
+                    live in the SAME breathe/body transform, so the overlap cannot
+                    drift apart when the groom animates. Do not add a separately
+                    transformed waist patch here. */}
               </div>
             </div>
 
