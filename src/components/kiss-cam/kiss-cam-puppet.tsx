@@ -509,6 +509,25 @@ export function GroomFigure({ phase, className, rigDebug = false }: PuppetProps)
                     }}
                   />
                 </div>
+
+                {/* The viewer-left waist has a slightly wider transparent edge in
+                    the generated trouser/torso masters. Reinforce only that side
+                    with the same torso pixels so the right-side repair is not
+                    changed. This overlay stays in the breathe wrapper and follows
+                    the exact same animation transform. */}
+                <div
+                  className="pointer-events-none absolute inset-0 overflow-visible"
+                  style={{ clipPath: "inset(40% 50% 38% 0)" }}
+                  aria-hidden
+                >
+                  <LayerImg
+                    src={`${base}/torso.png`}
+                    style={{
+                      transformOrigin: `${pct(rig.hipPivot.x, "x")}% ${pct(rig.hipPivot.y, "y")}%`,
+                      transform: "translate(-0.35%, 1.2%) scaleX(1.025) scaleY(1.015)",
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
