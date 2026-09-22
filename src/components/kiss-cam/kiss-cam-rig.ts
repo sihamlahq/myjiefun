@@ -243,9 +243,13 @@ export function resolveCharacterRig(
       forearm: outerIdle.forearm + sway * 2,
       hand: outerIdle.hand,
     };
-    // Inner right: lift slightly toward bride (A-pose already reaches sideways)
+    // Inner right: keep the shoulder root locked to the jacket seam, matching
+    // the viewer-left fix above. The previous +14° upper-arm rotation pulled
+    // the viewer-right sleeve root away from the torso during hold/motion,
+    // making that waist edge look compressed. Let the forearm provide the
+    // reaching motion instead of rotating the attached upper-arm root.
     const innerIdle: ArmAngles = { upper: 0, forearm: 0, hand: 0 };
-    const innerHold: ArmAngles = { upper: 14, forearm: -12, hand: -6 };
+    const innerHold: ArmAngles = { upper: 0, forearm: -12, hand: -6 };
     left = outerSway;
     right = lerpArm(innerIdle, innerHold, hold);
   } else {
