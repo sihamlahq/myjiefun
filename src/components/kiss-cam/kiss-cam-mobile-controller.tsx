@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { signalingChannelName } from "@/components/kiss-cam/kiss-cam-session";
@@ -21,6 +21,7 @@ export function KissCamMobileController({ sessionId }: Props) {
   const [sending, setSending] = useState<KissCamControlAction | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loadingScreen, setLoadingScreen] = useState(false);
+  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
 
   const channelName = useMemo(
     () => (sessionId ? signalingChannelName(sessionId) : null),
@@ -34,6 +35,7 @@ export function KissCamMobileController({ sessionId }: Props) {
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false } },
     });
+    channelRef.current = channel;
 
     channel.subscribe((status) => {
       setConnected(status === "SUBSCRIBED");
@@ -44,6 +46,7 @@ export function KissCamMobileController({ sessionId }: Props) {
 
     return () => {
       setConnected(false);
+      channelRef.current = null;
       void supabase.removeChannel(channel);
     };
   }, [channelName]);
@@ -55,41 +58,25 @@ export function KissCamMobileController({ sessionId }: Props) {
       setMessage(null);
 
       try {
-        const supabase = createClient();
-        const channel = supabase.channel(channelName, {
-          config: { broadcast: { self: false } },
-        });
+        const channel = channelRef.current;
+        if (!channel || !connected) {
+          throw new Error("Controller is not connected");
+        }
 
-        await new Promise<void>((resolve, reject) => {
-          const timeout = window.setTimeout(
-            () => reject(new Error("Connection timed out")),
-            5000,
-          );
-          channel.subscribe((status) => {
-            if (status === "SUBSCRIBED") {
-              window.clearTimeout(timeout);
-              resolve();
-            } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-              window.clearTimeout(timeout);
-              reject(new Error("Connection failed"));
-            }
-          });
-        });
-
+        // Reuse the already-subscribed channel. Creating a new Supabase
+        // Realtime channel for every button press adds noticeable latency.
         await channel.send({
           type: "broadcast",
           event: "signal",
           payload: { type: "control", action },
         });
-
-        await supabase.removeChannel(channel);
       } catch {
         setMessage("Command could not be sent. Check the connection.");
       } finally {
         setSending(null);
       }
     },
-    [channelName],
+    [channelName, connected],
   );
 
   const trigger = (action: KissCamControlAction) => {
