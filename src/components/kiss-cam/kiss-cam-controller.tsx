@@ -603,7 +603,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                   {coupleVideoLabel}
                 </p>
                 <p className="mt-1 text-[11px] text-[#f7f1e8]/55">
-                  Plays in the love frame until a phone camera goes live. Default file path:{" "}
+                  Full-screen with a Play button until a phone camera goes live (live cam still uses
+                  the heart frame). Default:{" "}
                   <code className="text-[10px]">/assets/kiss-cam/kiss-cam.mp4</code>
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
