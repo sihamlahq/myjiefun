@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BrideFigure, GroomFigure } from "@/components/kiss-cam/kiss-cam-characters";
 import {
   KissCamBackground,
   KissCamBalloons,
@@ -34,13 +33,10 @@ type KissCamDisplayProps = {
   fallbackVideoSrc?: string;
   celebrate: boolean;
   loveBurst?: boolean;
-  /** Soft loading overlay — keeps background + couple visible. */
+  /** Soft loading overlay — keeps background visible. */
   loading?: boolean;
-  showCharacters: boolean;
   /** Fill the parent completely (true fullscreen) — no 16:9 letterboxing. */
   fillViewport?: boolean;
-  /** Development-only character rig overlay (never in production). */
-  rigDebug?: boolean;
   className?: string;
 };
 
@@ -58,9 +54,7 @@ export function KissCamDisplay({
   celebrate,
   loveBurst = false,
   loading = false,
-  showCharacters,
   fillViewport = false,
-  rigDebug = false,
   className = "",
 }: KissCamDisplayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -173,11 +167,6 @@ export function KissCamDisplay({
   const livePhone = Boolean(remoteStream);
   const cameraLive = cameraEnabled && (livePhone || (cameraLayout === "love" && demoReady));
   const showBigLove = loveBurst || autoLove;
-  // Heart (live camera) mode owns the stage — hide groom/bride puppets so they
-  // don't cover the love-shaped video (or look like a revert to the old models).
-  const renderCharacters = showCharacters && cameraLayout !== "love";
-  // Keep couple calmly on stage while loading (background stays too).
-  const characterPhase: KissCamAnimationPhase = loading ? "idle" : phase;
   const overlayCountdown = loading
     ? null
     : (remoteCountdown ?? (phase === "countdown" ? countdownValue : null));
@@ -261,36 +250,12 @@ export function KissCamDisplay({
         ) : null}
       </div>
 
-      {/* ── CHARACTER SAFE AREA ── full-body couple; animation stays here.
-          Must NOT use overflow-hidden: footAlign translateY would clip the
-          figures to invisibility. flex-1 + min-h-0 yields a real band height;
-          the inset-0 stage is the definite containing block for h-full figures
-          and provides container-type:size for groom cqw/cqh arm chains. */}
+      {/* ── STAGE CENTER ── overlays (countdown / love / loading) over the heart video */}
       <div
         className="relative z-[3] min-h-0 w-full flex-1"
-        data-kiss-safe="characters"
+        data-kiss-safe="stage"
         style={{ position: "relative", width: "100%", minHeight: 0 }}
       >
-        <div
-          className="absolute inset-0 h-full w-full overflow-visible"
-          data-kiss-character-stage="1"
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            minHeight: 0,
-            containerType: "size",
-          }}
-        >
-          {renderCharacters ? (
-            <>
-              <GroomFigure phase={characterPhase} className="z-[3]" rigDebug={rigDebug} />
-              <BrideFigure phase={characterPhase} className="z-[4]" rigDebug={rigDebug} />
-            </>
-          ) : null}
-        </div>
-
         <KissCamHearts active={!loading && (celebrate || showBigLove)} />
         <KissCamConfetti active={!loading && (celebrate || showBigLove)} />
         <KissCamLoveBurst
@@ -324,7 +289,7 @@ export function KissCamDisplay({
         <KissCamLoadingOverlay active={loading} size="stage" />
       </div>
 
-      {/* ── BOTTOM SAFE AREA ── couple / event text; characters must not enter */}
+      {/* ── BOTTOM SAFE AREA ── couple / event text */}
       <div
         className="relative z-20 flex w-full shrink-0 flex-col items-center justify-start px-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1 text-center"
         style={{ flexBasis: "var(--kiss-bottom-safe)", minHeight: "var(--kiss-bottom-safe)" }}

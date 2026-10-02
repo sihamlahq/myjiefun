@@ -1,48 +1,26 @@
-# Kiss Cam artwork assets
+# Kiss Cam assets
 
-## Architecture
-
-```
-poseForPhase()          → animation intent (x, rotations, holdProgress, kissProgress)
-        ↓
-kiss-cam-rig.ts         → measured joints + resolveCharacterRig()
-        ↓
-kiss-cam-puppet.tsx     → nested layer transforms (true 2-bone arms)
-```
-
-Do **not** map poses onto legacy SVG transform origins (`78px 140px`, etc.).
-Joints live in `masters/joints.json` and `kiss-cam-rig.ts`, measured from the PNG layers.
-
-## Live characters (layered puppets)
+Heart-frame stage assets (SVG motifs + optional couple standby video).
 
 | Path | Purpose |
 |------|---------|
-| `groom/*.png` | Groom layers cut from the premium master |
-| `bride/*.png` | Bride layers (+ tiara, veil, bodice, skirt) |
-| `masters/*-master.png` | Full-body painted masters |
-| `masters/joints.json` | Measured joint pivots for the puppet rig |
+| `kiss-cam.mp4` | Couple video looped in the Heart frame until a phone camera goes live |
+| `music/theme.mp3` | Optional default LED music |
+| `background.svg`, `hearts.svg`, `balloons.svg` | Atmosphere |
 
-### Regenerating layers from masters
+Bride/groom puppet PNGs and rig code have been removed. Live camera + this video own the LED.
 
-```bash
-node scripts/split-kiss-cam-masters.cjs
-# Then re-measure joints into kiss-cam-rig.ts / joints.json
+## Add `kiss-cam.mp4` from your PC
+
+Cloud agents cannot receive large Desktop attachments. From the monorepo root on Windows:
+
+```powershell
+Copy-Item "$env:USERPROFILE\OneDrive\Desktop\kiss-cam.mp4" `
+  "myjiefun-website\public\assets\kiss-cam\kiss-cam.mp4" -Force
+git add myjiefun-website/public/assets/kiss-cam/kiss-cam.mp4
+git commit -m "Add Kiss Cam couple video"
+git push origin main
+powershell -ExecutionPolicy Bypass -File scripts\deploy-myjiefun-now.ps1
 ```
 
-Do **not** use `scripts/generate-kiss-cam-layers.cjs` for production art.
-
-## Character Rig Debug (development only)
-
-Toggle **Character Rig Debug** in Kiss Cam Controls, or `?rigDebug=1`, or
-`NEXT_PUBLIC_KISS_CAM_RIG_DEBUG=1`. Shows pivots, bone lines
-(shoulder→elbow→wrist→hand), hold + kiss targets. **Never in production.**
-
-## Legacy static SVG references
-
-Older `groom.svg` / `bride.svg` cartoon references were removed. Live puppets use
-only the layered PNGs under `groom/` and `bride/`.
-
-## Couple standby video
-
-Put `kiss-cam.mp4` at `public/assets/kiss-cam/kiss-cam.mp4` (or Choose video in LED Controls).
-It loops in the Heart frame until a phone camera goes live.
+Or use **Choose video** in Kiss Cam Controls for a same-browser test (not persisted to production).

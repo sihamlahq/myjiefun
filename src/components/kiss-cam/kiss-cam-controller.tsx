@@ -12,7 +12,6 @@ import {
 import { useKissCamMusic } from "@/components/kiss-cam/kiss-cam-music";
 import { KissCamQRCode } from "@/components/kiss-cam/kiss-cam-qr";
 import { CameraStatusDot, KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
-import { isKissCamRigDebugEnabled } from "@/components/kiss-cam/kiss-cam-rig-debug";
 import { SESSION_TTL_MS } from "@/components/kiss-cam/kiss-cam-session";
 import {
   defaultKissCamState,
@@ -40,7 +39,6 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [remoteCountdown, setRemoteCountdown] = useState<1 | 2 | 3 | null>(null);
   const [remoteCountdownTick, setRemoteCountdownTick] = useState(0);
   const [sessionRefreshing, setSessionRefreshing] = useState(false);
-  const [rigDebug, setRigDebug] = useState(false);
   /** Keep QR / controls reachable even while the LED is fullscreen. */
   const [forceShowChrome, setForceShowChrome] = useState(false);
   const [coupleVideoSrc, setCoupleVideoSrc] = useState(KISS_CAM_COUPLE_VIDEO_SRC);
@@ -59,25 +57,6 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const music = useKissCamMusic();
   const musicPlayRef = useRef(music.play);
   musicPlayRef.current = music.play;
-
-  // Character Rig Debug — development only (never in production builds).
-  const rigDebugAvailable = process.env.NODE_ENV !== "production";
-  useEffect(() => {
-    if (!rigDebugAvailable) {
-      setRigDebug(false);
-      return;
-    }
-    setRigDebug(isKissCamRigDebugEnabled());
-  }, [rigDebugAvailable]);
-
-  useEffect(() => {
-    if (!rigDebugAvailable || typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem("kissCamRigDebug", rigDebug ? "1" : "0");
-    } catch {
-      // ignore
-    }
-  }, [rigDebug, rigDebugAvailable]);
 
   const tagline =
     weddingTitle && weddingTitle.trim() && weddingTitle !== coupleNames
@@ -370,9 +349,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           celebrate={celebrate}
           loveBurst={loveBurst}
           loading={loadingScreen}
-          showCharacters
           fillViewport
-          rigDebug={rigDebugAvailable && rigDebug}
           className="h-full w-full"
         />
       </div>
@@ -497,13 +474,6 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                 on={music.enabled}
                 onToggle={() => music.setEnabled(!music.enabled)}
               />
-              {rigDebugAvailable ? (
-                <ToggleRow
-                  label="Character Rig Debug"
-                  on={rigDebug}
-                  onToggle={() => setRigDebug((v) => !v)}
-                />
-              ) : null}
               <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ffc9d4]/85">
                   LED music
