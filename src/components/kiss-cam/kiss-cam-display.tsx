@@ -14,28 +14,23 @@ import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import { STAGE_SAFE_AREA_STYLE } from "@/components/kiss-cam/kiss-cam-layout";
 import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 
-/** Couple standby video — full stage (not heart-clipped). */
+/** Couple standby video — clipped inside the dark love shape (same as live camera). */
 export const KISS_CAM_COUPLE_VIDEO_SRC = "/assets/kiss-cam/kiss-cam.mp4";
 
 type KissCamDisplayProps = {
   phase: KissCamAnimationPhase;
   countdownValue: number | null;
-  /** Manual countdown from the phone (1 / 2 / 3 buttons). */
   remoteCountdown?: 1 | 2 | 3 | null;
-  /** Bumps on every phone press so the same digit can replay. */
   remoteCountdownTick?: number;
   coupleNames: string;
   tagline?: string;
   cameraEnabled: boolean;
   cameraLayout: CameraLayoutMode;
   remoteStream: MediaStream | null;
-  /** Full-screen couple video when no phone is live. */
   fallbackVideoSrc?: string;
   celebrate: boolean;
   loveBurst?: boolean;
-  /** Soft loading overlay — keeps background visible. */
   loading?: boolean;
-  /** Fill the parent completely (true fullscreen) — no 16:9 letterboxing. */
   fillViewport?: boolean;
   className?: string;
 };
@@ -57,9 +52,8 @@ export function KissCamDisplay({
   fillViewport = false,
   className = "",
 }: KissCamDisplayProps) {
-  const streamVideoRef = useRef<HTMLVideoElement>(null);
-  const coupleVideoRef = useRef<HTMLVideoElement>(null);
-  const [streamVideoEl, setStreamVideoEl] = useState<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [fadeIn, setFadeIn] = useState(true);
   const [autoLove, setAutoLove] = useState(false);
   const [autoLoveId, setAutoLoveId] = useState(0);
@@ -68,92 +62,95 @@ export function KissCamDisplay({
   const lastPhaseRef = useRef(phase);
 
   const livePhone = Boolean(remoteStream);
-  const showCoupleVideo = !livePhone && cameraEnabled && Boolean(fallbackVideoSrc);
-  const cameraLive = cameraEnabled && livePhone;
+  const loveLayout = cameraLayout === "love";
+  const useCoupleFile = !livePhone && cameraEnabled && Boolean(fallbackVideoSrc);
+  // Heart window always on in love mode; video only paints inside that silhouette.
+  const compositorEnabled = cameraEnabled && (livePhone || (useCoupleFile && couplePlaying));
+  const showLoveWindow = loveLayout && cameraEnabled;
 
-  // Live phone → hidden video + heart compositor.
   useEffect(() => {
-    const video = streamVideoRef.current;
+    const video = videoRef.current;
     if (!video) return;
-    setStreamVideoEl(video);
+    setVideoEl(video);
 
-    if (!remoteStream) {
-      video.srcObject = null;
-      return;
-    }
-
-    setFadeIn(true);
-    if (video.srcObject !== remoteStream) {
-      video.srcObject = remoteStream;
-    }
-    void video.play().catch(() => undefined);
-    const track = remoteStream.getVideoTracks()[0];
-    if (!track) return;
-    const kick = () => {
-      void video.play().catch(() => undefined);
-      setFadeIn(true);
-    };
-    track.addEventListener("unmute", kick);
-    track.addEventListener("ended", kick);
-    return () => {
-      track.removeEventListener("unmute", kick);
-      track.removeEventListener("ended", kick);
-    };
-  }, [remoteStream]);
-
-  // Couple mp4 → full-bleed visible video (paused until Play).
-  useEffect(() => {
-    const video = coupleVideoRef.current;
-    if (!video || !showCoupleVideo || !fallbackVideoSrc) {
-      setCoupleReady(false);
+    if (remoteStream) {
       setCouplePlaying(false);
-      return;
-    }
-
-    let cancelled = false;
-    const onReady = () => {
-      if (!cancelled) setCoupleReady(true);
-    };
-    const onError = () => {
-      if (!cancelled) {
-        setCoupleReady(false);
-        setCouplePlaying(false);
+      setCoupleReady(false);
+      setFadeIn(true);
+      video.removeAttribute("src");
+      video.load();
+      video.muted = true;
+      if (video.srcObject !== remoteStream) {
+        video.srcObject = remoteStream;
       }
-    };
-    const onPlay = () => {
-      if (!cancelled) setCouplePlaying(true);
-    };
-    const onPause = () => {
-      if (!cancelled) setCouplePlaying(false);
-    };
-
-    video.loop = true;
-    video.playsInline = true;
-    video.muted = true;
-    if (video.getAttribute("src") !== fallbackVideoSrc) {
-      video.src = fallbackVideoSrc;
+      void video.play().catch(() => undefined);
+      const track = remoteStream.getVideoTracks()[0];
+      if (!track) return;
+      const kick = () => {
+        void video.play().catch(() => undefined);
+        setFadeIn(true);
+      };
+      track.addEventListener("unmute", kick);
+      track.addEventListener("ended", kick);
+      return () => {
+        track.removeEventListener("unmute", kick);
+        track.removeEventListener("ended", kick);
+      };
     }
-    video.addEventListener("canplay", onReady);
-    video.addEventListener("loadeddata", onReady);
-    video.addEventListener("error", onError);
-    video.addEventListener("play", onPlay);
-    video.addEventListener("pause", onPause);
-    video.pause();
-    setCouplePlaying(false);
 
-    return () => {
-      cancelled = true;
-      video.removeEventListener("canplay", onReady);
-      video.removeEventListener("loadeddata", onReady);
-      video.removeEventListener("error", onError);
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("pause", onPause);
-    };
-  }, [showCoupleVideo, fallbackVideoSrc]);
+    video.srcObject = null;
+
+    if (useCoupleFile && fallbackVideoSrc) {
+      let cancelled = false;
+      const onReady = () => {
+        if (!cancelled) setCoupleReady(true);
+      };
+      const onError = () => {
+        if (!cancelled) {
+          setCoupleReady(false);
+          setCouplePlaying(false);
+        }
+      };
+      const onPlay = () => {
+        if (!cancelled) setCouplePlaying(true);
+      };
+      const onPause = () => {
+        if (!cancelled) setCouplePlaying(false);
+      };
+
+      video.loop = true;
+      video.playsInline = true;
+      video.muted = true;
+      if (video.getAttribute("src") !== fallbackVideoSrc) {
+        video.src = fallbackVideoSrc;
+      }
+      video.addEventListener("canplay", onReady);
+      video.addEventListener("loadeddata", onReady);
+      video.addEventListener("error", onError);
+      video.addEventListener("play", onPlay);
+      video.addEventListener("pause", onPause);
+      video.pause();
+      setCouplePlaying(false);
+
+      return () => {
+        cancelled = true;
+        video.removeEventListener("canplay", onReady);
+        video.removeEventListener("loadeddata", onReady);
+        video.removeEventListener("error", onError);
+        video.removeEventListener("play", onPlay);
+        video.removeEventListener("pause", onPause);
+      };
+    }
+
+    setCoupleReady(false);
+    setCouplePlaying(false);
+    video.removeAttribute("src");
+    video.load();
+  }, [remoteStream, useCoupleFile, fallbackVideoSrc]);
 
   useEffect(() => {
     if (loading || !livePhone) return;
-    const video = streamVideoRef.current;
+    const video = videoRef.current;
     if (!video?.srcObject) return;
     void video.play().catch(() => undefined);
     setFadeIn(true);
@@ -177,18 +174,27 @@ export function KissCamDisplay({
   }, [phase, autoLove]);
 
   const playCoupleVideo = useCallback(() => {
-    const video = coupleVideoRef.current;
+    const video = videoRef.current;
     if (!video) return;
-    // Start unmuted when the guest taps Play (browser allows after gesture).
     video.muted = false;
-    void video.play().then(() => setCouplePlaying(true)).catch(() => {
-      video.muted = true;
-      void video.play().then(() => setCouplePlaying(true)).catch(() => undefined);
-    });
+    void video
+      .play()
+      .then(() => {
+        setCouplePlaying(true);
+        setFadeIn(true);
+      })
+      .catch(() => {
+        video.muted = true;
+        void video.play().then(() => {
+          setCouplePlaying(true);
+          setFadeIn(true);
+        }).catch(() => undefined);
+      });
   }, []);
 
   const finalFrame = phase === "final" || phase === "celebration";
   const showBigLove = loveBurst || autoLove;
+  const stageActive = compositorEnabled;
   const overlayCountdown = loading
     ? null
     : (remoteCountdown ?? (phase === "countdown" ? countdownValue : null));
@@ -197,8 +203,9 @@ export function KissCamDisplay({
       ? `remote-${remoteCountdown}-${remoteCountdownTick}`
       : `auto-${countdownValue}`;
   const showIdleHeader =
-    !loading && phase === "idle" && !livePhone && !(showCoupleVideo && couplePlaying);
-  const stageFilled = cameraLive || (showCoupleVideo && couplePlaying);
+    !loading && phase === "idle" && !livePhone && !couplePlaying;
+  const showPlayButton =
+    useCoupleFile && loveLayout && coupleReady && !couplePlaying && !loading && !livePhone;
 
   return (
     <div
@@ -213,59 +220,41 @@ export function KissCamDisplay({
       }}
     >
       <div className="pointer-events-none absolute inset-0 z-0">
-        <KissCamBackground active lite={stageFilled} showHeartMotifs={!stageFilled} />
+        <KissCamBackground active lite={stageActive} showHeartMotifs={!stageActive} />
       </div>
 
-      {/* Full-bleed couple video — not clipped to the heart */}
-      {showCoupleVideo ? (
-        <video
-          ref={coupleVideoRef}
-          className="absolute inset-0 z-[1] h-full w-full object-cover"
-          playsInline
-          loop
-          preload="auto"
-          disablePictureInPicture
-          aria-label="Kiss Cam couple video"
-        />
-      ) : null}
-
-      {/* Hidden stream source for live phone + heart compositor */}
+      {/* Hidden media source only — never shown as a rectangular overlay */}
       <video
-        ref={streamVideoRef}
+        ref={videoRef}
         className="pointer-events-none absolute h-px w-px opacity-0"
-        muted
         playsInline
-        autoPlay
+        loop
         disablePictureInPicture
         aria-hidden
       />
 
-      <div
-        className={
-          cameraLayout === "love"
-            ? "pointer-events-none absolute inset-0 z-[5]"
-            : "pointer-events-none absolute inset-0 z-[1]"
-        }
-      >
+      {/* Heart window + clipped video — below chrome so QR/controls stay visible */}
+      <div className="pointer-events-none absolute inset-0 z-[1]">
         <KissCamCanvasCompositor
-          video={streamVideoEl}
-          enabled={cameraLive}
+          video={videoEl}
+          enabled={compositorEnabled}
+          showLoveWindow={showLoveWindow}
           layout={cameraLayout}
           fadeIn={fadeIn}
         />
       </div>
 
       <div className="pointer-events-none absolute inset-0 z-[2]">
-        <KissCamBalloons active={!stageFilled || celebrate} celebrate={celebrate} />
+        <KissCamBalloons active={!stageActive || celebrate} celebrate={celebrate} />
       </div>
 
-      {showCoupleVideo && coupleReady && !couplePlaying && !loading ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#2a1a22]/35 backdrop-blur-[1px]">
+      {showPlayButton ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center">
           <button
             type="button"
             onClick={playCoupleVideo}
             className="group flex flex-col items-center gap-3 rounded-full px-4 py-3 text-[#fff5f7] outline-none transition focus-visible:ring-2 focus-visible:ring-[#ffc9d4]"
-            aria-label="Play couple video"
+            aria-label="Play couple video inside love frame"
           >
             <span className="flex h-24 w-24 items-center justify-center rounded-full bg-[#c45a78] shadow-[0_18px_48px_rgba(0,0,0,.4)] transition group-hover:scale-105 group-hover:bg-[#a84864] sm:h-28 sm:w-28">
               <svg viewBox="0 0 24 24" className="ml-1 h-12 w-12 fill-current sm:h-14 sm:w-14" aria-hidden>

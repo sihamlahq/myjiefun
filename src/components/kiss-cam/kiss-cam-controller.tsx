@@ -4,12 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { KissCamConnection } from "@/components/kiss-cam/kiss-cam-connection";
+import {
+  KissCamConnection,
+  type KissCamCameraPeer,
+} from "@/components/kiss-cam/kiss-cam-connection";
 import {
   KISS_CAM_COUPLE_VIDEO_SRC,
   KissCamDisplay,
 } from "@/components/kiss-cam/kiss-cam-display";
 import { useKissCamMusic } from "@/components/kiss-cam/kiss-cam-music";
+import { KissCamPhoneSwitcher } from "@/components/kiss-cam/kiss-cam-phone-switcher";
 import { KissCamQRCode } from "@/components/kiss-cam/kiss-cam-qr";
 import { CameraStatusDot, KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
 import { SESSION_TTL_MS } from "@/components/kiss-cam/kiss-cam-session";
@@ -43,6 +47,9 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [forceShowChrome, setForceShowChrome] = useState(false);
   const [coupleVideoSrc, setCoupleVideoSrc] = useState(KISS_CAM_COUPLE_VIDEO_SRC);
   const [coupleVideoLabel, setCoupleVideoLabel] = useState("kiss-cam.mp4 (default path)");
+  const [cameraPeers, setCameraPeers] = useState<KissCamCameraPeer[]>([]);
+  const [publisherId, setPublisherId] = useState<string | null>(null);
+  const [switchingPhone, setSwitchingPhone] = useState(false);
   const coupleVideoObjectUrl = useRef<string | null>(null);
   const connRef = useRef<KissCamConnection | null>(null);
   const rafRef = useRef(0);
@@ -83,6 +90,10 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         // New QR = new pairing session; phone must scan again.
         cameraState: "waiting",
       }));
+      setCameraPeers([]);
+      setPublisherId(null);
+      setRemoteStream(null);
+      setSwitchingPhone(false);
     } catch {
       setError("Unable to refresh the QR code. Please try again.");
     } finally {
@@ -120,11 +131,16 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       const conn = new KissCamConnection(supabase, state.sessionId!, "display", {
         onRemoteStream: (stream) => {
           if (cancelled) return;
-          setRemoteStream(stream);
-          setState((s) => ({
-            ...s,
-            cameraState: stream ? "connected" : s.cameraState === "connected" ? "disconnected" : s.cameraState,
-          }));
+          // Only clear when explicitly null with no publisher; otherwise keep last
+          // frame until the new phone's track arrives (instant switch).
+          setRemoteStream((prev) => {
+            if (stream) return stream;
+            return prev;
+          });
+          if (stream) {
+            setSwitchingPhone(false);
+            setState((s) => ({ ...s, cameraState: "connected" }));
+          }
         },
         onConnectionState: (pcState) => {
           if (cancelled) return;
@@ -151,6 +167,29 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                 ? s.cameraState
                 : "connecting",
           }));
+        },
+        onPublisherChange: (_self, nextPublisher) => {
+          if (cancelled) return;
+          setPublisherId(nextPublisher);
+          if (!nextPublisher) {
+            setRemoteStream(null);
+            setSwitchingPhone(false);
+            setState((s) => ({
+              ...s,
+              cameraState: s.cameraState === "waiting" ? "waiting" : "disconnected",
+            }));
+          } else {
+            setSwitchingPhone(true);
+            setState((s) => ({
+              ...s,
+              cameraState: s.cameraState === "connected" ? "connected" : "connecting",
+            }));
+          }
+        },
+        onRoster: (cameras, liveId) => {
+          if (cancelled) return;
+          setCameraPeers(cameras);
+          setPublisherId(liveId);
         },
         onQuality: (quality: ConnectionQuality) => {
           if (!cancelled) setState((s) => ({ ...s, connectionQuality: quality }));
@@ -412,13 +451,25 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             }}
           />
 
+          <KissCamPhoneSwitcher
+            cameras={cameraPeers}
+            publisherId={publisherId}
+            switching={switchingPhone}
+            onSelect={(clientId) => {
+              setSwitchingPhone(true);
+              void connRef.current?.promoteCamera(clientId).catch(() => {
+                setSwitchingPhone(false);
+              });
+            }}
+          />
+
           <div className="rounded-2xl border border-white/10 bg-[#3a2f28]/92 p-4 text-[#f7f1e8] shadow-[0_16px_40px_rgba(0,0,0,.35)] backdrop-blur-md">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ffc9d4]/90">
               Controls
             </p>
             <p className="mt-2 text-[11px] leading-snug text-[#f7f1e8]/60">
-              Phone camera: scan the QR. Mobile buttons (countdown / Love / zoom) are on that camera
-              page — there is no separate controller URL.
+              Scan QR on each phone. Use Camera phones above to switch the live heart view — standby
+              phones stay connected.
             </p>
             <div className="mt-3 grid gap-2">
               <Button
@@ -603,8 +654,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                   {coupleVideoLabel}
                 </p>
                 <p className="mt-1 text-[11px] text-[#f7f1e8]/55">
-                  Full-screen with a Play button until a phone camera goes live (live cam still uses
-                  the heart frame). Default:{" "}
+                  Plays inside the dark love shape (Play button) until a phone goes live. Default:{" "}
                   <code className="text-[10px]">/assets/kiss-cam/kiss-cam.mp4</code>
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-2">

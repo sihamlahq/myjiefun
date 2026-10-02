@@ -298,7 +298,9 @@ export function KissCamCameraClient() {
   const loadingBusyRef = useRef(false);
   const placeholderTrackRef = useRef<MediaStreamTrack | null>(null);
   const pauseCameraForLoadingRef = useRef<(notify?: boolean) => Promise<void>>(async () => undefined);
-  const startCameraRef = useRef<() => Promise<void>>(async () => undefined);
+  const startCameraRef = useRef<(mode?: "take" | "if-free") => Promise<void>>(
+    async () => undefined,
+  );
 
   const stopPlaceholderTrack = useCallback(() => {
     const track = placeholderTrackRef.current;
@@ -518,14 +520,17 @@ export function KissCamCameraClient() {
       },
       onStandby: () => {
         stopPlaceholderTrack();
-        stopTracksOnly();
-        void releaseWakeLock();
+        // Keep local camera preview + wake lock so LED can switch back instantly.
         setLoadingScreen(false);
         setPrimaryAction("start");
         setNeedsConnectTap(false);
         setStatus("standby");
         setQuality(null);
-        setMessage("Connected · standby (another phone is live)");
+        setMessage("Connected · standby (another phone is live — tap Go Live to switch)");
+      },
+      onPromote: () => {
+        // LED selected this phone — publish without dropping the session.
+        void startCameraRef.current();
       },
       onError: () => {
         if (!conn.isPublishing) return;
@@ -543,11 +548,10 @@ export function KissCamCameraClient() {
       .then(() => {
         if (cancelled || didAutoStart) return;
         didAutoStart = true;
-        // Scan QR → auto claim live slot (no Start Camera tap).
-        // Standby only if another phone already owns the publisher slot.
+        // Scan QR → open camera; claim live only if the slot is free (else standby).
         setStatus("connecting");
         setMessage("Connecting camera…");
-        void startCameraRef.current();
+        void startCameraRef.current("if-free");
       })
       .catch((error) => {
         if (cancelled) return;
@@ -566,7 +570,7 @@ export function KissCamCameraClient() {
     };
   }, [releaseWakeLock, sessionId, stopPlaceholderTrack, stopTracksOnly]);
 
-  const startCamera = useCallback(async () => {
+  const startCamera = useCallback(async (claimMode: "take" | "if-free" = "take") => {
     if (switchingRef.current || startingRef.current || loadingBusyRef.current) return;
     startingRef.current = true;
 
@@ -601,7 +605,7 @@ export function KissCamCameraClient() {
     }
 
     setStatus("connecting");
-    setMessage("Connecting camera…");
+    setMessage(claimMode === "if-free" ? "Joining camera session…" : "Going live…");
 
     try {
       const conn = connRef.current;
@@ -611,7 +615,7 @@ export function KissCamCameraClient() {
 
       // If we only paused for loading, reopen the lens and renegotiate media.
       if (conn.isPublishing) {
-        const stream = await openCamera(facingRef.current);
+        const stream = streamRef.current ?? (await openCamera(facingRef.current));
         await bindPreview(stream);
         await requestWakeLock();
         const track = stream.getVideoTracks()[0] ?? null;
@@ -627,20 +631,24 @@ export function KissCamCameraClient() {
       }
 
       stopPlaceholderTrack();
-      stopTracksOnly();
 
-      const stream = await openCamera(facingRef.current);
+      // Reuse standby preview stream when possible (instant switch).
+      let stream = streamRef.current;
+      const liveTrack = stream?.getVideoTracks()[0];
+      if (!stream || !liveTrack || liveTrack.readyState === "ended") {
+        stopTracksOnly();
+        stream = await openCamera(facingRef.current);
+      }
       await bindPreview(stream);
       await requestWakeLock();
-      await conn.startPublishing(stream);
+      await conn.startPublishing(stream, { mode: claimMode });
       if (!conn.isPublishing) {
-        // Signaling stays up — connected standby while another phone is live.
-        stopTracksOnly();
-        await releaseWakeLock();
+        // Stay connected with local preview — LED can promote this phone later.
         setPrimaryAction("start");
         setNeedsConnectTap(false);
         setStatus("standby");
-        setMessage("Connected · standby (another phone is live)");
+        setCameraOn(true);
+        setMessage("Connected · standby (another phone is live — tap Go Live to switch)");
         startingRef.current = false;
         return;
       }

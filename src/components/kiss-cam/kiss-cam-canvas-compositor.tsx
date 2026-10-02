@@ -7,18 +7,21 @@ type KissCamCanvasCompositorProps = {
   enabled: boolean;
   layout: "love" | "center" | "portrait" | "rounded" | "full";
   fadeIn: boolean;
+  /** Keep the dark heart window visible even before video frames arrive. */
+  showLoveWindow?: boolean;
   className?: string;
 };
 
 /**
- * Draws the live camera into a cinematic frame.
- * Default "love" fills the large single-heart stage opening with the live feed.
+ * Draws camera / couple video into a cinematic frame.
+ * Love layout = only inside the dark heart silhouette (never a full-screen rect).
  */
 export function KissCamCanvasCompositor({
   video,
   enabled,
   layout,
   fadeIn,
+  showLoveWindow = false,
   className = "",
 }: KissCamCanvasCompositorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -28,7 +31,8 @@ export function KissCamCanvasCompositor({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !enabled) {
+    const loveWindow = layout === "love" && (enabled || showLoveWindow);
+    if (!canvas || (!enabled && !loveWindow)) {
       opacityRef.current = 0;
       return;
     }
@@ -92,8 +96,27 @@ export function KissCamCanvasCompositor({
       const w = cssW;
       const h = cssH;
 
-      const targetOpacity = video && video.readyState >= 2 ? 1 : 0;
+      const hasVideo = Boolean(video && video.readyState >= 2 && !video.paused);
+      const hasStreamStill =
+        Boolean(video && video.readyState >= 2 && video.srcObject instanceof MediaStream);
+      const paintVideo = hasVideo || hasStreamStill;
+      const targetOpacity = paintVideo ? 1 : 0;
       opacityRef.current += (targetOpacity - opacityRef.current) * (fadeIn ? 0.12 : 0.3);
+
+      if (layout === "love") {
+        const vw = video?.videoWidth || 1920;
+        const vh = video?.videoHeight || 1080;
+        drawLoveCamera(
+          ctx,
+          paintVideo ? video : null,
+          w,
+          h,
+          vw,
+          vh,
+          paintVideo ? Math.max(opacityRef.current, 0.08) : 0,
+        );
+        return;
+      }
 
       if (opacityRef.current < 0.01 || !video || video.readyState < 2) {
         return;
@@ -101,11 +124,6 @@ export function KissCamCanvasCompositor({
 
       const vw = video.videoWidth || 1920;
       const vh = video.videoHeight || 1080;
-
-      if (layout === "love") {
-        drawLoveCamera(ctx, video, w, h, vw, vh, opacityRef.current);
-        return;
-      }
 
       // Larger frame so faces read clearer / higher on the LED.
       let fw = w * 0.66;
@@ -170,9 +188,9 @@ export function KissCamCanvasCompositor({
 
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [video, enabled, layout, fadeIn]);
+  }, [video, enabled, layout, fadeIn, showLoveWindow]);
 
-  if (!enabled) return null;
+  if (!enabled && !(layout === "love" && showLoveWindow)) return null;
 
   return (
     <canvas
@@ -184,54 +202,60 @@ export function KissCamCanvasCompositor({
 }
 
 /**
- * Single large heart that fills the LED black heart opening.
- * Cover-fills with the live camera so no black margins remain inside the silhouette.
+ * Dark love window + optional video clipped exactly to that silhouette.
+ * Never draws a rectangular video layer outside the heart.
  */
 function drawLoveCamera(
   ctx: CanvasRenderingContext2D,
-  video: HTMLVideoElement,
+  video: HTMLVideoElement | null,
   stageW: number,
   stageH: number,
   vw: number,
   vh: number,
   opacity: number,
 ) {
-  // Match the large black stage cutout (≈70% wide × 84% tall, above the ribbon).
-  // Path is normalized to the heart's real bounds (not the padded 24×24 viewBox).
-  const boxH = stageH * 0.86;
-  const boxW = Math.min(stageW * 0.74, boxH * 1.18);
+  // Large central heart opening (above bottom ribbon / chrome).
+  const boxH = stageH * 0.78;
+  const boxW = Math.min(stageW * 0.62, boxH * 1.05);
   const boxX = (stageW - boxW) / 2;
-  const boxY = stageH * 0.05;
+  const boxY = stageH * 0.07;
 
   const heart = singleHeartPath2D(boxX, boxY, boxW, boxH);
 
-  // Opaque heart mask, then source-in the live cover video.
+  // 1) Always paint the dark love shape (empty window).
   ctx.save();
   ctx.globalAlpha = 1;
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#0a0610";
   ctx.fill(heart);
-
-  ctx.globalCompositeOperation = "source-in";
-  ctx.globalAlpha = opacity;
-  // Overscan so anti-aliased lobe edges never reveal the black stage.
-  const scale = Math.max(boxW / vw, boxH / vh) * 1.16;
-  const dw = vw * scale;
-  const dh = vh * scale;
-  const dx = boxX + (boxW - dw) / 2;
-  const dy = boxY + (boxH - dh) / 2;
-  ctx.drawImage(video, dx, dy, dw, dh);
   ctx.restore();
 
-  // Soft rose outline on top of the filled video.
+  // 2) Clip video to the same heart — nothing draws outside.
+  if (video && opacity > 0.01) {
+    ctx.save();
+    ctx.clip(heart);
+    ctx.globalAlpha = Math.min(1, opacity);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    // Cover-fill inside the heart bounds only.
+    const scale = Math.max(boxW / vw, boxH / vh) * 1.08;
+    const dw = vw * scale;
+    const dh = vh * scale;
+    const dx = boxX + (boxW - dw) / 2;
+    const dy = boxY + (boxH - dh) / 2;
+    ctx.drawImage(video, dx, dy, dw, dh);
+    ctx.restore();
+  }
+
+  // 3) Rose rim on the love shape (matches the frame, not a second video panel).
   ctx.save();
-  ctx.globalAlpha = opacity * 0.95;
+  ctx.globalAlpha = 0.95;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(255, 201, 212, 0.95)";
-  ctx.lineWidth = Math.max(3, Math.min(stageW, stageH) * 0.004);
+  ctx.strokeStyle = "rgba(232, 121, 154, 0.95)";
+  ctx.lineWidth = Math.max(3, Math.min(stageW, stageH) * 0.0045);
   ctx.stroke(heart);
-  ctx.strokeStyle = "rgba(255, 248, 250, 0.4)";
-  ctx.lineWidth = Math.max(1, Math.min(stageW, stageH) * 0.0014);
+  ctx.strokeStyle = "rgba(255, 248, 250, 0.55)";
+  ctx.lineWidth = Math.max(1.5, Math.min(stageW, stageH) * 0.0018);
   ctx.stroke(heart);
   ctx.restore();
 }

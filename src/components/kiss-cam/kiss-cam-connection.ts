@@ -28,13 +28,24 @@ type ClientRole = "display" | "camera";
 
 type SignalEnvelope = { from: string };
 
+export type KissCamClaimMode = "take" | "if-free";
+
+export type KissCamCameraPeer = {
+  clientId: string;
+  label: string;
+  publishing: boolean;
+  lastBeat: number;
+};
+
 type SignalMessage = SignalEnvelope &
   (
-    | { type: "hello"; role: ClientRole }
-    | { type: "heartbeat"; role: ClientRole; ts: number; publishing?: boolean }
-    | { type: "claim" }
+    | { type: "hello"; role: ClientRole; label?: string }
+    | { type: "heartbeat"; role: ClientRole; ts: number; publishing?: boolean; label?: string }
+    | { type: "claim"; mode?: KissCamClaimMode }
     | { type: "standby" }
     | { type: "publisher"; clientId: string | null }
+    | { type: "promote"; clientId: string }
+    | { type: "roster"; cameras: Array<{ clientId: string; label: string; publishing: boolean }> }
     | { type: "offer"; sdp: RTCSessionDescriptionInit }
     | { type: "answer"; sdp: RTCSessionDescriptionInit }
     | { type: "ice"; candidate: RTCIceCandidateInit }
@@ -55,9 +66,13 @@ type Handlers = {
   onQuality?: (quality: ConnectionQuality) => void;
   onError?: (message: string) => void;
   onControl?: (action: KissCamControlAction) => void;
-  /** This phone lost the live camera slot — keep signaling, stop sending video. */
+  /** This phone lost the live camera slot — keep signaling; local preview may stay. */
   onStandby?: () => void;
   onPublisherChange?: (selfIsPublisher: boolean, publisherId: string | null) => void;
+  /** LED: connected camera phones (live + standby). */
+  onRoster?: (cameras: KissCamCameraPeer[], publisherId: string | null) => void;
+  /** Phone: LED asked this device to become the live camera. */
+  onPromote?: () => void;
 };
 
 function createClientId() {
@@ -108,6 +123,12 @@ export class KissCamConnection {
   /** Display: which camera client currently owns the live slot. */
   private publisherId: string | null = null;
   private publisherWaiters: Array<(id: string | null) => void> = [];
+  /** Display roster of camera phones still on signaling. */
+  private cameras = new Map<string, { label: string; publishing: boolean; lastBeat: number }>();
+  private phoneLabel =
+    typeof navigator !== "undefined"
+      ? `Phone ${(navigator.userAgent.match(/iPhone|Android|Mobile/i)?.[0] ?? "Cam").slice(0, 8)}-${this.clientId.slice(0, 4)}`
+      : `Phone-${this.clientId.slice(0, 4)}`;
   /** Adaptive encode — soft start, fast downshift (controller-like resilience). */
   private qualityController = new AdaptiveVideoQualityController({
     initialProfile: "medium",
@@ -134,6 +155,14 @@ export class KissCamConnection {
 
   get isPublishing() {
     return this.publishing;
+  }
+
+  get currentPublisherId() {
+    return this.publisherId;
+  }
+
+  getCameraRoster(): KissCamCameraPeer[] {
+    return this.rosterList();
   }
 
   async connect() {
@@ -170,7 +199,11 @@ export class KissCamConnection {
 
       this.channel!.subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          void this.send({ type: "hello", role: this.role });
+          void this.send({
+            type: "hello",
+            role: this.role,
+            ...(this.role === "camera" ? { label: this.phoneLabel } : {}),
+          });
           this.startHeartbeat();
           if (!settled) {
             settled = true;
@@ -284,20 +317,33 @@ export class KissCamConnection {
   }
 
   /**
-   * Take the live camera slot. Other phones receive `publisher` and stand down.
+   * Take / request the live camera slot.
+   * - `take` (default): become live; other phones stand down (keep signaling).
+   * - `if-free`: join as standby when someone else is already live.
    */
-  async startPublishing(stream: MediaStream) {
+  async startPublishing(stream: MediaStream, opts?: { mode?: KissCamClaimMode }) {
     if (this.role !== "camera" || this.disposed || !this.channel) return;
-    this.publishing = true;
+    const mode: KissCamClaimMode = opts?.mode ?? "take";
     this.localStream = stream;
+
+    if (mode === "if-free" && this.publisherId && this.publisherId !== this.clientId) {
+      this.publishing = false;
+      this.handlers.onStandby?.();
+      this.handlers.onPublisherChange?.(false, this.publisherId);
+      return;
+    }
+
+    this.publishing = true;
     const ack = this.waitForPublisherAck(2200);
-    await this.send({ type: "claim" });
+    await this.send({ type: "claim", mode });
     const publisher = await ack;
     if (this.disposed) return;
     if (publisher && publisher !== this.clientId) {
       this.publishing = false;
-      this.localStream = null;
+      // Keep localStream for instant Go Live / promote later.
+      this.closePeerConnection();
       this.handlers.onStandby?.();
+      this.handlers.onPublisherChange?.(false, publisher);
       return;
     }
     this.publisherId = this.clientId;
@@ -311,13 +357,23 @@ export class KissCamConnection {
     if (this.role !== "camera") return;
     const wasPublishing = this.publishing;
     this.publishing = false;
-    this.localStream = null;
     this.contentHintApplied = false;
     this.closePeerConnection();
+    // Keep localStream so standby can re-publish instantly without re-opening the lens.
     if (wasPublishing && this.channel) {
       await this.send({ type: "standby" });
     }
-    this.handlers.onPublisherChange?.(false, this.publisherId === this.clientId ? null : this.publisherId);
+    this.handlers.onPublisherChange?.(
+      false,
+      this.publisherId === this.clientId ? null : this.publisherId,
+    );
+  }
+
+  /** LED: make a standby phone the live camera without dropping its signaling. */
+  async promoteCamera(clientId: string) {
+    if (this.role !== "display" || this.disposed || !clientId) return;
+    await this.setPublisher(clientId);
+    await this.send({ type: "promote", clientId });
   }
 
   async attachLocalStream(stream: MediaStream) {
@@ -596,6 +652,10 @@ export class KissCamConnection {
     if (message.type === "hello") {
       this.notePresence(message);
       if (this.role === "display") {
+        if (message.role === "camera") {
+          this.upsertCamera(message.from, message.label, false);
+          await this.broadcastRoster();
+        }
         await this.send({ type: "publisher", clientId: this.publisherId });
       }
       // Realtime often re-hellos after a brief channel blip. Re-offering while
@@ -613,18 +673,44 @@ export class KissCamConnection {
 
     if (message.type === "heartbeat") {
       this.notePresence(message);
+      if (this.role === "display" && message.role === "camera") {
+        this.upsertCamera(message.from, message.label, Boolean(message.publishing));
+      }
       return;
     }
 
     if (message.type === "claim" && this.role === "display") {
+      const mode: KissCamClaimMode = message.mode ?? "take";
+      if (mode === "if-free" && this.publisherId && this.publisherId !== message.from) {
+        this.upsertCamera(message.from, undefined, false);
+        await this.send({ type: "publisher", clientId: this.publisherId });
+        await this.broadcastRoster();
+        return;
+      }
+      this.upsertCamera(message.from, undefined, true);
       await this.setPublisher(message.from);
       return;
     }
 
     if (message.type === "standby" && this.role === "display") {
+      this.upsertCamera(message.from, undefined, false);
       if (this.publisherId === message.from) {
         await this.setPublisher(null);
+      } else {
+        await this.broadcastRoster();
       }
+      return;
+    }
+
+    if (message.type === "promote" && this.role === "camera") {
+      if (message.clientId === this.clientId) {
+        this.handlers.onPromote?.();
+      }
+      return;
+    }
+
+    if (message.type === "roster" && this.role === "camera") {
+      // Phones don't need the full roster for switching — LED owns that UI.
       return;
     }
 
@@ -637,7 +723,6 @@ export class KissCamConnection {
       this.resolvePublisherWaiters(message.clientId);
       if (!selfIsPublisher && this.publishing) {
         this.publishing = false;
-        this.localStream = null;
         this.closePeerConnection();
         this.handlers.onStandby?.();
       }
@@ -645,10 +730,13 @@ export class KissCamConnection {
     }
 
     if (message.type === "bye") {
-      if (this.role === "display" && this.publisherId === message.from) {
-        await this.setPublisher(null);
-      } else if (this.role === "camera") {
-        // Only the LED going away should drop presence — other phones leaving is fine.
+      if (this.role === "display") {
+        this.cameras.delete(message.from);
+        if (this.publisherId === message.from) {
+          await this.setPublisher(null);
+        } else {
+          await this.broadcastRoster();
+        }
       }
       return;
     }
@@ -703,19 +791,71 @@ export class KissCamConnection {
   private async setPublisher(clientId: string | null) {
     const changed = this.publisherId !== clientId;
     this.publisherId = clientId;
+    if (clientId) {
+      this.upsertCamera(clientId, undefined, true);
+      for (const [id, meta] of this.cameras) {
+        if (id !== clientId && meta.publishing) {
+          this.cameras.set(id, { ...meta, publishing: false });
+        }
+      }
+    }
     if (changed) {
+      // New PC for the next publisher. Keep the last LED frame until ontrack
+      // delivers the new stream (instant visual switch, no black flash).
       this.createPeerConnection();
-      this.handlers.onRemoteStream?.(null);
       this.handlers.onPeerPresence?.(Boolean(clientId));
       this.handlers.onPublisherChange?.(false, clientId);
       if (!clientId) {
         this.lastPeerBeat = 0;
+        this.handlers.onRemoteStream?.(null);
       }
     } else {
       // Same publisher re-claimed (phone remount / Start again) — keep PC, refresh ack.
       this.handlers.onPeerPresence?.(Boolean(clientId));
     }
     await this.send({ type: "publisher", clientId });
+    await this.broadcastRoster();
+  }
+
+  private upsertCamera(clientId: string, label: string | undefined, publishing: boolean) {
+    if (this.role !== "display") return;
+    const prev = this.cameras.get(clientId);
+    this.cameras.set(clientId, {
+      label: label?.trim() || prev?.label || `Phone ${clientId.slice(0, 4)}`,
+      publishing,
+      lastBeat: Date.now(),
+    });
+    this.emitRoster();
+  }
+
+  private rosterList(): KissCamCameraPeer[] {
+    return [...this.cameras.entries()]
+      .map(([clientId, meta]) => ({
+        clientId,
+        label: meta.label,
+        publishing: meta.publishing || this.publisherId === clientId,
+        lastBeat: meta.lastBeat,
+      }))
+      .sort((a, b) => {
+        if (a.publishing !== b.publishing) return a.publishing ? -1 : 1;
+        return a.label.localeCompare(b.label);
+      });
+  }
+
+  private emitRoster() {
+    if (this.role !== "display") return;
+    this.handlers.onRoster?.(this.rosterList(), this.publisherId);
+  }
+
+  private async broadcastRoster() {
+    if (this.role !== "display") return;
+    this.emitRoster();
+    const cameras = this.rosterList().map(({ clientId, label, publishing }) => ({
+      clientId,
+      label,
+      publishing,
+    }));
+    await this.send({ type: "roster", cameras });
   }
 
   private waitForPublisherAck(ms: number) {
@@ -728,8 +868,8 @@ export class KissCamConnection {
         resolve(id);
       };
       const timer = setTimeout(() => finish(this.publisherId), ms);
+      // Any publisher broadcast after our claim is an ack (won or lost).
       const onAck = (id: string | null) => {
-        if (id !== this.clientId) return;
         clearTimeout(timer);
         finish(id);
       };
@@ -738,9 +878,8 @@ export class KissCamConnection {
   }
 
   private resolvePublisherWaiters(id: string | null) {
-    const waiters = this.publisherWaiters;
-    this.publisherWaiters = [];
-    for (const waiter of waiters) waiter(id);
+    // Waiters remove themselves when they settle — do not wipe the list first.
+    for (const waiter of [...this.publisherWaiters]) waiter(id);
   }
 
   private async send(payload: OutgoingSignal) {
@@ -760,7 +899,23 @@ export class KissCamConnection {
         role: this.role,
         ts: Date.now(),
         publishing: this.publishing,
+        ...(this.role === "camera" ? { label: this.phoneLabel } : {}),
       });
+      // Drop stale roster entries on the LED (standby phones that left silently).
+      if (this.role === "display") {
+        const now = Date.now();
+        let changed = false;
+        for (const [id, meta] of this.cameras) {
+          if (now - meta.lastBeat > HEARTBEAT_MISS_MS) {
+            this.cameras.delete(id);
+            changed = true;
+            if (this.publisherId === id) {
+              void this.setPublisher(null);
+            }
+          }
+        }
+        if (changed) void this.broadcastRoster();
+      }
       // Signaling silence only updates presence — never force a WebRTC reconnect.
       // Missed Realtime beats are common on venue Wi‑Fi while media stays up.
       if (this.role === "camera" && this.lastPeerBeat && Date.now() - this.lastPeerBeat > HEARTBEAT_MISS_MS) {
