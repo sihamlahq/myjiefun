@@ -90,7 +90,7 @@ export function KissCamQRCode({
         {refreshing ? "Refreshing…" : "Refresh QR code"}
       </Button>
       <p className="text-center text-[11px] leading-snug text-[var(--foreground)]/50">
-        Tap refresh to issue a new QR when you need a new phone connection.
+        Phone auto-connects after scan. Extra phones stay in connected standby.
       </p>
     </div>
   );

@@ -161,7 +161,7 @@ function readActiveLensFactor(track: MediaStreamTrack | null, lenses: LensOption
 /**
  * Flagship phone profile (iPhone 11+ / Galaxy S23 Ultra class):
  * open quickly with ideal 1080p30 constraints, then refine.
- * Avoid long cascades of exact constraints that fail and delay Start Camera.
+ * Avoid long cascades of exact constraints that fail and delay auto-connect.
  * Prefer 30fps — adaptive WebRTC encode handles weak networks.
  */
 async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStream> {
@@ -274,8 +274,10 @@ export function KissCamCameraClient() {
   const [loveBurstId, setLoveBurstId] = useState(0);
   const [loveBusy, setLoveBusy] = useState(false);
   const [loadingScreen, setLoadingScreen] = useState(false);
-  /** Primary control slot: Start Camera ↔ Loading Screen (swaps instantly on press). */
+  /** Primary control slot: Go Live / Connect ↔ Loading Screen (swaps once live). */
   const [primaryAction, setPrimaryAction] = useState<"start" | "loading">("start");
+  /** iOS / some browsers need one tap before getUserMedia — shown only if auto-connect is blocked. */
+  const [needsConnectTap, setNeedsConnectTap] = useState(false);
   const [countdownBusy, setCountdownBusy] = useState<1 | 2 | 3 | null>(null);
   const [lenses, setLenses] = useState<LensOption[]>([]);
   const [activeLens, setActiveLens] = useState(1);
@@ -297,6 +299,7 @@ export function KissCamCameraClient() {
   const loadingBusyRef = useRef(false);
   const placeholderTrackRef = useRef<MediaStreamTrack | null>(null);
   const pauseCameraForLoadingRef = useRef<(notify?: boolean) => Promise<void>>(async () => undefined);
+  const startCameraRef = useRef<() => Promise<void>>(async () => undefined);
 
   const stopPlaceholderTrack = useCallback(() => {
     const track = placeholderTrackRef.current;
@@ -430,9 +433,15 @@ export function KissCamCameraClient() {
     await releaseWakeLock();
     setLoadingScreen(false);
     setPrimaryAction("start");
+    setNeedsConnectTap(false);
+    // Stay joined to the session — standby with signaling connection.
     setStatus(connRef.current?.alive ? "standby" : "waiting");
     setQuality(null);
-    setMessage(null);
+    setMessage(
+      connRef.current?.alive
+        ? "Connected · standby (tap Go Live to share camera again)"
+        : null,
+    );
   }, [releaseWakeLock, stopPlaceholderTrack, stopTracksOnly]);
 
   const pauseCameraForLoading = useCallback(
@@ -514,9 +523,10 @@ export function KissCamCameraClient() {
         void releaseWakeLock();
         setLoadingScreen(false);
         setPrimaryAction("start");
+        setNeedsConnectTap(false);
         setStatus("standby");
         setQuality(null);
-        setMessage("Standby · another phone is sharing the live camera");
+        setMessage("Connected · standby (another phone is live)");
       },
       onError: () => {
         if (!conn.isPublishing) return;
@@ -525,13 +535,20 @@ export function KissCamCameraClient() {
       },
     });
     connRef.current = conn;
+    setNeedsConnectTap(false);
     setStatus("connecting");
+    setMessage("Connecting to wedding screen…");
+    let didAutoStart = false;
     void conn
       .connect()
       .then(() => {
-        if (cancelled) return;
-        setStatus("standby");
-        setMessage(null);
+        if (cancelled || didAutoStart) return;
+        didAutoStart = true;
+        // Scan QR → auto claim live slot (no Start Camera tap).
+        // Standby only if another phone already owns the publisher slot.
+        setStatus("connecting");
+        setMessage("Connecting camera…");
+        void startCameraRef.current();
       })
       .catch((error) => {
         if (cancelled) return;
@@ -555,7 +572,8 @@ export function KissCamCameraClient() {
     startingRef.current = true;
 
     setMessage(null);
-    // Swap the primary button to Loading Screen immediately.
+    setNeedsConnectTap(false);
+    // Swap the primary button to Loading Screen immediately once we go live.
     setPrimaryAction("loading");
     setLoadingScreen(false);
 
@@ -584,6 +602,7 @@ export function KissCamCameraClient() {
     }
 
     setStatus("connecting");
+    setMessage("Connecting camera…");
 
     try {
       const conn = connRef.current;
@@ -601,6 +620,7 @@ export function KissCamCameraClient() {
         stopPlaceholderTrack();
         void conn.sendControl("loading-off").catch(() => undefined);
         setPrimaryAction("loading");
+        setNeedsConnectTap(false);
         setStatus("connected");
         setMessage(null);
         startingRef.current = false;
@@ -615,39 +635,47 @@ export function KissCamCameraClient() {
       await requestWakeLock();
       await conn.startPublishing(stream);
       if (!conn.isPublishing) {
+        // Signaling stays up — connected standby while another phone is live.
         stopTracksOnly();
         await releaseWakeLock();
         setPrimaryAction("start");
+        setNeedsConnectTap(false);
         setStatus("standby");
-        setMessage("Standby · another phone is sharing the live camera");
+        setMessage("Connected · standby (another phone is live)");
         startingRef.current = false;
         return;
       }
       void conn.sendControl("loading-off").catch(() => undefined);
       setPrimaryAction("loading");
+      setNeedsConnectTap(false);
       setStatus("connected");
       setMessage(null);
     } catch (error) {
       setPrimaryAction("start");
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        setMessage("Camera access is required to use the mobile camera.");
+        // Auto-connect often needs one user gesture on iOS — keep session joined.
+        setNeedsConnectTap(true);
+        setStatus("standby");
+        setMessage("Connected · tap once to allow the camera");
       } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setStatus("error");
         setMessage("Camera unavailable. Please check your phone camera.");
       } else {
+        setStatus("error");
         setMessage(
           error instanceof Error
             ? `Unable to start camera: ${error.message}`
             : "Camera unavailable. Please check your phone camera.",
         );
       }
-      setStatus("error");
       stopPlaceholderTrack();
       stopTracksOnly();
     } finally {
       startingRef.current = false;
     }
   }, [bindPreview, isSecure, releaseWakeLock, requestWakeLock, sessionId, stopPlaceholderTrack, stopTracksOnly]);
+  startCameraRef.current = startCamera;
 
   const switchCamera = useCallback(async () => {
     if (switchingRef.current || !cameraOn) return;
@@ -835,11 +863,13 @@ export function KissCamCameraClient() {
     : status === "waiting"
       ? "Waiting for display..."
       : status === "standby"
-        ? "Standby · tap Start Camera to go live"
+        ? needsConnectTap
+          ? "Connected · tap to allow camera"
+          : "Connected · standby"
         : status === "connecting"
-        ? "Connecting..."
+        ? "Connecting…"
         : status === "connected"
-          ? `Camera connected ✓ · ${facingMode === "environment" ? "Rear" : "Front"}`
+          ? `Connected ✓ · ${facingMode === "environment" ? "Rear" : "Front"}`
           : status === "lost"
             ? "Connection lost"
             : status === "reconnecting"
@@ -892,11 +922,15 @@ export function KissCamCameraClient() {
             autoPlay
             disablePictureInPicture
           />
-          {!cameraOn && (status === "waiting" || status === "standby") ? (
+          {!cameraOn && (status === "waiting" || status === "standby" || status === "connecting") ? (
             <div className="absolute inset-0 z-[1] flex items-center justify-center px-10 text-center text-sm leading-relaxed text-[#5a2f38]/85">
-              {status === "standby"
-                ? "This phone is in standby. Love and countdown still work. Start Camera to share live video."
-                : "Press Start Camera to share video with the wedding screen."}
+              {status === "connecting"
+                ? "Connecting to the wedding screen…"
+                : status === "standby"
+                  ? needsConnectTap
+                    ? "Tap Connect below to allow the camera (one-time)."
+                    : "Connected in standby. Love and countdown work. Tap Go Live to share video."
+                  : "Joining session…"}
             </div>
           ) : null}
           {switching ? (
@@ -1014,7 +1048,7 @@ export function KissCamCameraClient() {
             <p className="text-center text-[11px] text-[#ffc9d4]/55">
               {cameraOn
                 ? "Stock zoom lenses not available on this camera"
-                : "Start camera to use stock zoom lenses"}
+                : "Zoom unlocks after the camera connects"}
             </p>
           )}
         </div>
@@ -1054,7 +1088,11 @@ export function KissCamCameraClient() {
             }}
             disabled={!sessionId || status === "connecting" || switching}
           >
-            {status === "connecting" ? "Starting…" : "Start Camera"}
+            {status === "connecting"
+              ? "Connecting…"
+              : needsConnectTap
+                ? "Connect Camera"
+                : "Go Live"}
           </Button>
         )}
         <Button
