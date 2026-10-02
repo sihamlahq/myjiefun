@@ -217,28 +217,6 @@ async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStrea
   throw lastError;
 }
 
-/** Tiny silent video track that keeps the WebRTC media path warm during loading. */
-function createPlaceholderVideoTrack(): MediaStreamTrack {
-  const canvas = document.createElement("canvas");
-  canvas.width = 640;
-  canvas.height = 360;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.fillStyle = "#3a2430";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-  const stream = canvas.captureStream(5);
-  const track = stream.getVideoTracks()[0];
-  if (!track) throw new Error("Unable to create placeholder video track");
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (track as any).contentHint = "motion";
-  } catch {
-    // ignore
-  }
-  return track;
-}
-
 async function tuneCaptureTrack(stream: MediaStream) {
   const track = stream.getVideoTracks()[0];
   if (!track) return;
