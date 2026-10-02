@@ -71,8 +71,10 @@ const ICE_RESTART_FAILED_MS = 800;
  * Mobile Wi‑Fi often dips to `disconnected` for several seconds (radio power-save /
  * AP roaming) and recovers on its own. Restarting ICE too early causes drop loops.
  */
-const ICE_RESTART_DISCONNECTED_MS = 12_000;
-const ICE_RESTART_MAX_ATTEMPTS = 5;
+const ICE_RESTART_DISCONNECTED_MS = 10_000;
+const ICE_RESTART_MAX_ATTEMPTS = 4;
+/** After ICE restarts fail, rebuild the peer (keep Realtime signaling — like controller). */
+const MEDIA_REBUILD_MAX = 3;
 const HEARTBEAT_INTERVAL_MS = 2500;
 /** Missed signaling beats ≠ media drop — keep this loose on flaky venue Wi‑Fi. */
 const HEARTBEAT_MISS_MS = 20_000;
@@ -86,6 +88,9 @@ export class KissCamConnection {
   private pc: RTCPeerConnection | null = null;
   private channel: RealtimeChannel | null = null;
   private iceServers: RTCIceServer[] = [];
+  private turnConfigured = false;
+  /** Prefer TURN relay after host/srflx paths keep failing on venue Wi‑Fi. */
+  private preferRelay = false;
   private makingOffer = false;
   private ignoreOffer = false;
   private isSettingRemoteAnswerPending = false;
@@ -93,6 +98,8 @@ export class KissCamConnection {
   private statsTimer: ReturnType<typeof setInterval> | null = null;
   private iceRestartTimer: ReturnType<typeof setTimeout> | null = null;
   private iceRestartAttempts = 0;
+  private mediaRebuildAttempts = 0;
+  private mediaRebuildInFlight = false;
   private lastPeerBeat = 0;
   private localStream: MediaStream | null = null;
   private disposed = false;
@@ -101,11 +108,11 @@ export class KissCamConnection {
   /** Display: which camera client currently owns the live slot. */
   private publisherId: string | null = null;
   private publisherWaiters: Array<(id: string | null) => void> = [];
-  /** Adaptive encode profile — camera role only; changes via setParameters. */
+  /** Adaptive encode — soft start, fast downshift (controller-like resilience). */
   private qualityController = new AdaptiveVideoQualityController({
-    initialProfile: "high",
-    downgradeHoldSamples: 3,
-    upgradeHoldSamples: 6,
+    initialProfile: "medium",
+    downgradeHoldSamples: 1,
+    upgradeHoldSamples: 8,
   });
   private contentHintApplied = false;
   private prevOutboundBytes: { bytes: number; ts: number } | null = null;
@@ -131,8 +138,9 @@ export class KissCamConnection {
 
   async connect() {
     this.disposed = false;
-    const { iceServers } = await fetchIceServers();
+    const { iceServers, turnConfigured } = await fetchIceServers();
     this.iceServers = iceServers;
+    this.turnConfigured = turnConfigured;
 
     // Display always has a peer; camera phones join signaling first and only
     // open WebRTC after they claim the live publisher slot.
@@ -203,6 +211,10 @@ export class KissCamConnection {
       iceCandidatePoolSize: 8,
       bundlePolicy: "max-bundle",
       rtcpMuxPolicy: "require",
+      // After repeated failures on guest Wi‑Fi, force TURN when configured.
+      ...(this.preferRelay && this.turnConfigured
+        ? { iceTransportPolicy: "relay" as RTCIceTransportPolicy }
+        : {}),
     });
     this.pc = pc;
     this.makingOffer = false;
@@ -240,7 +252,10 @@ export class KissCamConnection {
       if (!state || this.pc !== pc) return;
       if (state === "connected" || state === "connecting") {
         this.clearIceRestartTimer();
-        if (state === "connected") this.iceRestartAttempts = 0;
+        if (state === "connected") {
+          this.iceRestartAttempts = 0;
+          this.mediaRebuildAttempts = 0;
+        }
         this.handlers.onConnectionState?.(state);
         return;
       }
@@ -468,12 +483,20 @@ export class KissCamConnection {
   private scheduleIceRestart(delayMs: number) {
     if (this.role !== "camera" || !this.publishing) return;
     if (this.iceRestartTimer) return;
-    if (this.iceRestartAttempts >= ICE_RESTART_MAX_ATTEMPTS) return;
+    if (this.iceRestartAttempts >= ICE_RESTART_MAX_ATTEMPTS) {
+      // ICE restart budget spent — rebuild PC while keeping signaling (controller-style).
+      void this.rebuildMediaLink();
+      return;
+    }
     this.iceRestartTimer = setTimeout(() => {
       this.iceRestartTimer = null;
       const state = this.pc?.connectionState;
       const stillBroken = state === "failed" || state === "disconnected";
       if (!stillBroken || !this.publishing) return;
+      if (this.iceRestartAttempts >= ICE_RESTART_MAX_ATTEMPTS) {
+        void this.rebuildMediaLink();
+        return;
+      }
       // Only surface "reconnecting" once ICE actually needs a restart.
       this.handlers.onConnectionState?.("reconnecting");
       this.iceRestartAttempts += 1;
@@ -499,7 +522,49 @@ export class KissCamConnection {
     try {
       await this.createAndSendOffer(true);
     } catch {
-      // Fall through — peer may re-hello
+      // Fall through — peer may re-hello / rebuild
+    }
+  }
+
+  /**
+   * Full media reconnect without dropping Supabase signaling (Love/countdown stay up).
+   * Mirrors the controller’s “immortal channel” model when WebRTC needs a hard reset.
+   */
+  private async rebuildMediaLink() {
+    if (this.role !== "camera" || !this.publishing || this.disposed) return;
+    if (this.mediaRebuildInFlight) return;
+    if (this.mediaRebuildAttempts >= MEDIA_REBUILD_MAX) {
+      this.handlers.onConnectionState?.("failed");
+      this.handlers.onError?.(
+        "Camera link could not recover on this Wi‑Fi. Keep Love/countdown; tap Go Live to retry video.",
+      );
+      return;
+    }
+
+    this.mediaRebuildInFlight = true;
+    this.mediaRebuildAttempts += 1;
+    this.handlers.onConnectionState?.("reconnecting");
+
+    // After the first rebuild, prefer TURN if the venue blocks host candidates.
+    if (this.turnConfigured && this.mediaRebuildAttempts >= 1) {
+      this.preferRelay = true;
+    }
+
+    const stream = this.localStream;
+    try {
+      this.createPeerConnection();
+      if (stream) {
+        this.qualityController.reset("medium");
+        await this.attachLocalStream(stream);
+      } else {
+        await this.createAndSendOffer(true);
+      }
+    } catch (error) {
+      this.handlers.onError?.(
+        error instanceof Error ? error.message : "Unable to rebuild camera link",
+      );
+    } finally {
+      this.mediaRebuildInFlight = false;
     }
   }
 
@@ -942,7 +1007,10 @@ export class KissCamConnection {
     this.stopHeartbeat();
     this.stopStats();
     this.clearIceRestartTimer();
-    this.qualityController.reset("high");
+    this.qualityController.reset("medium");
+    this.preferRelay = false;
+    this.mediaRebuildAttempts = 0;
+    this.mediaRebuildInFlight = false;
     this.contentHintApplied = false;
     this.prevOutboundBytes = null;
     this.prevInboundBytes = null;

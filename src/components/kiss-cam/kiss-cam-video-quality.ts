@@ -31,7 +31,8 @@ export const VIDEO_ENCODING_PROFILES: Record<VideoQualityProfile, VideoEncodingP
     id: "ultra",
     labelWidth: 1920,
     labelHeight: 1080,
-    maxBitrate: 6_500_000,
+    // Cap below previous 6.5 Mbps — venue Wi‑Fi rarely sustains that without freezes.
+    maxBitrate: 4_500_000,
     maxFramerate: 30,
     scaleResolutionDownBy: 1,
   },
@@ -39,7 +40,7 @@ export const VIDEO_ENCODING_PROFILES: Record<VideoQualityProfile, VideoEncodingP
     id: "high",
     labelWidth: 1280,
     labelHeight: 720,
-    maxBitrate: 3_500_000,
+    maxBitrate: 2_500_000,
     maxFramerate: 30,
     // 1920/1280 ≈ 1.5 when capture is 1080p
     scaleResolutionDownBy: 1.5,
@@ -48,7 +49,7 @@ export const VIDEO_ENCODING_PROFILES: Record<VideoQualityProfile, VideoEncodingP
     id: "medium",
     labelWidth: 960,
     labelHeight: 540,
-    maxBitrate: 1_800_000,
+    maxBitrate: 1_400_000,
     maxFramerate: 24,
     scaleResolutionDownBy: 2,
   },
@@ -56,7 +57,7 @@ export const VIDEO_ENCODING_PROFILES: Record<VideoQualityProfile, VideoEncodingP
     id: "low",
     labelWidth: 640,
     labelHeight: 360,
-    maxBitrate: 850_000,
+    maxBitrate: 700_000,
     maxFramerate: 20,
     scaleResolutionDownBy: 3,
   },
@@ -90,45 +91,50 @@ export function classifyNetworkBand(sample: NetworkSample): NetworkBand {
         : null;
 
   // Prefer availableOutgoingBitrate when present; fall back to measured media rate.
-  const limited =
-    sample.qualityLimitationReason === "bandwidth" ||
-    sample.qualityLimitationReason === "cpu";
+  const bandwidthLimited = sample.qualityLimitationReason === "bandwidth";
+  const cpuLimited = sample.qualityLimitationReason === "cpu";
 
-  if (rtt == null && loss == null && availKbps == null) return "unknown";
+  if (rtt == null && loss == null && availKbps == null && !bandwidthLimited && !cpuLimited) {
+    return "unknown";
+  }
 
-  // Very weak — prioritize stability
+  // Encoder already hitting a bandwidth wall — treat as very weak immediately.
+  if (bandwidthLimited) return "very-weak";
+
+  // Very weak — prioritize stability on venue APs
   if (
-    (rtt != null && rtt > 400) ||
-    (loss != null && loss > 0.07) ||
-    (availKbps != null && availKbps < 1000) ||
-    (limited && availKbps != null && availKbps < 1500)
+    (rtt != null && rtt > 320) ||
+    (loss != null && loss > 0.05) ||
+    (availKbps != null && availKbps < 1200) ||
+    (cpuLimited && availKbps != null && availKbps < 1800)
   ) {
     return "very-weak";
   }
 
   // Weak
   if (
-    (rtt != null && rtt > 250) ||
-    (loss != null && loss > 0.03) ||
-    (availKbps != null && availKbps < 2000)
+    (rtt != null && rtt > 200) ||
+    (loss != null && loss > 0.025) ||
+    (availKbps != null && availKbps < 2200) ||
+    cpuLimited
   ) {
     return "weak";
   }
 
   // Good
   if (
-    (rtt != null && rtt > 120) ||
+    (rtt != null && rtt > 110) ||
     (loss != null && loss > 0.01) ||
-    (availKbps != null && availKbps < 4000)
+    (availKbps != null && availKbps < 3500)
   ) {
     return "good";
   }
 
   // Strong
   if (
-    (rtt == null || rtt <= 120) &&
+    (rtt == null || rtt <= 110) &&
     (loss == null || loss <= 0.01) &&
-    (availKbps == null || availKbps >= 4000)
+    (availKbps == null || availKbps >= 3500)
   ) {
     return "strong";
   }
@@ -147,7 +153,8 @@ export function targetProfileForBand(band: NetworkBand): VideoQualityProfile {
     case "very-weak":
       return "low";
     default:
-      return "high";
+      // Unknown → stay conservative until stats arrive (matches soft start).
+      return "medium";
   }
 }
 
@@ -186,9 +193,10 @@ export class AdaptiveVideoQualityController {
   private readonly upgradeHold: number;
 
   constructor(opts: AdaptiveControllerOptions = {}) {
-    this.profile = opts.initialProfile ?? "high";
-    this.downgradeHold = opts.downgradeHoldSamples ?? 3;
-    this.upgradeHold = opts.upgradeHoldSamples ?? 6;
+    // Soft start on venue Wi‑Fi; climb only after sustained good samples.
+    this.profile = opts.initialProfile ?? "medium";
+    this.downgradeHold = opts.downgradeHoldSamples ?? 1;
+    this.upgradeHold = opts.upgradeHoldSamples ?? 8;
   }
 
   get current(): VideoQualityProfile {
@@ -209,15 +217,20 @@ export class AdaptiveVideoQualityController {
       return null;
     }
 
+    const upgrading = profileRank(desired) < profileRank(this.profile);
+    // Bandwidth walls: step down on the first sample (no hold).
+    const immediateDown =
+      !upgrading && sample.qualityLimitationReason === "bandwidth";
+
     if (this.pendingTarget !== desired) {
       this.pendingTarget = desired;
       this.pendingCount = 1;
-      return null;
+      if (!immediateDown) return null;
+    } else {
+      this.pendingCount += 1;
     }
 
-    this.pendingCount += 1;
-    const upgrading = profileRank(desired) < profileRank(this.profile);
-    const need = upgrading ? this.upgradeHold : this.downgradeHold;
+    const need = upgrading ? this.upgradeHold : immediateDown ? 1 : this.downgradeHold;
     if (this.pendingCount < need) return null;
 
     const next = stepTowardProfile(this.profile, desired);
@@ -232,17 +245,17 @@ export class AdaptiveVideoQualityController {
     return next;
   }
 
-  reset(profile: VideoQualityProfile = "high") {
+  reset(profile: VideoQualityProfile = "medium") {
     this.profile = profile;
     this.pendingTarget = null;
     this.pendingCount = 0;
   }
 }
 
-/** Capture constraints: 1080p30 ideal — never force 60fps for wedding WebRTC. */
+/** Capture constraints: prefer 720p30 for stable venue share; encode adapts further. */
 export const KISS_CAM_CAPTURE_CONSTRAINTS: MediaTrackConstraints = {
-  width: { ideal: 1920, max: 1920 },
-  height: { ideal: 1080, max: 1080 },
+  width: { ideal: 1280, max: 1920 },
+  height: { ideal: 720, max: 1080 },
   frameRate: { ideal: 30, max: 30 },
 };
 

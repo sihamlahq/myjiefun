@@ -159,10 +159,9 @@ function readActiveLensFactor(track: MediaStreamTrack | null, lenses: LensOption
 }
 
 /**
- * Flagship phone profile (iPhone 11+ / Galaxy S23 Ultra class):
- * open quickly with ideal 1080p30 constraints, then refine.
- * Avoid long cascades of exact constraints that fail and delay auto-connect.
- * Prefer 30fps — adaptive WebRTC encode handles weak networks.
+ * Venue-stable capture: open quickly at 720p30 (not 1080 first).
+ * Soft encode starts at "medium" and climbs only when the link is strong —
+ * same idea as the controller staying up on flaky Wi‑Fi.
  */
 async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStream> {
   let preferredDeviceId = deviceId;
@@ -180,8 +179,8 @@ async function openCamera(facing: Facing, deviceId?: string): Promise<MediaStrea
   }
 
   const softHd: MediaTrackConstraints = {
-    width: { ideal: 1920, max: 1920 },
-    height: { ideal: 1080, max: 1080 },
+    width: { ideal: 1280, max: 1920 },
+    height: { ideal: 720, max: 1080 },
     frameRate: { ideal: 30, max: 30 },
   };
 
@@ -228,22 +227,22 @@ async function tuneCaptureTrack(stream: MediaStream) {
     // ignore
   }
 
-  // Prefer stable 1080p30 capture — WebRTC adapts encode quality to the network.
+  // Prefer stable 720p30; allow 1080 only if the device already has headroom.
   const upgrades: MediaTrackConstraints[] = [
-    {
-      width: { ideal: 1920, max: 1920 },
-      height: { ideal: 1080, max: 1080 },
-      frameRate: { ideal: 30, max: 30 },
-    },
-    {
-      width: { ideal: 1920, max: 1920 },
-      height: { ideal: 1080, max: 1080 },
-      frameRate: { ideal: 30, min: 24, max: 30 },
-    },
     {
       width: { ideal: 1280, max: 1920 },
       height: { ideal: 720, max: 1080 },
       frameRate: { ideal: 30, max: 30 },
+    },
+    {
+      width: { ideal: 1280, max: 1920 },
+      height: { ideal: 720, max: 1080 },
+      frameRate: { ideal: 30, min: 24, max: 30 },
+    },
+    {
+      width: { ideal: 960, max: 1280 },
+      height: { ideal: 540, max: 720 },
+      frameRate: { ideal: 24, max: 30 },
     },
   ];
 
