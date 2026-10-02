@@ -15,6 +15,7 @@ import type { ConnectionQuality } from "@/components/kiss-cam/kiss-cam-types";
 
 type UiStatus =
   | "waiting"
+  | "standby"
   | "connecting"
   | "connected"
   | "lost"
@@ -442,13 +443,16 @@ export function KissCamCameraClient() {
     startingRef.current = false;
     loadingBusyRef.current = false;
     stopPlaceholderTrack();
-    await connRef.current?.dispose();
-    connRef.current = null;
+    try {
+      await connRef.current?.stopPublishing();
+    } catch {
+      // keep signaling even if the live slot is already released
+    }
     stopTracksOnly();
     await releaseWakeLock();
     setLoadingScreen(false);
     setPrimaryAction("start");
-    setStatus("waiting");
+    setStatus(connRef.current?.alive ? "standby" : "waiting");
     setQuality(null);
     setMessage(null);
   }, [releaseWakeLock, stopPlaceholderTrack, stopTracksOnly]);
@@ -465,6 +469,20 @@ export function KissCamCameraClient() {
       setMessage(null);
 
       const conn = connRef.current;
+      const isLive = Boolean(conn?.alive && conn.isPublishing);
+      if (!isLive) {
+        // Controller / standby phones only toggle the LED overlay.
+        if (notifyDisplay && conn?.alive) {
+          try {
+            await conn.sendControl("loading-on");
+          } catch {
+            // ignore
+          }
+        }
+        setLoadingScreen(true);
+        loadingBusyRef.current = false;
+        return;
+      }
       // Tell the LED first, then park a tiny placeholder on the peer connection
       // so RTP/ICE stay warm. Buttons already work over signaling; video needs this.
       if (notifyDisplay && conn?.alive) {
@@ -505,6 +523,87 @@ export function KissCamCameraClient() {
   );
   pauseCameraForLoadingRef.current = pauseCameraForLoading;
 
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    let supabase: ReturnType<typeof createClient>;
+    try {
+      supabase = createClient();
+    } catch {
+      setStatus("error");
+      setMessage("Kiss Cam signaling is not configured.");
+      return;
+    }
+
+    const conn = new KissCamConnection(supabase, sessionId, "camera", {
+      onConnectionState: (pcState) => {
+        if (!conn.isPublishing) return;
+        if (pcState === "connected") {
+          setStatus("connected");
+          setMessage(null);
+        } else if (pcState === "reconnecting") {
+          setStatus("reconnecting");
+          setMessage("Connection is unstable on this network. Trying to reconnect...");
+        } else if (pcState === "failed" || pcState === "disconnected") {
+          setStatus("lost");
+        }
+      },
+      onPeerPresence: (present) => {
+        if (!present && conn.isPublishing) {
+          setStatus((s) => (s === "connected" ? "reconnecting" : s));
+        }
+      },
+      onQuality: setQuality,
+      onControl: (action) => {
+        if (action === "loading-on") {
+          void pauseCameraForLoadingRef.current(false);
+        }
+        if (action === "loading-off") {
+          setLoadingScreen(false);
+        }
+      },
+      onStandby: () => {
+        stopPlaceholderTrack();
+        stopTracksOnly();
+        void releaseWakeLock();
+        setLoadingScreen(false);
+        setPrimaryAction("start");
+        setStatus("standby");
+        setQuality(null);
+        setMessage("Standby · another phone is sharing the live camera");
+      },
+      onError: () => {
+        if (!conn.isPublishing) return;
+        setMessage("Unable to connect to the wedding screen. Please scan the QR code again.");
+        setStatus("reconnecting");
+      },
+    });
+    connRef.current = conn;
+    setStatus("connecting");
+    void conn
+      .connect()
+      .then(() => {
+        if (cancelled) return;
+        setStatus("standby");
+        setMessage(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setStatus("error");
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to join the wedding screen. Please scan the QR code again.",
+        );
+      });
+
+    return () => {
+      cancelled = true;
+      void conn.dispose();
+      if (connRef.current === conn) connRef.current = null;
+    };
+  }, [releaseWakeLock, sessionId, stopPlaceholderTrack, stopTracksOnly]);
+
   const startCamera = useCallback(async () => {
     if (switchingRef.current || startingRef.current || loadingBusyRef.current) return;
     startingRef.current = true;
@@ -541,17 +640,20 @@ export function KissCamCameraClient() {
     setStatus("connecting");
 
     try {
-      const existing = connRef.current?.alive ? connRef.current : null;
+      const conn = connRef.current;
+      if (!conn?.alive) {
+        throw new Error("Not joined to the wedding screen yet. Wait a moment and try again.");
+      }
 
       // If we only paused for loading, reopen the lens and renegotiate media.
-      if (existing) {
+      if (conn.isPublishing) {
         const stream = await openCamera(facingRef.current);
         await bindPreview(stream);
         await requestWakeLock();
         const track = stream.getVideoTracks()[0] ?? null;
-        await existing.replaceVideoTrack(track, { renegotiate: true });
+        await conn.replaceVideoTrack(track, { renegotiate: true });
         stopPlaceholderTrack();
-        void existing.sendControl("loading-off").catch(() => undefined);
+        void conn.sendControl("loading-off").catch(() => undefined);
         setPrimaryAction("loading");
         setStatus("connected");
         setMessage(null);
@@ -559,79 +661,21 @@ export function KissCamCameraClient() {
         return;
       }
 
-      // Fresh connect: open the camera while signaling/ICE set up in parallel.
-      if (connRef.current) {
-        try {
-          await connRef.current.dispose();
-        } catch {
-          // ignore
-        }
-        connRef.current = null;
-      }
       stopPlaceholderTrack();
       stopTracksOnly();
 
-      const supabase = createClient();
-      const conn = new KissCamConnection(supabase, sessionId, "camera", {
-        onConnectionState: (pcState) => {
-          if (pcState === "connected") {
-            setStatus("connected");
-            setMessage(null);
-          } else if (pcState === "reconnecting") {
-            setStatus("reconnecting");
-            setMessage("Connection is unstable on this network. Trying to reconnect...");
-          } else if (pcState === "failed" || pcState === "disconnected") {
-            setStatus("lost");
-          }
-        },
-        onPeerPresence: (present) => {
-          if (!present) setStatus((s) => (s === "connected" ? "reconnecting" : s));
-        },
-        onQuality: setQuality,
-        onControl: (action) => {
-          if (action === "loading-on") {
-            void pauseCameraForLoadingRef.current(false);
-          }
-          if (action === "loading-off") {
-            setLoadingScreen(false);
-          }
-        },
-        onError: () => {
-          setMessage("Unable to connect to the wedding screen. Please scan the QR code again.");
-          setStatus("reconnecting");
-        },
-      });
-      connRef.current = conn;
-
-      // Open the lens while ICE + Realtime subscribe — cuts time-to-first-frame.
-      const streamPromise = openCamera(facingRef.current);
-      try {
-        await conn.connect();
-        const stream = await streamPromise;
-        await bindPreview(stream);
-        await requestWakeLock();
-        await conn.attachLocalStream(stream);
-      } catch (bootError) {
-        // Stop a camera that opened while signaling failed, and drop a half-open PC.
-        try {
-          const leaked = await streamPromise.catch(() => null);
-          leaked?.getTracks().forEach((t) => {
-            try {
-              t.stop();
-            } catch {
-              // ignore
-            }
-          });
-        } catch {
-          // ignore
-        }
-        try {
-          await conn.dispose();
-        } catch {
-          // ignore
-        }
-        if (connRef.current === conn) connRef.current = null;
-        throw bootError;
+      const stream = await openCamera(facingRef.current);
+      await bindPreview(stream);
+      await requestWakeLock();
+      await conn.startPublishing(stream);
+      if (!conn.isPublishing) {
+        stopTracksOnly();
+        await releaseWakeLock();
+        setPrimaryAction("start");
+        setStatus("standby");
+        setMessage("Standby · another phone is sharing the live camera");
+        startingRef.current = false;
+        return;
       }
       void conn.sendControl("loading-off").catch(() => undefined);
       setPrimaryAction("loading");
@@ -657,7 +701,7 @@ export function KissCamCameraClient() {
     } finally {
       startingRef.current = false;
     }
-  }, [bindPreview, isSecure, requestWakeLock, sessionId, stopPlaceholderTrack, stopTracksOnly]);
+  }, [bindPreview, isSecure, releaseWakeLock, requestWakeLock, sessionId, stopPlaceholderTrack, stopTracksOnly]);
 
   const switchCamera = useCallback(async () => {
     if (switchingRef.current || !cameraOn) return;
@@ -759,7 +803,7 @@ export function KissCamCameraClient() {
   const triggerLove = useCallback(() => {
     // Short cooldown only — keeping the button disabled for the full animation
     // made taps feel dead / laggy on phones.
-    if (loveCooldownRef.current || !cameraOn || switchingRef.current) return;
+    if (loveCooldownRef.current || !connRef.current?.alive || switchingRef.current) return;
     loveCooldownRef.current = true;
     setLoveBusy(true);
 
@@ -783,13 +827,11 @@ export function KissCamCameraClient() {
       setLoveBurst(false);
       loveClearRef.current = null;
     }, 1800);
-  }, [cameraOn]);
+  }, []);
 
   const triggerCountdown = useCallback(
     (value: 1 | 2 | 3) => {
-      if (!cameraOn || switchingRef.current) return;
-      // Allow pressing the same digit again immediately — only skip double-fire
-      // from pointerdown + click on the same gesture (~120ms).
+      if (!connRef.current?.alive || switchingRef.current) return;
       if (countdownCooldownRef.current) return;
       countdownCooldownRef.current = true;
       setCountdownBusy(value);
@@ -812,7 +854,7 @@ export function KissCamCameraClient() {
         countdownClearRef.current = null;
       }, 700);
     },
-    [cameraOn],
+    [],
   );
 
   useEffect(() => {
@@ -823,12 +865,6 @@ export function KissCamCameraClient() {
       if (countdownClearRef.current) clearTimeout(countdownClearRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    return () => {
-      void stopCamera();
-    };
-  }, [stopCamera]);
 
   const resolveCode = async () => {
     const code = codeInput.trim().toUpperCase();
@@ -847,11 +883,14 @@ export function KissCamCameraClient() {
     }
   };
 
+  const controlsReady = Boolean(sessionId && connRef.current?.alive && status !== "error");
   const statusText = loadingScreen
     ? "Camera paused · Loading screen on LED"
     : status === "waiting"
       ? "Waiting for display..."
-      : status === "connecting"
+      : status === "standby"
+        ? "Standby · tap Start Camera to go live"
+        : status === "connecting"
         ? "Connecting..."
         : status === "connected"
           ? `Camera connected ✓ · ${facingMode === "environment" ? "Rear" : "Front"}`
@@ -907,9 +946,11 @@ export function KissCamCameraClient() {
             autoPlay
             disablePictureInPicture
           />
-          {!cameraOn && status === "waiting" ? (
+          {!cameraOn && (status === "waiting" || status === "standby") ? (
             <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm leading-relaxed text-white/75">
-              Press Start Camera to share video with the wedding screen.
+              {status === "standby"
+                ? "This phone is in standby. Love and countdown still work. Start Camera to share live video."
+                : "Press Start Camera to share video with the wedding screen."}
             </div>
           ) : null}
           {switching ? (
@@ -1085,7 +1126,7 @@ export function KissCamCameraClient() {
             e.preventDefault();
             triggerLove();
           }}
-          disabled={!cameraOn || switching || loveBusy}
+          disabled={!controlsReady || switching || loveBusy}
           aria-pressed={loveBurst}
         >
           ♥ Love
@@ -1111,7 +1152,7 @@ export function KissCamCameraClient() {
                 e.preventDefault();
                 triggerCountdown(value);
               }}
-              disabled={!cameraOn || switching}
+              disabled={!controlsReady || switching}
               aria-label={`Show countdown ${value} on the wedding screen`}
             >
               {value}

@@ -24,14 +24,29 @@ export type KissCamControlAction =
   | "countdown-2"
   | "countdown-3";
 
-type SignalMessage =
-  | { type: "hello"; role: "display" | "camera" }
-  | { type: "heartbeat"; role: "display" | "camera"; ts: number }
-  | { type: "offer"; sdp: RTCSessionDescriptionInit }
-  | { type: "answer"; sdp: RTCSessionDescriptionInit }
-  | { type: "ice"; candidate: RTCIceCandidateInit }
-  | { type: "bye" }
-  | { type: "control"; action: KissCamControlAction };
+type ClientRole = "display" | "camera";
+
+type SignalEnvelope = { from: string };
+
+type SignalMessage = SignalEnvelope &
+  (
+    | { type: "hello"; role: ClientRole }
+    | { type: "heartbeat"; role: ClientRole; ts: number; publishing?: boolean }
+    | { type: "claim" }
+    | { type: "standby" }
+    | { type: "publisher"; clientId: string | null }
+    | { type: "offer"; sdp: RTCSessionDescriptionInit }
+    | { type: "answer"; sdp: RTCSessionDescriptionInit }
+    | { type: "ice"; candidate: RTCIceCandidateInit }
+    | { type: "bye" }
+    | { type: "control"; action: KissCamControlAction }
+  );
+
+type OutgoingSignal = SignalMessage extends infer M
+  ? M extends { from: string }
+    ? Omit<M, "from">
+    : never
+  : never;
 
 type Handlers = {
   onRemoteStream?: (stream: MediaStream | null) => void;
@@ -40,23 +55,40 @@ type Handlers = {
   onQuality?: (quality: ConnectionQuality) => void;
   onError?: (message: string) => void;
   onControl?: (action: KissCamControlAction) => void;
+  /** This phone lost the live camera slot — keep signaling, stop sending video. */
+  onStandby?: () => void;
+  onPublisherChange?: (selfIsPublisher: boolean, publisherId: string | null) => void;
 };
+
+function createClientId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `kc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 /**
  * Perfect negotiation: display is polite, camera (offerer of media) is impolite.
- * Camera creates the offer when it has a local stream.
+ * Only one camera publishes WebRTC at a time; other phones stay on signaling (standby).
  */
 export class KissCamConnection {
+  readonly clientId = createClientId();
   private pc: RTCPeerConnection | null = null;
   private channel: RealtimeChannel | null = null;
+  private iceServers: RTCIceServer[] = [];
   private makingOffer = false;
   private ignoreOffer = false;
   private isSettingRemoteAnswerPending = false;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private statsTimer: ReturnType<typeof setInterval> | null = null;
+  private iceRestartTimer: ReturnType<typeof setTimeout> | null = null;
+  private iceRestartAttempts = 0;
   private lastPeerBeat = 0;
   private localStream: MediaStream | null = null;
   private disposed = false;
+  /** Camera is the active WebRTC publisher (display always has a peer). */
+  private publishing = false;
+  /** Display: which camera client currently owns the live slot. */
+  private publisherId: string | null = null;
+  private publisherWaiters: Array<(id: string | null) => void> = [];
   /** Adaptive encode profile — camera role only; changes via setParameters. */
   private qualityController = new AdaptiveVideoQualityController({
     initialProfile: "high",
@@ -81,47 +113,20 @@ export class KissCamConnection {
     return this.role === "display";
   }
 
+  get isPublishing() {
+    return this.publishing;
+  }
+
   async connect() {
     this.disposed = false;
     const { iceServers } = await fetchIceServers();
-    this.pc = new RTCPeerConnection({
-      iceServers,
-      iceCandidatePoolSize: 8,
-      bundlePolicy: "max-bundle",
-      rtcpMuxPolicy: "require",
-    });
+    this.iceServers = iceServers;
 
-    this.pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        void this.send({ type: "ice", candidate: event.candidate.toJSON() });
-      }
-    };
-
-    this.pc.ontrack = (event) => {
-      const stream = event.streams[0] ?? new MediaStream([event.track]);
-      // ReplaceTrack resume does not fire ontrack again — listen for unmute
-      // so the LED rebinds when the camera comes back after loading.
-      event.track.onunmute = () => {
-        this.handlers.onRemoteStream?.(
-          event.streams[0] ?? new MediaStream([event.track]),
-        );
-      };
-      event.track.onmute = () => {
-        // Keep the MediaStream reference; compositor handles blank frames.
-      };
-      this.handlers.onRemoteStream?.(stream);
-    };
-
-    this.pc.onconnectionstatechange = () => {
-      const state = this.pc?.connectionState;
-      if (!state) return;
-      if (state === "failed" || state === "disconnected") {
-        this.handlers.onConnectionState?.("reconnecting");
-        void this.tryIceRestart();
-      } else {
-        this.handlers.onConnectionState?.(state);
-      }
-    };
+    // Display always has a peer; camera phones join signaling first and only
+    // open WebRTC after they claim the live publisher slot.
+    if (this.role === "display") {
+      this.createPeerConnection();
+    }
 
     this.channel = this.supabase.channel(signalingChannelName(this.sessionId), {
       config: { broadcast: { self: false } },
@@ -158,25 +163,125 @@ export class KissCamConnection {
     if (this.disposed) return;
 
     if (this.role === "camera" && this.localStream) {
-      await this.attachLocalStream(this.localStream);
+      await this.startPublishing(this.localStream);
     }
 
     this.startStats();
   }
 
   get alive() {
-    return (
-      !this.disposed &&
-      this.pc != null &&
-      this.channel != null &&
-      this.pc.connectionState !== "closed"
-    );
+    return !this.disposed && this.channel != null;
+  }
+
+  private createPeerConnection() {
+    this.closePeerConnection();
+    const pc = new RTCPeerConnection({
+      iceServers: this.iceServers,
+      iceCandidatePoolSize: 8,
+      bundlePolicy: "max-bundle",
+      rtcpMuxPolicy: "require",
+    });
+    this.pc = pc;
+    this.makingOffer = false;
+    this.ignoreOffer = false;
+    this.isSettingRemoteAnswerPending = false;
+    this.iceRestartAttempts = 0;
+    this.contentHintApplied = false;
+    this.prevOutboundBytes = null;
+    this.prevInboundBytes = null;
+    this.prevPacketsLost = 0;
+    this.prevPacketsSent = 0;
+    this.prevPacketsReceived = 0;
+
+    pc.onicecandidate = (event) => {
+      if (!event.candidate) return;
+      if (this.role === "camera" && !this.publishing) return;
+      void this.send({ type: "ice", candidate: event.candidate.toJSON() });
+    };
+
+    pc.ontrack = (event) => {
+      const stream = event.streams[0] ?? new MediaStream([event.track]);
+      event.track.onunmute = () => {
+        this.handlers.onRemoteStream?.(
+          event.streams[0] ?? new MediaStream([event.track]),
+        );
+      };
+      event.track.onmute = () => {
+        // Keep the MediaStream reference; compositor handles blank frames.
+      };
+      this.handlers.onRemoteStream?.(stream);
+    };
+
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      if (!state || this.pc !== pc) return;
+      if (state === "connected" || state === "connecting") {
+        this.clearIceRestartTimer();
+        if (state === "connected") this.iceRestartAttempts = 0;
+        this.handlers.onConnectionState?.(state);
+        return;
+      }
+      if (state === "failed" || state === "disconnected") {
+        this.handlers.onConnectionState?.("reconnecting");
+        this.scheduleIceRestart(state === "failed" ? 600 : 2800);
+        return;
+      }
+      this.handlers.onConnectionState?.(state);
+    };
+  }
+
+  private closePeerConnection() {
+    this.clearIceRestartTimer();
+    if (!this.pc) return;
+    this.pc.onicecandidate = null;
+    this.pc.ontrack = null;
+    this.pc.onconnectionstatechange = null;
+    this.pc.close();
+    this.pc = null;
+  }
+
+  /**
+   * Take the live camera slot. Other phones receive `publisher` and stand down.
+   */
+  async startPublishing(stream: MediaStream) {
+    if (this.role !== "camera" || this.disposed || !this.channel) return;
+    this.publishing = true;
+    this.localStream = stream;
+    const ack = this.waitForPublisherAck(2200);
+    await this.send({ type: "claim" });
+    const publisher = await ack;
+    if (this.disposed) return;
+    if (publisher && publisher !== this.clientId) {
+      this.publishing = false;
+      this.localStream = null;
+      this.handlers.onStandby?.();
+      return;
+    }
+    this.publisherId = this.clientId;
+    this.createPeerConnection();
+    await this.attachLocalStream(stream);
+    this.handlers.onPublisherChange?.(true, this.clientId);
+  }
+
+  /** Keep Love / countdown signaling; drop WebRTC so another phone can go live. */
+  async stopPublishing() {
+    if (this.role !== "camera") return;
+    const wasPublishing = this.publishing;
+    this.publishing = false;
+    this.localStream = null;
+    this.contentHintApplied = false;
+    this.closePeerConnection();
+    if (wasPublishing && this.channel) {
+      await this.send({ type: "standby" });
+    }
+    this.handlers.onPublisherChange?.(false, this.publisherId === this.clientId ? null : this.publisherId);
   }
 
   async attachLocalStream(stream: MediaStream) {
     this.localStream = stream;
     this.contentHintApplied = false;
     if (!this.pc) return;
+    if (this.role === "camera" && !this.publishing) return;
     for (const track of stream.getTracks()) {
       if (track.kind === "video") {
         this.applyContentHintOnce(track);
@@ -194,7 +299,7 @@ export class KissCamConnection {
         }
       }
     }
-    if (this.role === "camera") {
+    if (this.role === "camera" && this.publishing) {
       await this.createAndSendOffer();
     }
   }
@@ -205,7 +310,7 @@ export class KissCamConnection {
    * the live camera again — buttons use signaling; video needs a fresh offer.
    */
   async replaceVideoTrack(track: MediaStreamTrack | null, opts?: { renegotiate?: boolean }) {
-    if (!this.pc) return;
+    if (!this.pc || (this.role === "camera" && !this.publishing)) return;
     if (track) {
       this.contentHintApplied = false;
       this.applyContentHintOnce(track);
@@ -230,7 +335,9 @@ export class KissCamConnection {
       if (track) {
         await this.applyVideoProfile(videoSender, this.qualityController.current);
         const shouldRenegotiate =
-          this.role === "camera" && (opts?.renegotiate === true || needIceRestart);
+          this.role === "camera" &&
+          this.publishing &&
+          (opts?.renegotiate === true || needIceRestart);
         if (shouldRenegotiate) {
           await this.createAndSendOffer(needIceRestart);
         }
@@ -241,7 +348,7 @@ export class KissCamConnection {
     if (track) {
       const newSender = this.pc.addTrack(track, this.localStream ?? new MediaStream([track]));
       await this.applyVideoProfile(newSender, this.qualityController.current);
-      if (this.role === "camera") await this.createAndSendOffer(needIceRestart);
+      if (this.role === "camera" && this.publishing) await this.createAndSendOffer(needIceRestart);
     }
   }
 
@@ -313,6 +420,7 @@ export class KissCamConnection {
 
   private async createAndSendOffer(iceRestart = false) {
     if (!this.pc) return;
+    if (this.role === "camera" && !this.publishing) return;
     try {
       this.makingOffer = true;
       const offer = await this.pc.createOffer(iceRestart ? { iceRestart: true } : undefined);
@@ -329,8 +437,29 @@ export class KissCamConnection {
     }
   }
 
+  private scheduleIceRestart(delayMs: number) {
+    if (this.role !== "camera" || !this.publishing) return;
+    if (this.iceRestartTimer) return;
+    if (this.iceRestartAttempts >= 4) return;
+    this.iceRestartTimer = setTimeout(() => {
+      this.iceRestartTimer = null;
+      const state = this.pc?.connectionState;
+      const stillBroken = state === "failed" || state === "disconnected";
+      if (!stillBroken || !this.publishing) return;
+      this.iceRestartAttempts += 1;
+      void this.tryIceRestart();
+    }, delayMs);
+  }
+
+  private clearIceRestartTimer() {
+    if (this.iceRestartTimer) {
+      clearTimeout(this.iceRestartTimer);
+      this.iceRestartTimer = null;
+    }
+  }
+
   private async tryIceRestart() {
-    if (this.role !== "camera" || !this.pc) return;
+    if (this.role !== "camera" || !this.publishing || !this.pc) return;
     try {
       await this.createAndSendOffer(true);
     } catch {
@@ -338,27 +467,81 @@ export class KissCamConnection {
     }
   }
 
-  private async onSignal(message: SignalMessage) {
-    if (!this.pc || this.disposed) return;
+  private isMediaFromPeer(message: SignalMessage) {
+    if (this.role === "display") {
+      return Boolean(this.publisherId && message.from === this.publisherId);
+    }
+    return this.publishing;
+  }
 
-    if (message.type === "hello") {
+  private notePresence(message: SignalMessage) {
+    if (this.role === "camera") {
+      if ("role" in message && message.role === "display") {
+        this.lastPeerBeat = Date.now();
+        this.handlers.onPeerPresence?.(true);
+      }
+      return;
+    }
+    if (this.publisherId && message.from === this.publisherId) {
       this.lastPeerBeat = Date.now();
       this.handlers.onPeerPresence?.(true);
-      if (this.role === "camera" && this.localStream) {
+    }
+  }
+
+  private async onSignal(message: SignalMessage) {
+    if (this.disposed) return;
+    if (!message.from || message.from === this.clientId) return;
+
+    if (message.type === "hello") {
+      this.notePresence(message);
+      if (this.role === "display") {
+        await this.send({ type: "publisher", clientId: this.publisherId });
+      }
+      if (this.role === "camera" && this.publishing && message.role === "display") {
         await this.createAndSendOffer();
       }
       return;
     }
 
     if (message.type === "heartbeat") {
+      this.notePresence(message);
+      return;
+    }
+
+    if (message.type === "claim" && this.role === "display") {
+      await this.setPublisher(message.from);
+      return;
+    }
+
+    if (message.type === "standby" && this.role === "display") {
+      if (this.publisherId === message.from) {
+        await this.setPublisher(null);
+      }
+      return;
+    }
+
+    if (message.type === "publisher" && this.role === "camera") {
+      this.publisherId = message.clientId;
       this.lastPeerBeat = Date.now();
       this.handlers.onPeerPresence?.(true);
+      const selfIsPublisher = message.clientId === this.clientId;
+      this.handlers.onPublisherChange?.(selfIsPublisher, message.clientId);
+      this.resolvePublisherWaiters(message.clientId);
+      if (!selfIsPublisher && this.publishing) {
+        this.publishing = false;
+        this.localStream = null;
+        this.closePeerConnection();
+        this.handlers.onStandby?.();
+      }
       return;
     }
 
     if (message.type === "bye") {
-      this.handlers.onPeerPresence?.(false);
-      this.handlers.onRemoteStream?.(null);
+      if (this.role === "display" && this.publisherId === message.from) {
+        await this.setPublisher(null);
+      } else if (this.role === "camera") {
+        // Only the LED going away should drop presence — other phones leaving is fine.
+      }
       return;
     }
 
@@ -366,6 +549,12 @@ export class KissCamConnection {
       this.handlers.onControl?.(message.action);
       return;
     }
+
+    if (message.type === "offer" && this.role === "display" && !this.publisherId && message.from) {
+      this.publisherId = message.from;
+    }
+
+    if (!this.pc || !this.isMediaFromPeer(message)) return;
 
     try {
       if (message.type === "offer" || message.type === "answer") {
@@ -403,20 +592,74 @@ export class KissCamConnection {
     }
   }
 
-  private async send(payload: SignalMessage) {
+  private async setPublisher(clientId: string | null) {
+    const changed = this.publisherId !== clientId;
+    this.publisherId = clientId;
+    if (changed) {
+      this.createPeerConnection();
+      this.handlers.onRemoteStream?.(null);
+      this.handlers.onPeerPresence?.(Boolean(clientId));
+      this.handlers.onPublisherChange?.(false, clientId);
+      if (!clientId) {
+        this.lastPeerBeat = 0;
+      }
+    }
+    await this.send({ type: "publisher", clientId });
+  }
+
+  private waitForPublisherAck(ms: number) {
+    return new Promise<string | null>((resolve) => {
+      let settled = false;
+      const finish = (id: string | null) => {
+        if (settled) return;
+        settled = true;
+        this.publisherWaiters = this.publisherWaiters.filter((waiter) => waiter !== onAck);
+        resolve(id);
+      };
+      const timer = setTimeout(() => finish(this.publisherId), ms);
+      const onAck = (id: string | null) => {
+        if (id !== this.clientId) return;
+        clearTimeout(timer);
+        finish(id);
+      };
+      this.publisherWaiters.push(onAck);
+    });
+  }
+
+  private resolvePublisherWaiters(id: string | null) {
+    const waiters = this.publisherWaiters;
+    this.publisherWaiters = [];
+    for (const waiter of waiters) waiter(id);
+  }
+
+  private async send(payload: OutgoingSignal) {
     if (!this.channel) return;
     await this.channel.send({
       type: "broadcast",
       event: "signal",
-      payload,
+      payload: { ...payload, from: this.clientId },
     });
   }
 
   private startHeartbeat() {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
-      void this.send({ type: "heartbeat", role: this.role, ts: Date.now() });
-      if (this.lastPeerBeat && Date.now() - this.lastPeerBeat > 8000) {
+      void this.send({
+        type: "heartbeat",
+        role: this.role,
+        ts: Date.now(),
+        publishing: this.publishing,
+      });
+      if (this.role === "camera" && this.lastPeerBeat && Date.now() - this.lastPeerBeat > 12_000) {
+        this.handlers.onPeerPresence?.(false);
+        if (this.publishing) this.handlers.onConnectionState?.("reconnecting");
+      }
+      if (
+        this.role === "display" &&
+        this.publisherId &&
+        this.lastPeerBeat &&
+        Date.now() - this.lastPeerBeat > 12_000
+      ) {
         this.handlers.onPeerPresence?.(false);
         this.handlers.onConnectionState?.("reconnecting");
       }
@@ -446,7 +689,7 @@ export class KissCamConnection {
   }
 
   private async sampleQuality() {
-    if (!this.pc) return;
+    if (!this.pc || (this.role === "camera" && !this.publishing)) return;
     try {
       const stats = await this.pc.getStats();
       const sample = this.parseNetworkSample(stats);
@@ -649,8 +892,10 @@ export class KissCamConnection {
 
   async dispose() {
     this.disposed = true;
+    this.publishing = false;
     this.stopHeartbeat();
     this.stopStats();
+    this.clearIceRestartTimer();
     this.qualityController.reset("high");
     this.contentHintApplied = false;
     this.prevOutboundBytes = null;
@@ -664,10 +909,7 @@ export class KissCamConnection {
       await this.supabase.removeChannel(this.channel);
       this.channel = null;
     }
-    if (this.pc) {
-      this.pc.close();
-      this.pc = null;
-    }
+    this.closePeerConnection();
     this.handlers.onRemoteStream?.(null);
   }
 
