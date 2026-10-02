@@ -153,15 +153,15 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         },
         onPeerPresence: (present) => {
           if (cancelled) return;
+          // Presence is signaling-only. Do not demote a live WebRTC link to
+          // "reconnecting" when Realtime heartbeats lag on the same Wi‑Fi.
+          if (!present) return;
           setState((s) => ({
             ...s,
-            cameraState: present
-              ? s.cameraState === "connected"
-                ? "connected"
-                : "connecting"
-              : s.cameraState === "connected"
-                ? "reconnecting"
-                : "waiting",
+            cameraState:
+              s.cameraState === "connected" || s.cameraState === "reconnecting"
+                ? s.cameraState
+                : "connecting",
           }));
         },
         onQuality: (quality: ConnectionQuality) => {
@@ -567,7 +567,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                     }))
                   }
                 >
-                  <option value="love">Double love (live camera)</option>
+                  <option value="love">Heart (live camera)</option>
                   <option value="center">Center</option>
                   <option value="portrait">Portrait</option>
                   <option value="rounded">Rounded cinematic</option>

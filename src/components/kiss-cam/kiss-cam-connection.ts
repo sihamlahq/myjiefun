@@ -65,6 +65,18 @@ function createClientId() {
   return `kc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** Quick recovery when ICE truly fails. */
+const ICE_RESTART_FAILED_MS = 800;
+/**
+ * Mobile Wi‑Fi often dips to `disconnected` for several seconds (radio power-save /
+ * AP roaming) and recovers on its own. Restarting ICE too early causes drop loops.
+ */
+const ICE_RESTART_DISCONNECTED_MS = 12_000;
+const ICE_RESTART_MAX_ATTEMPTS = 5;
+const HEARTBEAT_INTERVAL_MS = 2500;
+/** Missed signaling beats ≠ media drop — keep this loose on flaky venue Wi‑Fi. */
+const HEARTBEAT_MISS_MS = 20_000;
+
 /**
  * Perfect negotiation: display is polite, camera (offerer of media) is impolite.
  * Only one camera publishes WebRTC at a time; other phones stay on signaling (standby).
@@ -138,24 +150,35 @@ export class KissCamConnection {
 
     // Wait until Realtime is actually subscribed before sending offers/controls.
     // Otherwise the first camera offer is often dropped while buttons later work.
+    // Re-SUBSCRIBED (Realtime reconnect) still sends hello for presence — media
+    // renegotiation is gated in onSignal so we don't tear down a healthy PC.
     await new Promise<void>((resolve, reject) => {
+      let settled = false;
       const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
         reject(new Error("Kiss Cam signaling timed out. Check the network and try again."));
       }, 12_000);
 
       this.channel!.subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          clearTimeout(timeout);
           void this.send({ type: "hello", role: this.role });
           this.startHeartbeat();
-          resolve();
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeout);
+            resolve();
+          }
         } else if (
           status === "CHANNEL_ERROR" ||
           status === "TIMED_OUT" ||
           status === "CLOSED"
         ) {
-          clearTimeout(timeout);
-          reject(new Error(`Kiss Cam signaling failed (${status}).`));
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeout);
+            reject(new Error(`Kiss Cam signaling failed (${status}).`));
+          }
         }
       });
     });
@@ -221,9 +244,14 @@ export class KissCamConnection {
         this.handlers.onConnectionState?.(state);
         return;
       }
-      if (state === "failed" || state === "disconnected") {
+      if (state === "failed") {
         this.handlers.onConnectionState?.("reconnecting");
-        this.scheduleIceRestart(state === "failed" ? 600 : 2800);
+        this.scheduleIceRestart(ICE_RESTART_FAILED_MS);
+        return;
+      }
+      if (state === "disconnected") {
+        // Do not flap UI yet — many phones recover before the grace window ends.
+        this.scheduleIceRestart(ICE_RESTART_DISCONNECTED_MS);
         return;
       }
       this.handlers.onConnectionState?.(state);
@@ -440,15 +468,23 @@ export class KissCamConnection {
   private scheduleIceRestart(delayMs: number) {
     if (this.role !== "camera" || !this.publishing) return;
     if (this.iceRestartTimer) return;
-    if (this.iceRestartAttempts >= 4) return;
+    if (this.iceRestartAttempts >= ICE_RESTART_MAX_ATTEMPTS) return;
     this.iceRestartTimer = setTimeout(() => {
       this.iceRestartTimer = null;
       const state = this.pc?.connectionState;
       const stillBroken = state === "failed" || state === "disconnected";
       if (!stillBroken || !this.publishing) return;
+      // Only surface "reconnecting" once ICE actually needs a restart.
+      this.handlers.onConnectionState?.("reconnecting");
       this.iceRestartAttempts += 1;
       void this.tryIceRestart();
     }, delayMs);
+  }
+
+  /** True when the peer connection is healthy enough that a re-offer would only churn. */
+  private mediaLinkHealthy() {
+    const state = this.pc?.connectionState;
+    return state === "connected" || state === "connecting";
   }
 
   private clearIceRestartTimer() {
@@ -497,8 +533,15 @@ export class KissCamConnection {
       if (this.role === "display") {
         await this.send({ type: "publisher", clientId: this.publisherId });
       }
+      // Realtime often re-hellos after a brief channel blip. Re-offering while
+      // already connected causes renegotiation storms and looks like drop loops.
       if (this.role === "camera" && this.publishing && message.role === "display") {
-        await this.createAndSendOffer();
+        if (!this.mediaLinkHealthy()) {
+          const iceRestart =
+            this.pc?.connectionState === "failed" ||
+            this.pc?.connectionState === "disconnected";
+          await this.createAndSendOffer(iceRestart);
+        }
       }
       return;
     }
@@ -603,6 +646,9 @@ export class KissCamConnection {
       if (!clientId) {
         this.lastPeerBeat = 0;
       }
+    } else {
+      // Same publisher re-claimed (phone remount / Start again) — keep PC, refresh ack.
+      this.handlers.onPeerPresence?.(Boolean(clientId));
     }
     await this.send({ type: "publisher", clientId });
   }
@@ -650,20 +696,20 @@ export class KissCamConnection {
         ts: Date.now(),
         publishing: this.publishing,
       });
-      if (this.role === "camera" && this.lastPeerBeat && Date.now() - this.lastPeerBeat > 12_000) {
+      // Signaling silence only updates presence — never force a WebRTC reconnect.
+      // Missed Realtime beats are common on venue Wi‑Fi while media stays up.
+      if (this.role === "camera" && this.lastPeerBeat && Date.now() - this.lastPeerBeat > HEARTBEAT_MISS_MS) {
         this.handlers.onPeerPresence?.(false);
-        if (this.publishing) this.handlers.onConnectionState?.("reconnecting");
       }
       if (
         this.role === "display" &&
         this.publisherId &&
         this.lastPeerBeat &&
-        Date.now() - this.lastPeerBeat > 12_000
+        Date.now() - this.lastPeerBeat > HEARTBEAT_MISS_MS
       ) {
         this.handlers.onPeerPresence?.(false);
-        this.handlers.onConnectionState?.("reconnecting");
       }
-    }, 2500);
+    }, HEARTBEAT_INTERVAL_MS);
   }
 
   private stopHeartbeat() {

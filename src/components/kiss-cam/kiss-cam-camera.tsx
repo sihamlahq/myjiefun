@@ -495,10 +495,9 @@ export function KissCamCameraClient() {
           setStatus("lost");
         }
       },
-      onPeerPresence: (present) => {
-        if (!present && conn.isPublishing) {
-          setStatus((s) => (s === "connected" ? "reconnecting" : s));
-        }
+      onPeerPresence: () => {
+        // Signaling presence only — do not flip to "reconnecting" on missed beats.
+        // WebRTC `onConnectionState` owns live / reconnect UI.
       },
       onQuality: setQuality,
       onControl: (action) => {

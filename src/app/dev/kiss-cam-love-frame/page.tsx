@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { KissCamCanvasCompositor } from "@/components/kiss-cam/kiss-cam-canvas-compositor";
 
 /**
- * Dev-only visual test: bright fake "camera" into the double-love frame.
- * Open /dev/kiss-cam-love-frame and confirm no black gaps inside the hearts.
+ * Dev-only visual test: bright fake "camera" into the large heart frame.
+ * Open /dev/kiss-cam-love-frame and confirm no black gaps inside the heart.
  */
 export default function KissCamLoveFrameTestPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -40,7 +40,7 @@ export default function KissCamLoveFrameTestPage() {
       ctx.textAlign = "center";
       ctx.fillText("LIVE CAMERA TEST", canvas.width / 2, canvas.height / 2 - 20);
       ctx.font = "600 36px system-ui, sans-serif";
-      ctx.fillText("love frame should be fully covered", canvas.width / 2, canvas.height / 2 + 40);
+      ctx.fillText("heart frame should be fully covered", canvas.width / 2, canvas.height / 2 + 40);
       // Grid so letterboxing / uncovered edges show clearly.
       ctx.strokeStyle = "rgba(255,255,255,0.35)";
       ctx.lineWidth = 2;
@@ -73,10 +73,10 @@ export default function KissCamLoveFrameTestPage() {
   return (
     <main className="min-h-dvh bg-[#1a1014] p-4 text-[#fff5f7]">
       <h1 className="mb-2 text-center text-lg font-semibold tracking-wide">
-        Kiss Cam love-frame coverage test
+        Kiss Cam heart-frame coverage test
       </h1>
       <p className="mb-4 text-center text-sm text-white/70">
-        Bright fake live feed. Inside the double-love shape must be fully covered — no black voids.
+        Bright fake live feed. The large black heart opening must be fully covered — no black margins.
       </p>
       <div
         className="relative mx-auto aspect-video w-full max-w-5xl overflow-hidden rounded-xl bg-[#3a2430]"

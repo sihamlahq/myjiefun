@@ -12,8 +12,7 @@ type KissCamCanvasCompositorProps = {
 
 /**
  * Draws the live camera into a cinematic frame.
- * Default "love" clips to the same wide double-heart as the phone preview
- * and cover-fills with the exact live feed (no black placeholder).
+ * Default "love" fills the large single-heart stage opening with the live feed.
  */
 export function KissCamCanvasCompositor({
   video,
@@ -185,8 +184,8 @@ export function KissCamCanvasCompositor({
 }
 
 /**
- * Phone-matched wide double-heart: clip path in a centered box, cover-fill live video.
- * Paths use the same objectBoundingBox shapes as `#kiss-cam-double-love-clip`.
+ * Single large heart that fills the LED black heart opening.
+ * Cover-fills with the live camera so no black margins remain inside the silhouette.
  */
 function drawLoveCamera(
   ctx: CanvasRenderingContext2D,
@@ -197,28 +196,25 @@ function drawLoveCamera(
   vh: number,
   opacity: number,
 ) {
-  // Match phone preview proportions (aspect ~5 / 3.55) and keep it large on LED.
-  const boxW = Math.min(stageW * 0.92, stageH * (5 / 3.55) * 0.95);
-  const boxH = boxW * (3.55 / 5);
+  // Match the large black stage cutout (≈70% wide × 84% tall, above the ribbon).
+  // Path is normalized to the heart's real bounds (not the padded 24×24 viewBox).
+  const boxH = stageH * 0.86;
+  const boxW = Math.min(stageW * 0.74, boxH * 1.18);
   const boxX = (stageW - boxW) / 2;
-  const boxY = Math.max(8, stageH * 0.04);
+  const boxY = stageH * 0.05;
 
-  // Mask technique: fill each heart separately (same-path winding can punch a
-  // hole in the twin-heart overlap), then source-in the live cover video.
+  const heart = singleHeartPath2D(boxX, boxY, boxW, boxH);
+
+  // Opaque heart mask, then source-in the live cover video.
   ctx.save();
   ctx.globalAlpha = 1;
   ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  leftLovePath(ctx, boxX, boxY, boxW, boxH);
-  ctx.fill();
-  ctx.beginPath();
-  rightLovePath(ctx, boxX, boxY, boxW, boxH);
-  ctx.fill();
+  ctx.fill(heart);
 
   ctx.globalCompositeOperation = "source-in";
   ctx.globalAlpha = opacity;
-  // Overscan so lobe anti-aliasing never reveals the stage behind.
-  const scale = Math.max(boxW / vw, boxH / vh) * 1.08;
+  // Overscan so anti-aliased lobe edges never reveal the black stage.
+  const scale = Math.max(boxW / vw, boxH / vh) * 1.16;
   const dw = vw * scale;
   const dh = vh * scale;
   const dx = boxX + (boxW - dw) / 2;
@@ -232,142 +228,32 @@ function drawLoveCamera(
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = "rgba(255, 201, 212, 0.95)";
-  ctx.lineWidth = Math.max(2.5, Math.min(stageW, stageH) * 0.0035);
-  ctx.beginPath();
-  leftLovePath(ctx, boxX, boxY, boxW, boxH);
-  ctx.stroke();
-  ctx.beginPath();
-  rightLovePath(ctx, boxX, boxY, boxW, boxH);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255, 248, 250, 0.35)";
-  ctx.lineWidth = Math.max(1, Math.min(stageW, stageH) * 0.0012);
-  ctx.beginPath();
-  leftLovePath(ctx, boxX, boxY, boxW, boxH);
-  ctx.stroke();
-  ctx.beginPath();
-  rightLovePath(ctx, boxX, boxY, boxW, boxH);
-  ctx.stroke();
+  ctx.lineWidth = Math.max(3, Math.min(stageW, stageH) * 0.004);
+  ctx.stroke(heart);
+  ctx.strokeStyle = "rgba(255, 248, 250, 0.4)";
+  ctx.lineWidth = Math.max(1, Math.min(stageW, stageH) * 0.0014);
+  ctx.stroke(heart);
   ctx.restore();
 }
 
-/** Left heart from kiss-cam-double-love-clip (objectBoundingBox). */
-function leftLovePath(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-) {
-  ctx.moveTo(x + 0.34 * w, y + 0.96 * h);
-  ctx.bezierCurveTo(
-    x + 0.34 * w,
-    y + 0.96 * h,
-    x - 0.02 * w,
-    y + 0.62 * h,
-    x - 0.02 * w,
-    y + 0.34 * h,
-  );
-  ctx.bezierCurveTo(
-    x - 0.02 * w,
-    y + 0.16 * h,
-    x + 0.1 * w,
-    y + 0.06 * h,
-    x + 0.24 * w,
-    y + 0.1 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 0.31 * w,
-    y + 0.12 * h,
-    x + 0.36 * w,
-    y + 0.22 * h,
-    x + 0.38 * w,
-    y + 0.34 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 0.4 * w,
-    y + 0.22 * h,
-    x + 0.47 * w,
-    y + 0.1 * h,
-    x + 0.56 * w,
-    y + 0.1 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 0.7 * w,
-    y + 0.06 * h,
-    x + 0.8 * w,
-    y + 0.18 * h,
-    x + 0.78 * w,
-    y + 0.34 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 0.76 * w,
-    y + 0.58 * h,
-    x + 0.5 * w,
-    y + 0.88 * h,
-    x + 0.34 * w,
-    y + 0.96 * h,
-  );
-  ctx.closePath();
-}
+/**
+ * Classic heart from kiss-cam hearts.svg. The path does not fill the full 24×24
+ * viewBox (empty padding above/below), so we normalize to content bounds.
+ */
+const HEART_PATH =
+  "M12 21s-7.2-4.6-9.6-9.2C.6 8.2 2.4 4.8 6 4.8c2 0 3.3 1.2 4 2.2.7-1 2-2.2 4-2.2 3.6 0 5.4 3.4 3.6 7C19.2 16.4 12 21 12 21z";
+const HEART_BOUNDS = { x: 0.55, y: 4.55, w: 22.9, h: 16.55 };
 
-/** Right heart from kiss-cam-double-love-clip (objectBoundingBox). */
-function rightLovePath(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-) {
-  ctx.moveTo(x + 0.66 * w, y + 0.96 * h);
-  ctx.bezierCurveTo(
-    x + 0.66 * w,
-    y + 0.96 * h,
-    x + 0.3 * w,
-    y + 0.62 * h,
-    x + 0.3 * w,
-    y + 0.34 * h,
+function singleHeartPath2D(x: number, y: number, w: number, h: number) {
+  const path = new Path2D();
+  path.addPath(
+    new Path2D(HEART_PATH),
+    new DOMMatrix()
+      .translate(x, y)
+      .scale(w / HEART_BOUNDS.w, h / HEART_BOUNDS.h)
+      .translate(-HEART_BOUNDS.x, -HEART_BOUNDS.y),
   );
-  ctx.bezierCurveTo(
-    x + 0.28 * w,
-    y + 0.18 * h,
-    x + 0.38 * w,
-    y + 0.06 * h,
-    x + 0.52 * w,
-    y + 0.1 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 0.59 * w,
-    y + 0.12 * h,
-    x + 0.64 * w,
-    y + 0.22 * h,
-    x + 0.66 * w,
-    y + 0.34 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 0.68 * w,
-    y + 0.22 * h,
-    x + 0.75 * w,
-    y + 0.1 * h,
-    x + 0.84 * w,
-    y + 0.1 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 0.98 * w,
-    y + 0.06 * h,
-    x + 1.08 * w,
-    y + 0.18 * h,
-    x + 1.06 * w,
-    y + 0.34 * h,
-  );
-  ctx.bezierCurveTo(
-    x + 1.04 * w,
-    y + 0.58 * h,
-    x + 0.82 * w,
-    y + 0.88 * h,
-    x + 0.66 * w,
-    y + 0.96 * h,
-  );
-  ctx.closePath();
+  return path;
 }
 
 function roundRectPath(
