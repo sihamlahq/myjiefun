@@ -5,7 +5,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { KissCamConnection } from "@/components/kiss-cam/kiss-cam-connection";
-import { KissCamDisplay } from "@/components/kiss-cam/kiss-cam-display";
+import {
+  KISS_CAM_COUPLE_VIDEO_SRC,
+  KissCamDisplay,
+} from "@/components/kiss-cam/kiss-cam-display";
 import { useKissCamMusic } from "@/components/kiss-cam/kiss-cam-music";
 import { KissCamQRCode } from "@/components/kiss-cam/kiss-cam-qr";
 import { CameraStatusDot, KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
@@ -38,6 +41,11 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [remoteCountdownTick, setRemoteCountdownTick] = useState(0);
   const [sessionRefreshing, setSessionRefreshing] = useState(false);
   const [rigDebug, setRigDebug] = useState(false);
+  /** Keep QR / controls reachable even while the LED is fullscreen. */
+  const [forceShowChrome, setForceShowChrome] = useState(false);
+  const [coupleVideoSrc, setCoupleVideoSrc] = useState(KISS_CAM_COUPLE_VIDEO_SRC);
+  const [coupleVideoLabel, setCoupleVideoLabel] = useState("kiss-cam.mp4 (default path)");
+  const coupleVideoObjectUrl = useRef<string | null>(null);
   const connRef = useRef<KissCamConnection | null>(null);
   const rafRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
@@ -46,6 +54,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const resetAnimationRef = useRef<() => void>(() => undefined);
   const remoteCountdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const musicFileInputRef = useRef<HTMLInputElement | null>(null);
+  const coupleVideoInputRef = useRef<HTMLInputElement | null>(null);
 
   const music = useKissCamMusic();
   const musicPlayRef = useRef(music.play);
@@ -311,7 +320,20 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   }, []);
 
   const celebrate = state.animation === "celebration" || state.animation === "final";
-  const showChrome = !state.fullscreen;
+  const showChrome = !state.fullscreen || forceShowChrome;
+
+  useEffect(() => {
+    if (!state.fullscreen) setForceShowChrome(false);
+  }, [state.fullscreen]);
+
+  useEffect(() => {
+    return () => {
+      if (coupleVideoObjectUrl.current) {
+        URL.revokeObjectURL(coupleVideoObjectUrl.current);
+        coupleVideoObjectUrl.current = null;
+      }
+    };
+  }, []);
 
   const toggleLoadingScreen = useCallback((next?: boolean) => {
     setLoadingScreen((prev) => {
@@ -344,6 +366,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           cameraEnabled={state.cameraEnabled}
           cameraLayout={state.cameraLayout}
           remoteStream={remoteStream}
+          fallbackVideoSrc={coupleVideoSrc}
           celebrate={celebrate}
           loveBurst={loveBurst}
           loading={loadingScreen}
@@ -353,6 +376,18 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           className="h-full w-full"
         />
       </div>
+
+      {state.fullscreen && !forceShowChrome ? (
+        <div className="absolute bottom-3 right-3 z-50 flex flex-col gap-2 sm:bottom-4 sm:right-4">
+          <Button
+            type="button"
+            className="h-11 bg-[#c45a78] text-white shadow-[0_12px_28px_rgba(0,0,0,.35)] hover:bg-[#a84864]"
+            onClick={() => setForceShowChrome(true)}
+          >
+            Show QR & controls
+          </Button>
+        </div>
+      ) : null}
 
       {showChrome ? (
         <header className="absolute inset-x-0 top-0 z-40 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-b from-[#2a1a22]/88 to-transparent px-4 pb-8 pt-[max(0.75rem,env(safe-area-inset-top))] text-[#f7f1e8]">
@@ -380,6 +415,17 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
 
       {showChrome ? (
         <aside className="absolute bottom-3 right-3 z-40 flex max-h-[min(72dvh,640px)] w-[min(100%-1.5rem,300px)] flex-col gap-3 overflow-y-auto sm:bottom-4 sm:right-4">
+          {state.fullscreen && forceShowChrome ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 border-white/20 bg-[#3a2f28]/92 text-[#f7f1e8]"
+              onClick={() => setForceShowChrome(false)}
+            >
+              Hide panel (keep fullscreen)
+            </Button>
+          ) : null}
+
           <KissCamQRCode
             sessionId={state.sessionId}
             shortCode={state.shortCode}
@@ -392,6 +438,10 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           <div className="rounded-2xl border border-white/10 bg-[#3a2f28]/92 p-4 text-[#f7f1e8] shadow-[0_16px_40px_rgba(0,0,0,.35)] backdrop-blur-md">
             <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ffc9d4]/90">
               Controls
+            </p>
+            <p className="mt-2 text-[11px] leading-snug text-[#f7f1e8]/60">
+              Phone camera: scan the QR. Mobile buttons (countdown / Love / zoom) are on that camera
+              page — there is no separate controller URL.
             </p>
             <div className="mt-3 grid gap-2">
               <Button
@@ -574,6 +624,62 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                   <option value="full">Full background</option>
                 </select>
               </label>
+
+              <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ffc9d4]/85">
+                  Couple video (heart standby)
+                </p>
+                <p className="mt-1 truncate text-xs text-[#f7f1e8]/75" title={coupleVideoLabel}>
+                  {coupleVideoLabel}
+                </p>
+                <p className="mt-1 text-[11px] text-[#f7f1e8]/55">
+                  Plays in the love frame until a phone camera goes live. Default file path:{" "}
+                  <code className="text-[10px]">/assets/kiss-cam/kiss-cam.mp4</code>
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-9"
+                    onClick={() => coupleVideoInputRef.current?.click()}
+                  >
+                    Choose video
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 border-white/20 text-[#f7f1e8]"
+                    onClick={() => {
+                      if (coupleVideoObjectUrl.current) {
+                        URL.revokeObjectURL(coupleVideoObjectUrl.current);
+                        coupleVideoObjectUrl.current = null;
+                      }
+                      setCoupleVideoSrc(KISS_CAM_COUPLE_VIDEO_SRC);
+                      setCoupleVideoLabel("kiss-cam.mp4 (default path)");
+                    }}
+                  >
+                    Use default
+                  </Button>
+                </div>
+                <input
+                  ref={coupleVideoInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    if (coupleVideoObjectUrl.current) {
+                      URL.revokeObjectURL(coupleVideoObjectUrl.current);
+                    }
+                    const url = URL.createObjectURL(file);
+                    coupleVideoObjectUrl.current = url;
+                    setCoupleVideoSrc(url);
+                    setCoupleVideoLabel(file.name);
+                  }}
+                />
+              </div>
             </div>
 
             {turnOk === false ? (

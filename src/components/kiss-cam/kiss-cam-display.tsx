@@ -15,6 +15,9 @@ import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import { STAGE_SAFE_AREA_STYLE } from "@/components/kiss-cam/kiss-cam-layout";
 import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-cam/kiss-cam-types";
 
+/** Couple demo / standby loop for Heart mode when no phone camera is live. */
+export const KISS_CAM_COUPLE_VIDEO_SRC = "/assets/kiss-cam/kiss-cam.mp4";
+
 type KissCamDisplayProps = {
   phase: KissCamAnimationPhase;
   countdownValue: number | null;
@@ -27,6 +30,8 @@ type KissCamDisplayProps = {
   cameraEnabled: boolean;
   cameraLayout: CameraLayoutMode;
   remoteStream: MediaStream | null;
+  /** Looping couple video for Heart mode when no phone is live. */
+  fallbackVideoSrc?: string;
   celebrate: boolean;
   loveBurst?: boolean;
   /** Soft loading overlay — keeps background + couple visible. */
@@ -49,6 +54,7 @@ export function KissCamDisplay({
   cameraEnabled,
   cameraLayout,
   remoteStream,
+  fallbackVideoSrc = KISS_CAM_COUPLE_VIDEO_SRC,
   celebrate,
   loveBurst = false,
   loading = false,
@@ -62,6 +68,7 @@ export function KissCamDisplay({
   const [fadeIn, setFadeIn] = useState(true);
   const [autoLove, setAutoLove] = useState(false);
   const [autoLoveId, setAutoLoveId] = useState(0);
+  const [demoReady, setDemoReady] = useState(false);
   const hadStream = useRef(false);
   const lastPhaseRef = useRef(phase);
 
@@ -69,9 +76,14 @@ export function KissCamDisplay({
     const video = videoRef.current;
     if (!video) return;
     setVideoEl(video);
+
     if (remoteStream) {
       hadStream.current = true;
+      setDemoReady(false);
       setFadeIn(true);
+      // Stop any demo file before attaching the live stream.
+      video.removeAttribute("src");
+      video.load();
       if (video.srcObject !== remoteStream) {
         video.srcObject = remoteStream;
       }
@@ -90,16 +102,50 @@ export function KissCamDisplay({
           track.removeEventListener("ended", kick);
         };
       }
-    } else {
-      video.srcObject = null;
+      return;
     }
-  }, [remoteStream]);
+
+    video.srcObject = null;
+
+    // Heart mode: loop the uploaded couple video until a phone goes live.
+    if (cameraLayout === "love" && cameraEnabled && fallbackVideoSrc) {
+      let cancelled = false;
+      const onReady = () => {
+        if (cancelled) return;
+        setDemoReady(true);
+        setFadeIn(true);
+        void video.play().catch(() => undefined);
+      };
+      const onError = () => {
+        if (!cancelled) setDemoReady(false);
+      };
+      video.loop = true;
+      video.muted = true;
+      video.playsInline = true;
+      if (video.getAttribute("src") !== fallbackVideoSrc) {
+        video.src = fallbackVideoSrc;
+      }
+      video.addEventListener("canplay", onReady);
+      video.addEventListener("error", onError);
+      void video.play().then(onReady).catch(onError);
+      return () => {
+        cancelled = true;
+        video.removeEventListener("canplay", onReady);
+        video.removeEventListener("error", onError);
+      };
+    }
+
+    setDemoReady(false);
+    video.removeAttribute("src");
+    video.load();
+  }, [remoteStream, cameraLayout, cameraEnabled, fallbackVideoSrc]);
 
   // When loading clears, force the compositor video to wake up immediately.
   useEffect(() => {
     if (loading) return;
     const video = videoRef.current;
-    if (!video?.srcObject) return;
+    if (!video) return;
+    if (!video.srcObject && !video.currentSrc) return;
     void video.play().catch(() => undefined);
     setFadeIn(true);
   }, [loading]);
@@ -124,7 +170,8 @@ export function KissCamDisplay({
   }, [phase, autoLove]);
 
   const finalFrame = phase === "final" || phase === "celebration";
-  const cameraLive = cameraEnabled && Boolean(remoteStream);
+  const livePhone = Boolean(remoteStream);
+  const cameraLive = cameraEnabled && (livePhone || (cameraLayout === "love" && demoReady));
   const showBigLove = loveBurst || autoLove;
   // Heart (live camera) mode owns the stage — hide groom/bride puppets so they
   // don't cover the love-shaped video (or look like a revert to the old models).
@@ -138,7 +185,7 @@ export function KissCamDisplay({
     remoteCountdown != null
       ? `remote-${remoteCountdown}-${remoteCountdownTick}`
       : `auto-${countdownValue}`;
-  const showIdleHeader = !loading && phase === "idle" && !remoteStream;
+  const showIdleHeader = !loading && phase === "idle" && !livePhone && !demoReady;
 
   return (
     <div

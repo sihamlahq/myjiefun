@@ -41,3 +41,8 @@ Toggle **Character Rig Debug** in Kiss Cam Controls, or `?rigDebug=1`, or
 
 Older `groom.svg` / `bride.svg` cartoon references were removed. Live puppets use
 only the layered PNGs under `groom/` and `bride/`.
+
+## Couple standby video
+
+Put `kiss-cam.mp4` at `public/assets/kiss-cam/kiss-cam.mp4` (or Choose video in LED Controls).
+It loops in the Heart frame until a phone camera goes live.
