@@ -567,6 +567,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
                     }))
                   }
                 >
+                  <option value="love">Double love (live camera)</option>
                   <option value="center">Center</option>
                   <option value="portrait">Portrait</option>
                   <option value="rounded">Rounded cinematic</option>

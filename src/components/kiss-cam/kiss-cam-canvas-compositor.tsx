@@ -5,15 +5,15 @@ import { useEffect, useRef } from "react";
 type KissCamCanvasCompositorProps = {
   video: HTMLVideoElement | null;
   enabled: boolean;
-  layout: "center" | "portrait" | "rounded" | "full";
+  layout: "love" | "center" | "portrait" | "rounded" | "full";
   fadeIn: boolean;
   className?: string;
 };
 
 /**
  * Draws the live camera into a cinematic frame.
- * Follows the phone capture rate (60fps when flagship 1080p60 is live, else 30)
- * with sharp high-DPR scaling for LED walls.
+ * Default "love" clips to the same wide double-heart as the phone preview
+ * and cover-fills with the exact live feed (no black placeholder).
  */
 export function KissCamCanvasCompositor({
   video,
@@ -100,6 +100,14 @@ export function KissCamCanvasCompositor({
         return;
       }
 
+      const vw = video.videoWidth || 1920;
+      const vh = video.videoHeight || 1080;
+
+      if (layout === "love") {
+        drawLoveCamera(ctx, video, w, h, vw, vh, opacityRef.current);
+        return;
+      }
+
       // Larger frame so faces read clearer / higher on the LED.
       let fw = w * 0.66;
       let fh = h * 0.74;
@@ -130,22 +138,17 @@ export function KissCamCanvasCompositor({
       ctx.save();
       ctx.globalAlpha = opacityRef.current;
 
-      // No canvas shadowBlur — it is very expensive every frame.
       roundRectPath(ctx, fx, fy, fw, fh, radius);
       ctx.clip();
 
-      const vw = video.videoWidth || 1920;
-      const vh = video.videoHeight || 1080;
       const scale = Math.max(fw / vw, fh / vh);
       const dw = vw * scale;
       const dh = vh * scale;
       const dx = fx + (fw - dw) / 2;
       const dy = fy + (fh - dh) / 2;
 
-      // No ctx.filter — CSS filters on canvas re-rasterize every frame and soften detail.
       ctx.drawImage(video, dx, dy, dw, dh);
 
-      // Very light vignette only — avoid washes that soften the feed.
       ctx.fillStyle = "rgba(40, 20, 30, 0.05)";
       ctx.fillRect(fx, fy + fh * 0.78, fw, fh * 0.22);
 
@@ -178,6 +181,166 @@ export function KissCamCanvasCompositor({
       className={`pointer-events-none absolute inset-0 h-full w-full ${className}`}
       aria-hidden
     />
+  );
+}
+
+/**
+ * Phone-matched wide double-heart: clip path in a centered box, cover-fill live video.
+ * Paths use the same objectBoundingBox shapes as `#kiss-cam-double-love-clip`.
+ */
+function drawLoveCamera(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  stageW: number,
+  stageH: number,
+  vw: number,
+  vh: number,
+  opacity: number,
+) {
+  // Match phone preview proportions (aspect ~5 / 3.55) and keep it large on LED.
+  const boxW = Math.min(stageW * 0.92, stageH * (5 / 3.55) * 0.95);
+  const boxH = boxW * (3.55 / 5);
+  const boxX = (stageW - boxW) / 2;
+  const boxY = stageH * 0.06;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.beginPath();
+  doubleLovePath(ctx, boxX, boxY, boxW, boxH);
+  ctx.clip();
+
+  const scale = Math.max(boxW / vw, boxH / vh);
+  const dw = vw * scale;
+  const dh = vh * scale;
+  const dx = boxX + (boxW - dw) / 2;
+  const dy = boxY + (boxH - dh) / 2;
+  ctx.drawImage(video, dx, dy, dw, dh);
+  ctx.restore();
+
+  // Soft rose outline like the phone stroke — not a black fill.
+  ctx.save();
+  ctx.globalAlpha = opacity * 0.95;
+  ctx.strokeStyle = "rgba(255, 201, 212, 0.95)";
+  ctx.lineWidth = Math.max(2, Math.min(stageW, stageH) * 0.003);
+  ctx.beginPath();
+  doubleLovePath(ctx, boxX, boxY, boxW, boxH);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 248, 250, 0.4)";
+  ctx.lineWidth = Math.max(1, Math.min(stageW, stageH) * 0.0012);
+  ctx.beginPath();
+  doubleLovePath(ctx, boxX, boxY, boxW, boxH);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** objectBoundingBox twin-heart paths scaled into a rectangle. */
+function doubleLovePath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  // Left heart (from kiss-cam-double-love-clip)
+  ctx.moveTo(x + 0.34 * w, y + 0.96 * h);
+  ctx.bezierCurveTo(
+    x + 0.34 * w,
+    y + 0.96 * h,
+    x - 0.02 * w,
+    y + 0.62 * h,
+    x - 0.02 * w,
+    y + 0.34 * h,
+  );
+  ctx.bezierCurveTo(
+    x - 0.02 * w,
+    y + 0.16 * h,
+    x + 0.1 * w,
+    y + 0.06 * h,
+    x + 0.24 * w,
+    y + 0.1 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.31 * w,
+    y + 0.12 * h,
+    x + 0.36 * w,
+    y + 0.22 * h,
+    x + 0.38 * w,
+    y + 0.34 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.4 * w,
+    y + 0.22 * h,
+    x + 0.47 * w,
+    y + 0.1 * h,
+    x + 0.56 * w,
+    y + 0.1 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.7 * w,
+    y + 0.06 * h,
+    x + 0.8 * w,
+    y + 0.18 * h,
+    x + 0.78 * w,
+    y + 0.34 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.76 * w,
+    y + 0.58 * h,
+    x + 0.5 * w,
+    y + 0.88 * h,
+    x + 0.34 * w,
+    y + 0.96 * h,
+  );
+
+  // Right heart
+  ctx.moveTo(x + 0.66 * w, y + 0.96 * h);
+  ctx.bezierCurveTo(
+    x + 0.66 * w,
+    y + 0.96 * h,
+    x + 0.3 * w,
+    y + 0.62 * h,
+    x + 0.3 * w,
+    y + 0.34 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.28 * w,
+    y + 0.18 * h,
+    x + 0.38 * w,
+    y + 0.06 * h,
+    x + 0.52 * w,
+    y + 0.1 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.59 * w,
+    y + 0.12 * h,
+    x + 0.64 * w,
+    y + 0.22 * h,
+    x + 0.66 * w,
+    y + 0.34 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.68 * w,
+    y + 0.22 * h,
+    x + 0.75 * w,
+    y + 0.1 * h,
+    x + 0.84 * w,
+    y + 0.1 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 0.98 * w,
+    y + 0.06 * h,
+    x + 1.08 * w,
+    y + 0.18 * h,
+    x + 1.06 * w,
+    y + 0.34 * h,
+  );
+  ctx.bezierCurveTo(
+    x + 1.04 * w,
+    y + 0.58 * h,
+    x + 0.82 * w,
+    y + 0.88 * h,
+    x + 0.66 * w,
+    y + 0.96 * h,
   );
 }
 

@@ -151,7 +151,8 @@ export function KissCamDisplay({
     >
       {/* Full-bleed atmosphere — behind the safe-area columns */}
       <div className="pointer-events-none absolute inset-0 z-0">
-        <KissCamBackground active lite={cameraLive} />
+        {/* Hide decorative heart watermarks when live — the compositor owns the love frame. */}
+        <KissCamBackground active lite={cameraLive} showHeartMotifs={!cameraLive} />
       </div>
 
       <video

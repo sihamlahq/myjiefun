@@ -460,66 +460,35 @@ export function KissCamCameraClient() {
   const pauseCameraForLoading = useCallback(
     async (notifyDisplay = true) => {
       if (switchingRef.current || loadingBusyRef.current || startingRef.current) return;
-      if (primaryAction === "start" && !cameraOn) return;
       loadingBusyRef.current = true;
-
-      // Swap the primary button to Start Camera immediately.
-      setPrimaryAction("start");
-      setLoadingScreen(true);
       setMessage(null);
 
       const conn = connRef.current;
-      const isLive = Boolean(conn?.alive && conn.isPublishing);
-      if (!isLive) {
-        // Controller / standby phones only toggle the LED overlay.
+      // Toggle soft loading overlay — keep the live love-frame video (no black placeholder).
+      if (loadingScreen) {
+        setLoadingScreen(false);
         if (notifyDisplay && conn?.alive) {
           try {
-            await conn.sendControl("loading-on");
+            await conn.sendControl("loading-off");
           } catch {
             // ignore
           }
         }
-        setLoadingScreen(true);
         loadingBusyRef.current = false;
         return;
       }
-      // Tell the LED first, then park a tiny placeholder on the peer connection
-      // so RTP/ICE stay warm. Buttons already work over signaling; video needs this.
+
+      setLoadingScreen(true);
       if (notifyDisplay && conn?.alive) {
         try {
           await conn.sendControl("loading-on");
         } catch {
-          // Display may already be offline; still pause local camera.
+          // Display may already be offline.
         }
-      }
-
-      try {
-        if (conn?.alive) {
-          stopPlaceholderTrack();
-          const placeholder = createPlaceholderVideoTrack();
-          placeholderTrackRef.current = placeholder;
-          await conn.replaceVideoTrack(placeholder, { renegotiate: false });
-        }
-      } catch {
-        // Fallback: detach video if placeholder fails.
-        try {
-          if (conn?.alive) await conn.replaceVideoTrack(null, { renegotiate: false });
-        } catch {
-          // ignore — local stop still proceeds
-        }
-      }
-
-      stopTracksOnly();
-      await releaseWakeLock();
-      // Keep status as connected while the peer session is still alive —
-      // only the camera hardware is paused for the loading screen.
-      if (!conn?.alive) {
-        setStatus("waiting");
-        setQuality(null);
       }
       loadingBusyRef.current = false;
     },
-    [cameraOn, primaryAction, releaseWakeLock, stopPlaceholderTrack, stopTracksOnly],
+    [loadingScreen],
   );
   pauseCameraForLoadingRef.current = pauseCameraForLoading;
 
@@ -940,14 +909,14 @@ export function KissCamCameraClient() {
         <div className="kiss-cam-double-love-media">
           <video
             ref={videoRef}
-            className="h-full w-full object-cover [transform:translateZ(0)]"
+            className="kiss-cam-double-love-video"
             muted
             playsInline
             autoPlay
             disablePictureInPicture
           />
           {!cameraOn && (status === "waiting" || status === "standby") ? (
-            <div className="absolute inset-0 flex items-center justify-center px-10 text-center text-sm leading-relaxed text-white/75">
+            <div className="absolute inset-0 z-[1] flex items-center justify-center px-10 text-center text-sm leading-relaxed text-[#5a2f38]/85">
               {status === "standby"
                 ? "This phone is in standby. Love and countdown still work. Start Camera to share live video."
                 : "Press Start Camera to share video with the wedding screen."}
@@ -1073,7 +1042,7 @@ export function KissCamCameraClient() {
           )}
         </div>
 
-        {primaryAction === "loading" ? (
+        {primaryAction === "loading" || loadingScreen ? (
           <Button
             type="button"
             size="xl"
@@ -1090,7 +1059,7 @@ export function KissCamCameraClient() {
             disabled={switching || status === "connecting"}
             aria-pressed={loadingScreen}
           >
-            Loading Screen
+            {loadingScreen ? "Clear Loading Screen" : "Loading Screen"}
           </Button>
         ) : (
           <Button

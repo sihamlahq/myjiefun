@@ -32,10 +32,13 @@ function makeHeartBalloons(count: number): Balloon[] {
 export function KissCamBackground({
   active,
   lite = false,
+  showHeartMotifs = true,
 }: {
   active: boolean;
   /** Fewer animated effects while the live camera feed is compositing. */
   lite?: boolean;
+  /** Decorative twin hearts — off when the live love camera frame is showing. */
+  showHeartMotifs?: boolean;
 }) {
   return (
     <div className="kiss-cam-love-stage absolute inset-0 overflow-hidden">
@@ -55,7 +58,7 @@ export function KissCamBackground({
         </>
       )}
 
-      <LoveHeartMotifs />
+      {showHeartMotifs ? <LoveHeartMotifs /> : null}
 
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_42%,rgba(58,36,48,.22))]" />
       {active && !lite ? <SparkleField /> : null}

@@ -13,7 +13,7 @@ export type KissCamAnimationPhase =
 
 export type CameraConnectionState = "waiting" | "connecting" | "connected" | "disconnected" | "reconnecting";
 
-export type CameraLayoutMode = "center" | "portrait" | "rounded" | "full";
+export type CameraLayoutMode = "love" | "center" | "portrait" | "rounded" | "full";
 
 export type ConnectionQuality = {
   score: number; // 0–100
@@ -59,7 +59,7 @@ export const defaultKissCamState: KissCamState = {
   sessionExpiresAt: null,
   cameraState: "waiting",
   connectionQuality: null,
-  cameraLayout: "center",
+  cameraLayout: "love",
   fullscreen: false,
   countdownValue: null,
 };
