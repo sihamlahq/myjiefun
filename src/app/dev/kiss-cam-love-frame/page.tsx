@@ -24,7 +24,7 @@ export default function KissCamLoveFrameTestPage() {
     if (!ctx) return;
 
     let raf = 0;
-    let t0 = performance.now();
+    const t0 = performance.now();
     const paint = (now: number) => {
       raf = requestAnimationFrame(paint);
       const t = (now - t0) / 1000;
