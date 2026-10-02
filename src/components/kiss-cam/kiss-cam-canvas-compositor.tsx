@@ -201,15 +201,24 @@ function drawLoveCamera(
   const boxW = Math.min(stageW * 0.92, stageH * (5 / 3.55) * 0.95);
   const boxH = boxW * (3.55 / 5);
   const boxX = (stageW - boxW) / 2;
-  const boxY = stageH * 0.06;
+  const boxY = Math.max(8, stageH * 0.04);
 
+  // Mask technique: fill each heart separately (same-path winding can punch a
+  // hole in the twin-heart overlap), then source-in the live cover video.
   ctx.save();
-  ctx.globalAlpha = opacity;
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "#ffffff";
   ctx.beginPath();
-  doubleLovePath(ctx, boxX, boxY, boxW, boxH);
-  ctx.clip();
+  leftLovePath(ctx, boxX, boxY, boxW, boxH);
+  ctx.fill();
+  ctx.beginPath();
+  rightLovePath(ctx, boxX, boxY, boxW, boxH);
+  ctx.fill();
 
-  const scale = Math.max(boxW / vw, boxH / vh);
+  ctx.globalCompositeOperation = "source-in";
+  ctx.globalAlpha = opacity;
+  // Overscan so lobe anti-aliasing never reveals the stage behind.
+  const scale = Math.max(boxW / vw, boxH / vh) * 1.08;
   const dw = vw * scale;
   const dh = vh * scale;
   const dx = boxX + (boxW - dw) / 2;
@@ -217,31 +226,38 @@ function drawLoveCamera(
   ctx.drawImage(video, dx, dy, dw, dh);
   ctx.restore();
 
-  // Soft rose outline like the phone stroke — not a black fill.
+  // Soft rose outline on top of the filled video.
   ctx.save();
   ctx.globalAlpha = opacity * 0.95;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
   ctx.strokeStyle = "rgba(255, 201, 212, 0.95)";
-  ctx.lineWidth = Math.max(2, Math.min(stageW, stageH) * 0.003);
+  ctx.lineWidth = Math.max(2.5, Math.min(stageW, stageH) * 0.0035);
   ctx.beginPath();
-  doubleLovePath(ctx, boxX, boxY, boxW, boxH);
+  leftLovePath(ctx, boxX, boxY, boxW, boxH);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(255, 248, 250, 0.4)";
+  ctx.beginPath();
+  rightLovePath(ctx, boxX, boxY, boxW, boxH);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 248, 250, 0.35)";
   ctx.lineWidth = Math.max(1, Math.min(stageW, stageH) * 0.0012);
   ctx.beginPath();
-  doubleLovePath(ctx, boxX, boxY, boxW, boxH);
+  leftLovePath(ctx, boxX, boxY, boxW, boxH);
+  ctx.stroke();
+  ctx.beginPath();
+  rightLovePath(ctx, boxX, boxY, boxW, boxH);
   ctx.stroke();
   ctx.restore();
 }
 
-/** objectBoundingBox twin-heart paths scaled into a rectangle. */
-function doubleLovePath(
+/** Left heart from kiss-cam-double-love-clip (objectBoundingBox). */
+function leftLovePath(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   w: number,
   h: number,
 ) {
-  // Left heart (from kiss-cam-double-love-clip)
   ctx.moveTo(x + 0.34 * w, y + 0.96 * h);
   ctx.bezierCurveTo(
     x + 0.34 * w,
@@ -291,8 +307,17 @@ function doubleLovePath(
     x + 0.34 * w,
     y + 0.96 * h,
   );
+  ctx.closePath();
+}
 
-  // Right heart
+/** Right heart from kiss-cam-double-love-clip (objectBoundingBox). */
+function rightLovePath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
   ctx.moveTo(x + 0.66 * w, y + 0.96 * h);
   ctx.bezierCurveTo(
     x + 0.66 * w,
@@ -342,6 +367,7 @@ function doubleLovePath(
     x + 0.66 * w,
     y + 0.96 * h,
   );
+  ctx.closePath();
 }
 
 function roundRectPath(
