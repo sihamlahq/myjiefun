@@ -126,6 +126,9 @@ export function KissCamDisplay({
   const finalFrame = phase === "final" || phase === "celebration";
   const cameraLive = cameraEnabled && Boolean(remoteStream);
   const showBigLove = loveBurst || autoLove;
+  // Heart (live camera) mode owns the stage — hide groom/bride puppets so they
+  // don't cover the love-shaped video (or look like a revert to the old models).
+  const renderCharacters = showCharacters && cameraLayout !== "love";
   // Keep couple calmly on stage while loading (background stays too).
   const characterPhase: KissCamAnimationPhase = loading ? "idle" : phase;
   const overlayCountdown = loading
@@ -165,7 +168,13 @@ export function KissCamDisplay({
         aria-hidden
       />
 
-      <div className="pointer-events-none absolute inset-0 z-[1]">
+      <div
+        className={
+          cameraLayout === "love"
+            ? "pointer-events-none absolute inset-0 z-[5]"
+            : "pointer-events-none absolute inset-0 z-[1]"
+        }
+      >
         <KissCamCanvasCompositor
           video={videoEl}
           enabled={cameraLive}
@@ -227,7 +236,7 @@ export function KissCamDisplay({
             containerType: "size",
           }}
         >
-          {showCharacters ? (
+          {renderCharacters ? (
             <>
               <GroomFigure phase={characterPhase} className="z-[3]" rigDebug={rigDebug} />
               <BrideFigure phase={characterPhase} className="z-[4]" rigDebug={rigDebug} />
