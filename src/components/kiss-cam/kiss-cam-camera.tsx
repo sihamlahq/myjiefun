@@ -962,7 +962,7 @@ export function KissCamCameraClient() {
           </Button>
         </div>
       ) : (
-      <div className="mt-auto flex min-h-0 shrink-0 flex-col gap-1 pt-1.5">
+      <div className="flex min-h-0 shrink-0 flex-col gap-1 pt-1.5">
         <div className="rounded-xl border border-rose-200/20 bg-[#3a2430]/65 px-2.5 py-1">
           <div className="mb-0.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffc9d4]/75">
             <span>Zoom</span>

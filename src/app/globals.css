@@ -313,22 +313,24 @@ h3,
 .kiss-cam-double-love {
   position: relative;
   width: 100%;
-  /* Fill leftover space only — never force the page taller than the screen */
+  /* Grow into leftover space between header and controls (no empty gap) */
   flex: 1 1 0;
-  min-height: 0;
-  max-height: min(38svh, 300px);
+  min-height: 140px;
+  max-height: min(36svh, 280px);
   aspect-ratio: auto;
 }
 
 @media (max-height: 720px) {
   .kiss-cam-double-love {
-    max-height: min(34svh, 260px);
+    min-height: 120px;
+    max-height: min(32svh, 240px);
   }
 }
 
 @media (max-height: 640px) {
   .kiss-cam-double-love {
-    max-height: min(30svh, 220px);
+    min-height: 100px;
+    max-height: min(28svh, 200px);
   }
 }
 
