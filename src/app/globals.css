@@ -334,8 +334,8 @@ h3,
   /* Same silhouette as LED live share (live-heart-mask.png) */
   -webkit-mask-image: url("/assets/kiss-cam/live-heart-mask.png");
   mask-image: url("/assets/kiss-cam/live-heart-mask.png");
-  -webkit-mask-size: 108% 108%;
-  mask-size: 108% 108%;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -950,10 +950,10 @@ h3,
 }
 
 /* Exact heart silhouette (cropped from kiss-cam.mp4) for the live share window.
-   Slightly oversized so the live feed tucks under the pink rim (no black fringe). */
+   Keep at 100% so bride/groom hair over the hole stays in front. */
 .kiss-cam-live-heart-mask {
-  -webkit-mask-size: 108% 108%;
-  mask-size: 108% 108%;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
