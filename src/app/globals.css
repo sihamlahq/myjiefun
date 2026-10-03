@@ -308,7 +308,8 @@ h3,
 .kiss-cam-double-love {
   position: relative;
   width: 100%;
-  aspect-ratio: 5 / 3.55;
+  /* Match the designed live-heart-mask / LED frame (16:9) */
+  aspect-ratio: 16 / 9;
   /* Keep preview short so controls stay on one phone screen without scrolling */
   max-height: min(30dvh, 240px);
   flex: 0 1 auto;
@@ -330,10 +331,21 @@ h3,
   position: absolute;
   inset: 0;
   overflow: hidden;
-  -webkit-clip-path: url(#kiss-cam-double-love-clip);
-  clip-path: url(#kiss-cam-double-love-clip);
+  /* Same silhouette as LED live share (live-heart-mask.png) */
+  -webkit-mask-image: url("/assets/kiss-cam/live-heart-mask.png");
+  mask-image: url("/assets/kiss-cam/live-heart-mask.png");
+  -webkit-mask-size: 108% 108%;
+  mask-size: 108% 108%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
   /* Soft rose fill only when the lens is off — never a black void over live video */
   background: rgba(255, 201, 212, 0.18);
+  filter: drop-shadow(0 0 1px rgba(255, 201, 212, 0.95))
+    drop-shadow(0 8px 20px rgba(90, 30, 50, 0.45));
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
 }
@@ -351,12 +363,7 @@ h3,
 }
 
 .kiss-cam-double-love-stroke {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  filter: drop-shadow(0 10px 24px rgba(90, 30, 50, 0.45));
+  display: none;
 }
 
 .kiss-cam-love-bloom {
