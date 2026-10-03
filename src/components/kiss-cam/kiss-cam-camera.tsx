@@ -448,7 +448,6 @@ export function KissCamCameraClient() {
     stopTracksOnly();
     await releaseWakeLock();
     setLoadingScreen(false);
-    setPrimaryAction("start");
     setNeedsConnectTap(false);
     // Stay joined to the session — standby with signaling connection.
     setStatus(connRef.current?.alive ? "standby" : "waiting");
@@ -537,7 +536,6 @@ export function KissCamCameraClient() {
         stopPlaceholderTrack();
         // Keep local camera preview + wake lock so LED can switch back instantly.
         setLoadingScreen(false);
-        setPrimaryAction("start");
         setNeedsConnectTap(false);
         setStatus("standby");
         setQuality(null);
@@ -591,12 +589,9 @@ export function KissCamCameraClient() {
 
     setMessage(null);
     setNeedsConnectTap(false);
-    // Swap the primary button to Loading Screen immediately once we go live.
-    setPrimaryAction("loading");
     setLoadingScreen(false);
 
     if (!isSecure) {
-      setPrimaryAction("start");
       setStatus("error");
       setMessage("Camera requires HTTPS. Open this page on a secure (https) link.");
       startingRef.current = false;
@@ -604,7 +599,6 @@ export function KissCamCameraClient() {
     }
 
     if (!sessionId) {
-      setPrimaryAction("start");
       setStatus("error");
       setMessage("This camera session has expired. Please scan a new QR code.");
       startingRef.current = false;
@@ -612,7 +606,6 @@ export function KissCamCameraClient() {
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setPrimaryAction("start");
       setStatus("error");
       setMessage("Camera unavailable. Please check your phone camera.");
       startingRef.current = false;
@@ -637,7 +630,6 @@ export function KissCamCameraClient() {
         await conn.replaceVideoTrack(track, { renegotiate: true });
         stopPlaceholderTrack();
         void conn.sendControl("loading-off").catch(() => undefined);
-        setPrimaryAction("loading");
         setNeedsConnectTap(false);
         setStatus("connected");
         setMessage(null);
@@ -659,7 +651,6 @@ export function KissCamCameraClient() {
       await conn.startPublishing(stream, { mode: claimMode });
       if (!conn.isPublishing) {
         // Stay connected with local preview — LED can promote this phone later.
-        setPrimaryAction("start");
         setNeedsConnectTap(false);
         setStatus("standby");
         setCameraOn(true);
@@ -668,12 +659,10 @@ export function KissCamCameraClient() {
         return;
       }
       void conn.sendControl("loading-off").catch(() => undefined);
-      setPrimaryAction("loading");
       setNeedsConnectTap(false);
       setStatus("connected");
       setMessage(null);
     } catch (error) {
-      setPrimaryAction("start");
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
         // Auto-connect often needs one user gesture on iOS — keep session joined.
@@ -1022,48 +1011,27 @@ export function KissCamCameraClient() {
         </div>
 
         <div className="grid grid-cols-2 gap-1">
-          {primaryAction === "loading" || loadingScreen ? (
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-xs font-semibold text-white hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.98]"
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                void pauseCameraForLoading(true);
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                void pauseCameraForLoading(true);
-              }}
-              disabled={switching || status === "connecting"}
-              aria-pressed={loadingScreen}
-            >
-              {loadingScreen ? "Clear Loading" : "Loading"}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 touch-manipulation bg-[#c45a78] text-xs text-white hover:bg-[#a84864] active:scale-[0.98]"
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                void startCamera();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                void startCamera();
-              }}
-              disabled={!sessionId || status === "connecting" || switching}
-            >
-              {status === "connecting"
-                ? "Connecting…"
-                : needsConnectTap
-                  ? "Connect"
-                  : "Go Live"}
-            </Button>
-          )}
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 touch-manipulation bg-[#c45a78] text-xs text-white hover:bg-[#a84864] active:scale-[0.98]"
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              e.preventDefault();
+              void startCamera();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              void startCamera();
+            }}
+            disabled={!sessionId || status === "connecting" || switching}
+          >
+            {status === "connecting"
+              ? "Connecting…"
+              : needsConnectTap
+                ? "Connect"
+                : "Go Live"}
+          </Button>
           <Button
             type="button"
             size="sm"
