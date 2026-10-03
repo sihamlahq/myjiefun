@@ -273,8 +273,6 @@ export function KissCamCameraClient() {
   const [loveBurstId, setLoveBurstId] = useState(0);
   const [loveBusy, setLoveBusy] = useState(false);
   const [loadingScreen, setLoadingScreen] = useState(false);
-  /** Primary control slot: Go Live / Connect ↔ Loading Screen (swaps once live). */
-  const [primaryAction, setPrimaryAction] = useState<"start" | "loading">("start");
   /** iOS / some browsers need one tap before getUserMedia — shown only if auto-connect is blocked. */
   const [needsConnectTap, setNeedsConnectTap] = useState(false);
   const [countdownBusy, setCountdownBusy] = useState<1 | 2 | 3 | null>(null);
@@ -319,6 +317,23 @@ export function KissCamCameraClient() {
     window.isSecureContext ||
     location.hostname === "localhost" ||
     location.hostname === "127.0.0.1";
+
+  // Keep the phone page from scrolling — content is sized to 100svh.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    const prevHeight = body.style.height;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.height = "100svh";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+      body.style.height = prevHeight;
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionParam) {
@@ -905,8 +920,7 @@ export function KissCamCameraClient() {
       </header>
 
       {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
-      <div className="relative kiss-cam-double-love mx-auto mt-1 w-full min-h-0">
-        <div className="kiss-cam-double-love-media">
+      <div className="relative kiss-cam-double-love mx-auto mt-1 w-full min-h-0">        <div className="kiss-cam-double-love-media">
           <video
             ref={videoRef}
             className="kiss-cam-double-love-video"
