@@ -1,10 +1,12 @@
 # Kiss Cam assets
 
-Heart-frame stage assets (SVG motifs + optional couple standby video).
+Heart-frame stage assets (SVG motifs + couple standby video + live mask).
 
 | Path | Purpose |
 |------|---------|
-| `kiss-cam.mp4` | Couple video looped in the Heart frame until a phone camera goes live |
+| `kiss-cam.mp4` | Couple video full-bleed until a phone camera goes live |
+| `love-frame.png` | Static frame (transparent heart) drawn in front of the live share |
+| `live-heart-mask.png` | Exact heart silhouette cropped from the designed video — CSS-masks the live camera |
 | `music/theme.mp3` | Optional default LED music |
 | `background.svg`, `hearts.svg`, `balloons.svg` | Atmosphere |
 
