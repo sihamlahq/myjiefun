@@ -715,14 +715,15 @@ h3,
   position: absolute;
   inset: 8%;
   border-radius: 9999px;
-  border: 3px solid rgba(196, 90, 120, 0.35);
-  box-shadow: 0 0 0 10px rgba(255, 245, 247, 0.18);
+  border: 3px solid rgba(255, 107, 157, 0.45);
+  box-shadow: 0 0 0 10px rgba(255, 182, 193, 0.22);
   animation: kiss-cam-count-ring 1s cubic-bezier(0.33, 0.1, 0.25, 1) both;
 }
 
 .kiss-cam-countdown {
   position: relative;
   z-index: 1;
+  color: #ff6b9d;
   animation: kiss-cam-count-smooth 1s cubic-bezier(0.22, 0.82, 0.28, 1) both;
 }
 

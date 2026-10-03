@@ -358,7 +358,7 @@ export function KissCamDisplay({
               className="kiss-cam-countdown-wrap relative flex items-center justify-center"
             >
               <span className="kiss-cam-countdown-ring" aria-hidden />
-              <span className="kiss-cam-countdown font-heading text-[min(28vw,200px)] font-semibold leading-none text-[#5a2f38]/92 drop-shadow-[0_10px_36px_rgba(90,40,50,.28)]">
+              <span className="kiss-cam-countdown font-heading text-[min(28vw,200px)] font-semibold leading-none text-[#ff6b9d] drop-shadow-[0_10px_36px_rgba(196,90,120,.45)]">
                 {overlayCountdown}
               </span>
             </div>
