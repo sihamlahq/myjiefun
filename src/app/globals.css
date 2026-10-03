@@ -920,10 +920,11 @@ h3,
   cursor: not-allowed;
 }
 
-/* Exact heart silhouette (cropped from kiss-cam.mp4) for the live share window */
+/* Exact heart silhouette (cropped from kiss-cam.mp4) for the live share window.
+   Slightly oversized so the live feed tucks under the pink rim (no black fringe). */
 .kiss-cam-live-heart-mask {
-  -webkit-mask-size: cover;
-  mask-size: cover;
+  -webkit-mask-size: 104% 104%;
+  mask-size: 104% 104%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
