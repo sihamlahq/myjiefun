@@ -976,20 +976,20 @@ export function KissCamCameraClient() {
           </Button>
         </div>
       ) : (
-      <div className="flex shrink-0 flex-col gap-0.5 pt-1">
-        <div className="flex items-center gap-1.5 rounded-lg border border-rose-200/20 bg-[#3a2430]/65 px-2 py-0.5">
-          <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#ffc9d4]/75">
+      <div className="flex shrink-0 flex-col gap-1.5 pt-1.5">
+        <div className="flex items-center gap-2 rounded-xl border border-rose-200/20 bg-[#3a2430]/65 px-2.5 py-1.5">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#ffc9d4]/75">
             Zoom
           </span>
           {cameraOn && lenses.length > 1 ? (
-            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5">
               {lenses.map((lens) => {
                 const selected = Math.abs(lens.factor - activeLens) < 0.05;
                 return (
                   <button
                     key={lens.key}
                     type="button"
-                    className={`min-h-7 min-w-7 touch-manipulation rounded-full px-2 text-[11px] font-semibold transition-[transform,background-color,color] active:scale-95 ${
+                    className={`min-h-11 min-w-11 touch-manipulation rounded-full px-3 text-sm font-semibold transition-[transform,background-color,color] active:scale-95 ${
                       selected
                         ? "bg-[#ff8fab] text-white"
                         : "bg-[#fff5f7]/12 text-[#fff5f7] hover:bg-[#fff5f7]/2"
@@ -1013,7 +1013,7 @@ export function KissCamCameraClient() {
               })}
             </div>
           ) : (
-            <p className="min-w-0 flex-1 truncate text-right text-[10px] text-[#ffc9d4]/55">
+            <p className="min-w-0 flex-1 truncate text-right text-xs text-[#ffc9d4]/55">
               {cameraOn
                 ? "No stock lenses"
                 : formatLensLabel(activeLens)}
@@ -1021,11 +1021,11 @@ export function KissCamCameraClient() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
-            size="sm"
-            className="h-8 touch-manipulation bg-[#c45a78] text-xs text-white hover:bg-[#a84864] active:scale-[0.98]"
+            size="lg"
+            className="h-12 touch-manipulation bg-[#c45a78] text-base font-semibold text-white hover:bg-[#a84864] active:scale-[0.98]"
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               e.preventDefault();
@@ -1045,8 +1045,8 @@ export function KissCamCameraClient() {
           </Button>
           <Button
             type="button"
-            size="sm"
-            className="h-8 touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-xs font-semibold text-white hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.97]"
+            size="lg"
+            className="h-12 touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-base font-semibold text-white hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.97]"
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               e.preventDefault();
@@ -1063,13 +1063,13 @@ export function KissCamCameraClient() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-5 gap-1.5">
           {([1, 2, 3] as const).map((value) => (
             <Button
               key={value}
               type="button"
-              size="sm"
-              className={`h-8 touch-manipulation text-sm font-semibold text-white active:scale-[0.96] ${
+              size="lg"
+              className={`h-12 touch-manipulation text-xl font-semibold text-white active:scale-[0.96] ${
                 countdownBusy === value
                   ? "bg-[#ff8fab]"
                   : "bg-[#5a2f38] hover:bg-[#7a3f4c]"
@@ -1090,9 +1090,9 @@ export function KissCamCameraClient() {
             </Button>
           ))}
           <Button
-            size="sm"
+            size="lg"
             variant="secondary"
-            className="h-8 touch-manipulation border border-rose-200/20 bg-[#fff5f7]/12 px-1 text-[10px] text-[#fff5f7] hover:bg-[#fff5f7]/18 active:scale-[0.98]"
+            className="h-12 touch-manipulation border border-rose-200/20 bg-[#fff5f7]/12 px-1 text-sm font-semibold text-[#fff5f7] hover:bg-[#fff5f7]/18 active:scale-[0.98]"
             onClick={() => void switchCamera()}
             disabled={!cameraOn || switching || status === "connecting"}
           >
@@ -1103,9 +1103,9 @@ export function KissCamCameraClient() {
                 : "Rear"}
           </Button>
           <Button
-            size="sm"
+            size="lg"
             variant="outline"
-            className="h-8 touch-manipulation border-rose-200/25 px-1 text-[10px] text-[#ffd6e0] active:scale-[0.98]"
+            className="h-12 touch-manipulation border-rose-200/25 px-1 text-sm font-semibold text-[#ffd6e0] active:scale-[0.98]"
             onClick={() => void stopCamera()}
             disabled={switching}
           >
