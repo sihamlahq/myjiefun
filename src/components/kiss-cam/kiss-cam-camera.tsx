@@ -885,18 +885,6 @@ export function KissCamCameraClient() {
 
   return (
     <main className="kiss-cam-phone-shell mx-auto flex h-dvh max-h-dvh max-w-md flex-col overflow-hidden px-3 text-[#fff5f7]">
-      {/* Hidden clip definition for the wide double-heart preview */}
-      <svg width={0} height={0} className="absolute" aria-hidden>
-        <defs>
-          <clipPath id="kiss-cam-double-love-clip" clipPathUnits="objectBoundingBox">
-            {/* Left heart */}
-            <path d="M0.34,0.96 C0.34,0.96 -0.02,0.62 -0.02,0.34 C-0.02,0.16 0.10,0.06 0.24,0.10 C0.31,0.12 0.36,0.22 0.38,0.34 C0.40,0.22 0.47,0.10 0.56,0.10 C0.70,0.06 0.80,0.18 0.78,0.34 C0.76,0.58 0.50,0.88 0.34,0.96 Z" />
-            {/* Right heart — overlaps for a wide double-love silhouette */}
-            <path d="M0.66,0.96 C0.66,0.96 0.30,0.62 0.30,0.34 C0.28,0.18 0.38,0.06 0.52,0.10 C0.59,0.12 0.64,0.22 0.66,0.34 C0.68,0.22 0.75,0.10 0.84,0.10 C0.98,0.06 1.08,0.18 1.06,0.34 C1.04,0.58 0.82,0.88 0.66,0.96 Z" />
-          </clipPath>
-        </defs>
-      </svg>
-
       <header className="shrink-0 text-center">
         <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-[#ffc9d4]/80">
           TableWedding
@@ -916,6 +904,7 @@ export function KissCamCameraClient() {
         </div>
       </header>
 
+      {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
       <div className="relative kiss-cam-double-love mx-auto mt-2 w-full shrink min-h-0">
         <div className="kiss-cam-double-love-media">
           <video
@@ -943,41 +932,6 @@ export function KissCamCameraClient() {
             </div>
           ) : null}
         </div>
-        <svg
-          className="kiss-cam-double-love-stroke"
-          viewBox="0 0 100 72"
-          preserveAspectRatio="none"
-          aria-hidden
-        >
-          <path
-            d="M34,69 C34,69 -2,45 -2,24 C-2,11 10,4 24,7 C31,9 36,16 38,24 C40,16 47,7 56,7 C70,4 80,13 78,24 C76,42 50,63 34,69 Z"
-            fill="none"
-            stroke="rgba(255, 201, 212, 0.95)"
-            strokeWidth="1.2"
-            vectorEffect="non-scaling-stroke"
-          />
-          <path
-            d="M66,69 C66,69 30,45 30,24 C28,13 38,4 52,7 C59,9 64,16 66,24 C68,16 75,7 84,7 C98,4 108,13 106,24 C104,42 82,63 66,69 Z"
-            fill="none"
-            stroke="rgba(255, 201, 212, 0.95)"
-            strokeWidth="1.2"
-            vectorEffect="non-scaling-stroke"
-          />
-          <path
-            d="M34,69 C34,69 -2,45 -2,24 C-2,11 10,4 24,7 C31,9 36,16 38,24 C40,16 47,7 56,7 C70,4 80,13 78,24 C76,42 50,63 34,69 Z"
-            fill="none"
-            stroke="rgba(255, 248, 250, 0.4)"
-            strokeWidth="0.45"
-            vectorEffect="non-scaling-stroke"
-          />
-          <path
-            d="M66,69 C66,69 30,45 30,24 C28,13 38,4 52,7 C59,9 64,16 66,24 C68,16 75,7 84,7 C98,4 108,13 106,24 C104,42 82,63 66,69 Z"
-            fill="none"
-            stroke="rgba(255, 248, 250, 0.4)"
-            strokeWidth="0.45"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
         <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
         <KissCamLoadingOverlay active={loadingScreen} size="phone" />
       </div>
