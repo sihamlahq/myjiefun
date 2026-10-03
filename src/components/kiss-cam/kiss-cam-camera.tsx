@@ -909,34 +909,37 @@ export function KissCamCameraClient() {
       </header>
 
       {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
-      <div className="relative kiss-cam-double-love mx-auto mt-1 w-full min-h-0">        <div className="kiss-cam-double-love-media">
-          <video
-            ref={videoRef}
-            className="kiss-cam-double-love-video"
-            muted
-            playsInline
-            autoPlay
-            disablePictureInPicture
-          />
-          {!cameraOn && (status === "waiting" || status === "standby" || status === "connecting") ? (
-            <div className="absolute inset-0 z-[1] flex items-center justify-center px-8 text-center text-xs leading-snug text-[#5a2f38]/85 sm:text-sm">
-              {status === "connecting"
-                ? "Connecting to the wedding screen…"
-                : status === "standby"
-                  ? needsConnectTap
-                    ? "Tap Connect below to allow the camera (one-time)."
-                    : "Connected in standby. Love and countdown work. Tap Go Live to share video."
-                  : "Joining session…"}
-            </div>
-          ) : null}
-          {switching ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#3a2430]/55 text-sm font-semibold">
-              Switching camera…
-            </div>
-          ) : null}
+      <div className="relative kiss-cam-double-love mx-auto mt-1 w-full min-h-0">
+        <div className="kiss-cam-double-love-plane">
+          <div className="kiss-cam-double-love-media">
+            <video
+              ref={videoRef}
+              className="kiss-cam-double-love-video"
+              muted
+              playsInline
+              autoPlay
+              disablePictureInPicture
+            />
+            {!cameraOn && (status === "waiting" || status === "standby" || status === "connecting") ? (
+              <div className="absolute inset-0 z-[1] flex items-center justify-center px-8 text-center text-xs leading-snug text-[#5a2f38]/85 sm:text-sm">
+                {status === "connecting"
+                  ? "Connecting to the wedding screen…"
+                  : status === "standby"
+                    ? needsConnectTap
+                      ? "Tap Connect below to allow the camera (one-time)."
+                      : "Connected in standby. Love and countdown work. Tap Go Live to share video."
+                    : "Joining session…"}
+              </div>
+            ) : null}
+            {switching ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-[#3a2430]/55 text-sm font-semibold">
+                Switching camera…
+              </div>
+            ) : null}
+          </div>
+          <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
+          <KissCamLoadingOverlay active={loadingScreen} size="phone" />
         </div>
-        <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
-        <KissCamLoadingOverlay active={loadingScreen} size="phone" />
       </div>
 
       {message ? (

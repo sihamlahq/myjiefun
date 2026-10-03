@@ -231,21 +231,32 @@ export function KissCamDisplay({
         </div>
       ) : null}
 
-      {/* LIVE camera — clipped to the exact cropped heart silhouette from the designed video */}
+      {/* LIVE camera + love frame — locked to designed 16:9 so the heart never squashes */}
       {showLoveLive ? (
-        <video
-          ref={streamVideoRef}
-          className="kiss-cam-live-heart-mask absolute inset-0 z-[1] h-full w-full object-cover"
-          style={{
-            WebkitMaskImage: `url(${KISS_CAM_LIVE_HEART_MASK_SRC})`,
-            maskImage: `url(${KISS_CAM_LIVE_HEART_MASK_SRC})`,
-          }}
-          muted
-          playsInline
-          autoPlay
-          disablePictureInPicture
-          aria-label="Live Kiss Cam camera"
-        />
+        <div className="kiss-cam-designed-plane-host z-[1]">
+          <div className="kiss-cam-designed-plane">
+            <video
+              ref={streamVideoRef}
+              className="kiss-cam-live-heart-mask absolute inset-0 z-[1] h-full w-full object-cover"
+              style={{
+                WebkitMaskImage: `url(${KISS_CAM_LIVE_HEART_MASK_SRC})`,
+                maskImage: `url(${KISS_CAM_LIVE_HEART_MASK_SRC})`,
+              }}
+              muted
+              playsInline
+              autoPlay
+              disablePictureInPicture
+              aria-label="Live Kiss Cam camera"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={KISS_CAM_LOVE_FRAME_SRC}
+              alt=""
+              className="pointer-events-none absolute inset-0 z-[5] h-full w-full object-fill"
+              draggable={false}
+            />
+          </div>
+        </div>
       ) : (
         <video
           ref={streamVideoRef}
@@ -268,17 +279,6 @@ export function KissCamDisplay({
           preload="auto"
           disablePictureInPicture
           aria-label="Kiss Cam couple video"
-        />
-      ) : null}
-
-      {/* Love frame overlay IN FRONT of live camera — transparent heart shows the feed */}
-      {showLoveLive ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={KISS_CAM_LOVE_FRAME_SRC}
-          alt=""
-          className="pointer-events-none absolute inset-0 z-[5] h-full w-full object-cover"
-          draggable={false}
         />
       ) : null}
 

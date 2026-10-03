@@ -308,24 +308,26 @@ h3,
 
 .kiss-cam-double-love {
   position: relative;
-  width: 100%;
-  /* Take all leftover height so Stop sits at the bottom with no empty pad */
+  /* Flex spacer that centers a true 16:9 heart (never stretch/squash the mask) */
   flex: 1 1 0;
-  min-height: 140px;
-  max-height: none;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
   aspect-ratio: auto;
 }
 
-@media (max-height: 720px) {
-  .kiss-cam-double-love {
-    min-height: 120px;
-  }
-}
-
-@media (max-height: 640px) {
-  .kiss-cam-double-love {
-    min-height: 100px;
-  }
+.kiss-cam-double-love-plane {
+  position: relative;
+  /* Match live-heart-mask.png / love-frame.png (16:9) — contain inside leftover space */
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  flex: 0 0 auto;
 }
 
 .kiss-cam-double-love-media {
@@ -335,8 +337,8 @@ h3,
   /* Same silhouette as LED live share (live-heart-mask.png) */
   -webkit-mask-image: url("/assets/kiss-cam/live-heart-mask.png");
   mask-image: url("/assets/kiss-cam/live-heart-mask.png");
-  -webkit-mask-size: cover;
-  mask-size: cover;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
@@ -952,7 +954,27 @@ h3,
 }
 
 /* Exact heart silhouette (cropped from kiss-cam.mp4) for the live share window.
-   Keep at 100% so bride/groom hair over the hole stays in front. */
+   Sized inside a 16:9 designed plane so the heart is never stretched. */
+.kiss-cam-designed-plane-host {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+  pointer-events: none;
+}
+
+.kiss-cam-designed-plane {
+  position: relative;
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .kiss-cam-live-heart-mask {
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
