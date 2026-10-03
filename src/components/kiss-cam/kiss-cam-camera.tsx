@@ -320,6 +320,23 @@ export function KissCamCameraClient() {
     location.hostname === "localhost" ||
     location.hostname === "127.0.0.1";
 
+  // Keep the phone page from scrolling — content is sized to 100svh.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    const prevHeight = body.style.height;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.height = "100svh";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+      body.style.height = prevHeight;
+    };
+  }, []);
+
   useEffect(() => {
     if (sessionParam) {
       setSessionId(sessionParam);
@@ -884,12 +901,12 @@ export function KissCamCameraClient() {
               : "Something went wrong";
 
   return (
-    <main className="kiss-cam-phone-shell mx-auto flex h-[100svh] max-h-[100svh] max-w-md flex-col overflow-hidden px-3 text-[#fff5f7]">
+    <main className="kiss-cam-phone-shell mx-auto flex h-[100svh] max-h-[100svh] max-w-md flex-col justify-start overflow-hidden px-3 text-[#fff5f7]">
       <header className="shrink-0 text-center">
         <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-[#ffc9d4]/80">
           TableWedding
         </p>
-        <h1 className="kiss-cam-love-title mt-0.5 text-[clamp(1.6rem,8vw,2.4rem)] leading-none">
+        <h1 className="kiss-cam-love-title mt-0.5 text-[clamp(1.45rem,7vw,2.1rem)] leading-none">
           <span className="kiss-cam-love-title-accent mr-1 text-[0.72em]" aria-hidden>
             ♥
           </span>
@@ -905,7 +922,7 @@ export function KissCamCameraClient() {
       </header>
 
       {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
-      <div className="relative kiss-cam-double-love mx-auto mt-1.5 w-full min-h-0 flex-1">
+      <div className="relative kiss-cam-double-love mx-auto mt-1 w-full shrink-0">
         <div className="kiss-cam-double-love-media">
           <video
             ref={videoRef}

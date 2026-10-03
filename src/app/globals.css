@@ -295,17 +295,13 @@ h3,
     radial-gradient(ellipse 70% 45% at 100% 30%, rgba(255, 182, 193, 0.28), transparent 50%),
     radial-gradient(ellipse 60% 40% at 0% 70%, rgba(232, 180, 200, 0.22), transparent 48%),
     linear-gradient(165deg, #3a2430 0%, #2a1a22 45%, #1f1419 100%);
-  /* svh = visible screen with mobile browser chrome; avoids a too-long page */
-  height: 100vh;
-  height: 100dvh;
+  /* Lock to the visible mobile screen (browser chrome safe) */
   height: 100svh;
-  max-height: 100vh;
-  max-height: 100dvh;
   max-height: 100svh;
   overflow: hidden;
   box-sizing: border-box;
-  padding-top: max(0.35rem, env(safe-area-inset-top, 0px));
-  padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+  padding-top: max(0.25rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
   padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
 }
@@ -313,24 +309,24 @@ h3,
 .kiss-cam-double-love {
   position: relative;
   width: 100%;
-  /* Grow into leftover space between header and controls (no empty gap) */
-  flex: 1 1 0;
-  min-height: 140px;
-  max-height: min(36svh, 280px);
+  /* Fixed compact size — never flex-grow (that left a huge empty middle gap) */
+  flex: 0 0 auto;
+  height: min(28svh, 220px);
+  max-height: min(28svh, 220px);
   aspect-ratio: auto;
 }
 
 @media (max-height: 720px) {
   .kiss-cam-double-love {
-    min-height: 120px;
-    max-height: min(32svh, 240px);
+    height: min(26svh, 200px);
+    max-height: min(26svh, 200px);
   }
 }
 
 @media (max-height: 640px) {
   .kiss-cam-double-love {
-    min-height: 100px;
-    max-height: min(28svh, 200px);
+    height: min(24svh, 170px);
+    max-height: min(24svh, 170px);
   }
 }
 
