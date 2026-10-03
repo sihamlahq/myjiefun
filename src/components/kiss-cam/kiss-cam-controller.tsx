@@ -648,13 +648,14 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
 
               <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#ffc9d4]/85">
-                  Couple video (heart standby)
+                  Couple video (full-screen standby)
                 </p>
                 <p className="mt-1 truncate text-xs text-[#f7f1e8]/75" title={coupleVideoLabel}>
                   {coupleVideoLabel}
                 </p>
                 <p className="mt-1 text-[11px] text-[#f7f1e8]/55">
-                  Plays inside the dark love shape (Play button) until a phone goes live. Default:{" "}
+                  Plays full-bleed in front until a phone goes live, then the live feed shows through
+                  the love-frame heart. Default:{" "}
                   <code className="text-[10px]">/assets/kiss-cam/kiss-cam.mp4</code>
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
