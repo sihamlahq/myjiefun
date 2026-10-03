@@ -908,7 +908,7 @@ export function KissCamCameraClient() {
         </div>
       </header>
 
-      {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
+      {/* Preview matches LED: live mask + love-frame.png in a locked 16:9 plane */}
       <div className="relative kiss-cam-double-love mx-auto mt-1 w-full min-h-0">
         <div className="kiss-cam-double-love-plane">
           <div className="kiss-cam-double-love-media">
@@ -937,6 +937,14 @@ export function KissCamCameraClient() {
               </div>
             ) : null}
           </div>
+          {/* Same love frame as the LED — keeps heart proportions readable */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/kiss-cam/love-frame.png"
+            alt=""
+            className="pointer-events-none absolute inset-0 z-[2] h-full w-full object-fill"
+            draggable={false}
+          />
           <KissCamLoveBurst active={loveBurst} burstId={loveBurstId} size="phone" />
           <KissCamLoadingOverlay active={loadingScreen} size="phone" />
         </div>
