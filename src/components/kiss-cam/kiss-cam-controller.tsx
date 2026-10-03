@@ -45,6 +45,9 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [sessionRefreshing, setSessionRefreshing] = useState(false);
   /** Keep QR / controls reachable even while the LED is fullscreen. */
   const [forceShowChrome, setForceShowChrome] = useState(false);
+  /** In clean projector mode, corner buttons only appear while the mouse is moving. */
+  const [idleChromeVisible, setIdleChromeVisible] = useState(true);
+  const idleChromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [coupleVideoSrc, setCoupleVideoSrc] = useState(KISS_CAM_COUPLE_VIDEO_SRC);
   const [coupleVideoLabel, setCoupleVideoLabel] = useState("kiss-cam.mp4 (default path)");
   const [cameraPeers, setCameraPeers] = useState<KissCamCameraPeer[]>([]);
@@ -339,9 +342,57 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
 
   const celebrate = state.animation === "celebration" || state.animation === "final";
   const showChrome = !state.fullscreen || forceShowChrome;
+  /** Fullscreen LED with panel hidden — projector-clean; use phone for Love / countdown. */
+  const cleanProjector = state.fullscreen && !forceShowChrome;
 
   useEffect(() => {
     if (!state.fullscreen) setForceShowChrome(false);
+  }, [state.fullscreen]);
+
+  // Clean projector: hide corner buttons after idle so the LCD stays empty.
+  useEffect(() => {
+    if (!cleanProjector) {
+      setIdleChromeVisible(true);
+      if (idleChromeTimerRef.current) {
+        clearTimeout(idleChromeTimerRef.current);
+        idleChromeTimerRef.current = null;
+      }
+      return;
+    }
+
+    const bump = () => {
+      setIdleChromeVisible(true);
+      if (idleChromeTimerRef.current) clearTimeout(idleChromeTimerRef.current);
+      idleChromeTimerRef.current = setTimeout(() => setIdleChromeVisible(false), 2800);
+    };
+
+    bump();
+    window.addEventListener("pointermove", bump, { passive: true });
+    window.addEventListener("pointerdown", bump, { passive: true });
+    window.addEventListener("keydown", bump);
+    return () => {
+      window.removeEventListener("pointermove", bump);
+      window.removeEventListener("pointerdown", bump);
+      window.removeEventListener("keydown", bump);
+      if (idleChromeTimerRef.current) {
+        clearTimeout(idleChromeTimerRef.current);
+        idleChromeTimerRef.current = null;
+      }
+    };
+  }, [cleanProjector]);
+
+  // H toggles the side panel while fullscreen (handy on the laptop without leaving FS).
+  useEffect(() => {
+    if (!state.fullscreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "h" && e.key !== "H") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      e.preventDefault();
+      setForceShowChrome((v) => !v);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [state.fullscreen]);
 
   useEffect(() => {
@@ -393,8 +444,13 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         />
       </div>
 
-      {state.fullscreen && !forceShowChrome ? (
-        <div className="absolute bottom-3 right-3 z-50 flex flex-col gap-2 sm:bottom-4 sm:right-4">
+      {cleanProjector ? (
+        <div
+          className={cn(
+            "absolute bottom-3 right-3 z-50 flex flex-col gap-2 transition-opacity duration-300 sm:bottom-4 sm:right-4",
+            idleChromeVisible ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+        >
           <Button
             type="button"
             className="h-11 bg-[#c45a78] text-white shadow-[0_12px_28px_rgba(0,0,0,.35)] hover:bg-[#a84864]"
@@ -402,6 +458,10 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           >
             Show QR & controls
           </Button>
+          <p className="max-w-[11rem] text-right text-[10px] leading-snug text-[#f7f1e8]/70">
+            Press <kbd className="rounded bg-black/40 px-1">H</kbd> · or use the phone for Love /
+            countdown (keeps projector clean)
+          </p>
         </div>
       ) : null}
 
@@ -470,6 +530,11 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             <p className="mt-2 text-[11px] leading-snug text-[#f7f1e8]/60">
               Scan QR on each phone. Use Camera phones above to switch the live heart view — standby
               phones stay connected.
+            </p>
+            <p className="mt-2 rounded-lg border border-[#ffc9d4]/25 bg-black/25 px-2.5 py-2 text-[11px] leading-snug text-[#ffd6e0]/90">
+              <strong className="font-semibold text-[#fff5f7]">Clean projector:</strong> Fullscreen →
+              Hide panel. Run Love / 1·2·3 / Loading / Go Live from the phone so settings never stay
+              on the LCD. Press <kbd className="rounded bg-white/10 px-1">H</kbd> to peek the panel.
             </p>
             <div className="mt-3 grid gap-2">
               <Button
@@ -715,9 +780,14 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         </aside>
       ) : null}
 
-      {/* Always-reachable music controls while fullscreen on the LED */}
+      {/* Music: only while idle chrome is visible in clean projector mode */}
       {state.fullscreen && music.ready ? (
-        <div className="absolute bottom-4 left-4 z-50 flex gap-2">
+        <div
+          className={cn(
+            "absolute bottom-4 left-4 z-50 flex gap-2 transition-opacity duration-300",
+            cleanProjector && !idleChromeVisible && "pointer-events-none opacity-0",
+          )}
+        >
           {music.playing ? (
             <button
               type="button"
