@@ -7,7 +7,7 @@ export default function KissCamCameraPage() {
   return (
     <Suspense
       fallback={
-        <main className="kiss-cam-phone-shell flex h-[100svh] max-h-[100svh] items-center justify-center overflow-hidden text-[#fff5f7]">
+        <main className="kiss-cam-phone-shell flex min-h-[40vh] items-center justify-center overflow-hidden px-3 text-[#fff5f7]">
           Loading camera…
         </main>
       }
