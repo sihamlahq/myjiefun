@@ -905,7 +905,7 @@ export function KissCamCameraClient() {
       </header>
 
       {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
-      <div className="relative kiss-cam-double-love mx-auto mt-2 w-full shrink min-h-0">
+      <div className="relative kiss-cam-double-love mx-auto mt-2 w-full min-h-0 flex-1">
         <div className="kiss-cam-double-love-media">
           <video
             ref={videoRef}

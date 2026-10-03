@@ -308,22 +308,27 @@ h3,
 .kiss-cam-double-love {
   position: relative;
   width: 100%;
-  /* Match the designed live-heart-mask / LED frame (16:9) */
-  aspect-ratio: 16 / 9;
-  /* Keep preview short so controls stay on one phone screen without scrolling */
-  max-height: min(30dvh, 240px);
-  flex: 0 1 auto;
+  /* Taller phone preview so the live heart is easy to see (not locked to 16:9 height) */
+  flex: 1 1 auto;
+  height: min(48dvh, 360px);
+  min-height: min(36dvh, 260px);
+  max-height: min(52dvh, 400px);
+  aspect-ratio: auto;
 }
 
 @media (max-height: 720px) {
   .kiss-cam-double-love {
-    max-height: min(26dvh, 200px);
+    height: min(42dvh, 300px);
+    min-height: min(32dvh, 220px);
+    max-height: min(46dvh, 320px);
   }
 }
 
 @media (max-height: 640px) {
   .kiss-cam-double-love {
-    max-height: min(22dvh, 160px);
+    height: min(36dvh, 240px);
+    min-height: min(28dvh, 180px);
+    max-height: min(40dvh, 260px);
   }
 }
 
@@ -334,8 +339,8 @@ h3,
   /* Same silhouette as LED live share (live-heart-mask.png) */
   -webkit-mask-image: url("/assets/kiss-cam/live-heart-mask.png");
   mask-image: url("/assets/kiss-cam/live-heart-mask.png");
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
+  -webkit-mask-size: cover;
+  mask-size: cover;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
