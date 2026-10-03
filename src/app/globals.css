@@ -295,13 +295,35 @@ h3,
     radial-gradient(ellipse 70% 45% at 100% 30%, rgba(255, 182, 193, 0.28), transparent 50%),
     radial-gradient(ellipse 60% 40% at 0% 70%, rgba(232, 180, 200, 0.22), transparent 48%),
     linear-gradient(165deg, #3a2430 0%, #2a1a22 45%, #1f1419 100%);
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
 }
 
 .kiss-cam-double-love {
   position: relative;
   width: 100%;
   aspect-ratio: 5 / 3.55;
-  max-height: min(52dvh, 420px);
+  /* Keep preview short so controls stay on one phone screen without scrolling */
+  max-height: min(30dvh, 240px);
+  flex: 0 1 auto;
+}
+
+@media (max-height: 720px) {
+  .kiss-cam-double-love {
+    max-height: min(26dvh, 200px);
+  }
+}
+
+@media (max-height: 640px) {
+  .kiss-cam-double-love {
+    max-height: min(22dvh, 160px);
+  }
 }
 
 .kiss-cam-double-love-media {
