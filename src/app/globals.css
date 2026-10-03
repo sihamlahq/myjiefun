@@ -295,12 +295,17 @@ h3,
     radial-gradient(ellipse 70% 45% at 100% 30%, rgba(255, 182, 193, 0.28), transparent 50%),
     radial-gradient(ellipse 60% 40% at 0% 70%, rgba(232, 180, 200, 0.22), transparent 48%),
     linear-gradient(165deg, #3a2430 0%, #2a1a22 45%, #1f1419 100%);
+  /* svh = visible screen with mobile browser chrome; avoids a too-long page */
+  height: 100vh;
   height: 100dvh;
+  height: 100svh;
+  max-height: 100vh;
   max-height: 100dvh;
+  max-height: 100svh;
   overflow: hidden;
   box-sizing: border-box;
-  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding-top: max(0.35rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
   padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
 }
@@ -308,27 +313,22 @@ h3,
 .kiss-cam-double-love {
   position: relative;
   width: 100%;
-  /* Taller phone preview so the live heart is easy to see (not locked to 16:9 height) */
-  flex: 1 1 auto;
-  height: min(48dvh, 360px);
-  min-height: min(36dvh, 260px);
-  max-height: min(52dvh, 400px);
+  /* Fill leftover space only — never force the page taller than the screen */
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: min(38svh, 300px);
   aspect-ratio: auto;
 }
 
 @media (max-height: 720px) {
   .kiss-cam-double-love {
-    height: min(42dvh, 300px);
-    min-height: min(32dvh, 220px);
-    max-height: min(46dvh, 320px);
+    max-height: min(34svh, 260px);
   }
 }
 
 @media (max-height: 640px) {
   .kiss-cam-double-love {
-    height: min(36dvh, 240px);
-    min-height: min(28dvh, 180px);
-    max-height: min(40dvh, 260px);
+    max-height: min(30svh, 220px);
   }
 }
 

@@ -884,12 +884,12 @@ export function KissCamCameraClient() {
               : "Something went wrong";
 
   return (
-    <main className="kiss-cam-phone-shell mx-auto flex h-dvh max-h-dvh max-w-md flex-col overflow-hidden px-3 text-[#fff5f7]">
+    <main className="kiss-cam-phone-shell mx-auto flex h-[100svh] max-h-[100svh] max-w-md flex-col overflow-hidden px-3 text-[#fff5f7]">
       <header className="shrink-0 text-center">
         <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-[#ffc9d4]/80">
           TableWedding
         </p>
-        <h1 className="kiss-cam-love-title mt-0.5 text-[clamp(1.85rem,9vw,2.75rem)] leading-none">
+        <h1 className="kiss-cam-love-title mt-0.5 text-[clamp(1.6rem,8vw,2.4rem)] leading-none">
           <span className="kiss-cam-love-title-accent mr-1 text-[0.72em]" aria-hidden>
             ♥
           </span>
@@ -898,14 +898,14 @@ export function KissCamCameraClient() {
             ♥
           </span>
         </h1>
-        <div className="mt-1 flex items-center justify-center gap-2">
-          <p className="truncate text-xs text-[#fff5f7]/70">{statusText}</p>
+        <div className="mt-0.5 flex items-center justify-center gap-2">
+          <p className="truncate text-[11px] text-[#fff5f7]/70">{statusText}</p>
           <KissCamSignalBars quality={quality} />
         </div>
       </header>
 
       {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
-      <div className="relative kiss-cam-double-love mx-auto mt-2 w-full min-h-0 flex-1">
+      <div className="relative kiss-cam-double-love mx-auto mt-1.5 w-full min-h-0 flex-1">
         <div className="kiss-cam-double-love-media">
           <video
             ref={videoRef}
@@ -962,9 +962,9 @@ export function KissCamCameraClient() {
           </Button>
         </div>
       ) : (
-      <div className="mt-auto flex min-h-0 shrink-0 flex-col gap-1.5 pt-2">
-        <div className="rounded-xl border border-rose-200/20 bg-[#3a2430]/65 px-2.5 py-1.5">
-          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffc9d4]/75">
+      <div className="mt-auto flex min-h-0 shrink-0 flex-col gap-1 pt-1.5">
+        <div className="rounded-xl border border-rose-200/20 bg-[#3a2430]/65 px-2.5 py-1">
+          <div className="mb-0.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-[#ffc9d4]/75">
             <span>Zoom</span>
             <span className="tabular-nums tracking-normal text-[#fff5f7]">
               {cameraOn && lenses.length ? formatLensLabel(activeLens) : "—"}
@@ -1014,7 +1014,7 @@ export function KissCamCameraClient() {
           <Button
             type="button"
             size="xl"
-            className="h-11 w-full touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-base font-semibold text-white shadow-[0_10px_28px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.98]"
+            className="h-10 w-full touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-sm font-semibold text-white shadow-[0_10px_28px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.98]"
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               e.preventDefault();
@@ -1033,7 +1033,7 @@ export function KissCamCameraClient() {
           <Button
             type="button"
             size="xl"
-            className="h-11 w-full touch-manipulation bg-[#c45a78] text-base text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864] active:scale-[0.98]"
+            className="h-10 w-full touch-manipulation bg-[#c45a78] text-sm text-white shadow-[0_10px_28px_rgba(196,90,120,0.35)] hover:bg-[#a84864] active:scale-[0.98]"
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               e.preventDefault();
@@ -1055,7 +1055,7 @@ export function KissCamCameraClient() {
         <Button
           type="button"
           size="lg"
-          className="h-10 w-full touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-sm font-semibold text-white shadow-[0_8px_22px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.97]"
+          className="h-9 w-full touch-manipulation border border-[#ffc9d4]/40 bg-gradient-to-r from-[#ff8fab] to-[#c45a78] text-sm font-semibold text-white shadow-[0_8px_22px_rgba(255,143,171,0.35)] hover:from-[#ff7a9a] hover:to-[#a84864] active:scale-[0.97]"
           onPointerDown={(e) => {
             // Instant feedback on mobile (avoids 300ms-feel click lag).
             if (e.button !== 0) return;
@@ -1079,7 +1079,7 @@ export function KissCamCameraClient() {
               key={value}
               type="button"
               size="lg"
-              className={`h-11 touch-manipulation text-xl font-semibold text-white shadow-[0_8px_20px_rgba(90,40,55,0.28)] active:scale-[0.96] ${
+              className={`h-10 touch-manipulation text-lg font-semibold text-white shadow-[0_8px_20px_rgba(90,40,55,0.28)] active:scale-[0.96] ${
                 countdownBusy === value
                   ? "bg-[#ff8fab]"
                   : "bg-[#5a2f38] hover:bg-[#7a3f4c]"
@@ -1108,7 +1108,7 @@ export function KissCamCameraClient() {
           <Button
             size="lg"
             variant="secondary"
-            className="h-10 touch-manipulation border border-rose-200/20 bg-[#fff5f7]/12 text-xs text-[#fff5f7] hover:bg-[#fff5f7]/18 active:scale-[0.98]"
+            className="h-9 touch-manipulation border border-rose-200/20 bg-[#fff5f7]/12 text-xs text-[#fff5f7] hover:bg-[#fff5f7]/18 active:scale-[0.98]"
             onClick={() => void switchCamera()}
             disabled={!cameraOn || switching || status === "connecting"}
           >
@@ -1121,7 +1121,7 @@ export function KissCamCameraClient() {
           <Button
             size="lg"
             variant="outline"
-            className="h-10 touch-manipulation border-rose-200/25 text-xs text-[#ffd6e0] active:scale-[0.98]"
+            className="h-9 touch-manipulation border-rose-200/25 text-xs text-[#ffd6e0] active:scale-[0.98]"
             onClick={() => void stopCamera()}
             disabled={switching}
           >
