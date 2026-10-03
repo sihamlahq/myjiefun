@@ -18,6 +18,8 @@ import type { CameraLayoutMode, KissCamAnimationPhase } from "@/components/kiss-
 export const KISS_CAM_COUPLE_VIDEO_SRC = "/assets/kiss-cam/kiss-cam.mp4";
 /** Static love frame with transparent heart hole — sits IN FRONT of the live camera. */
 export const KISS_CAM_LOVE_FRAME_SRC = "/assets/kiss-cam/love-frame.png";
+/** Exact heart silhouette cropped from the designed video — clips the live share. */
+export const KISS_CAM_LIVE_HEART_MASK_SRC = "/assets/kiss-cam/live-heart-mask.png";
 
 type KissCamDisplayProps = {
   phase: KissCamAnimationPhase;
@@ -229,11 +231,15 @@ export function KissCamDisplay({
         </div>
       ) : null}
 
-      {/* LIVE camera underlay — full stage; love-frame PNG sits in front with a heart hole */}
+      {/* LIVE camera — clipped to the exact cropped heart silhouette from the designed video */}
       {showLoveLive ? (
         <video
           ref={streamVideoRef}
-          className="absolute inset-0 z-[1] h-full w-full object-cover"
+          className="kiss-cam-live-heart-mask absolute inset-0 z-[1] h-full w-full object-cover"
+          style={{
+            WebkitMaskImage: `url(${KISS_CAM_LIVE_HEART_MASK_SRC})`,
+            maskImage: `url(${KISS_CAM_LIVE_HEART_MASK_SRC})`,
+          }}
           muted
           playsInline
           autoPlay

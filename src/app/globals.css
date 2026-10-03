@@ -920,6 +920,18 @@ h3,
   cursor: not-allowed;
 }
 
+/* Exact heart silhouette (cropped from kiss-cam.mp4) for the live share window */
+.kiss-cam-live-heart-mask {
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-mode: alpha;
+  mask-mode: alpha;
+}
+
 .kiss-cam-zoom-slider:focus-visible {
   outline: 2px solid rgba(255, 201, 212, 0.8);
   outline-offset: 2px;
