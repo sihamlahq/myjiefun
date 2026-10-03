@@ -884,7 +884,7 @@ export function KissCamCameraClient() {
               : "Something went wrong";
 
   return (
-    <main className="kiss-cam-phone-shell mx-auto flex w-full max-w-md flex-col justify-start overflow-hidden px-3 pb-2 text-[#fff5f7]">
+    <main className="kiss-cam-phone-shell mx-auto flex h-[100svh] max-h-[100svh] w-full max-w-md flex-col justify-start overflow-hidden px-3 text-[#fff5f7]">
       <header className="shrink-0 text-center">
         <p className="text-[9px] font-semibold uppercase tracking-[0.32em] text-[#ffc9d4]/80">
           TableWedding
@@ -905,7 +905,7 @@ export function KissCamCameraClient() {
       </header>
 
       {/* Preview uses the same live-heart-mask.png silhouette as the LED share */}
-      <div className="relative kiss-cam-double-love mx-auto mt-1 w-full shrink-0">
+      <div className="relative kiss-cam-double-love mx-auto mt-1 w-full min-h-0">
         <div className="kiss-cam-double-love-media">
           <video
             ref={videoRef}

@@ -295,14 +295,13 @@ h3,
     radial-gradient(ellipse 70% 45% at 100% 30%, rgba(255, 182, 193, 0.28), transparent 50%),
     radial-gradient(ellipse 60% 40% at 0% 70%, rgba(232, 180, 200, 0.22), transparent 48%),
     linear-gradient(165deg, #3a2430 0%, #2a1a22 45%, #1f1419 100%);
-  /* Hug content — don't stretch a long empty bottom to 100svh */
-  height: auto;
-  min-height: 0;
+  /* Fill one phone screen; compact controls leave leftover for the preview */
+  height: 100svh;
   max-height: 100svh;
   overflow: hidden;
   box-sizing: border-box;
   padding-top: max(0.25rem, env(safe-area-inset-top, 0px));
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
   padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
 }
@@ -310,24 +309,24 @@ h3,
 .kiss-cam-double-love {
   position: relative;
   width: 100%;
-  /* Fixed compact preview — no flex-grow empty gap */
-  flex: 0 0 auto;
-  height: min(30svh, 230px);
-  max-height: min(30svh, 230px);
+  /* Absorb leftover space so the bottom doesn't look like empty padding */
+  flex: 1 1 0;
+  min-height: 160px;
+  max-height: min(48svh, 360px);
   aspect-ratio: auto;
 }
 
 @media (max-height: 720px) {
   .kiss-cam-double-love {
-    height: min(28svh, 200px);
-    max-height: min(28svh, 200px);
+    min-height: 140px;
+    max-height: min(42svh, 300px);
   }
 }
 
 @media (max-height: 640px) {
   .kiss-cam-double-love {
-    height: min(26svh, 170px);
-    max-height: min(26svh, 170px);
+    min-height: 120px;
+    max-height: min(38svh, 240px);
   }
 }
 
