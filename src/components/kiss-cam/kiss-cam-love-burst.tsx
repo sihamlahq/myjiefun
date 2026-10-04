@@ -77,7 +77,12 @@ export function KissCamLoveBurst({
       className={`pointer-events-none absolute inset-0 z-40 overflow-hidden ${className}`}
       aria-hidden
     >
-      <div className="kiss-cam-love-bloom absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+      {/* Soft radial spark only — intentionally no frosted / milky plate. */}
+      <div
+        className={`kiss-cam-love-bloom absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
+          size === "stage" ? "scale-125" : ""
+        }`}
+      />
 
       {sparks.map((spark) => {
         const style: SparkStyle = {
@@ -126,10 +131,10 @@ export function KissCamLoveBurst({
       })}
 
       <p
-        className={`kiss-cam-love-word font-kiss absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[#fff5f7] ${
+        className={`kiss-cam-love-word font-kiss absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
           size === "stage"
             ? "text-[clamp(4.5rem,14vw,9.5rem)] tracking-[0.06em]"
-            : "text-3xl"
+            : "text-[clamp(2rem,12vw,2.75rem)] tracking-[0.04em]"
         }`}
       >
         {word}
