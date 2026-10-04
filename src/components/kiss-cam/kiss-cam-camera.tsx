@@ -332,6 +332,10 @@ export function KissCamCameraClient() {
   const recordStartedAtRef = useRef(0);
   const recordTickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordMaxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** While Go Live / publishing, keep recording (and roll new clips at the 50MB/3min cap). */
+  const wantLiveRecordRef = useRef(false);
+  const recordingRef = useRef(false);
+  const startRecordingRef = useRef<() => Promise<void>>(async () => undefined);
 
   const stopPlaceholderTrack = useCallback(() => {
     const track = placeholderTrackRef.current;
@@ -472,6 +476,7 @@ export function KissCamCameraClient() {
   const stopCamera = useCallback(async () => {
     startingRef.current = false;
     loadingBusyRef.current = false;
+    wantLiveRecordRef.current = false;
     try {
       mediaRecorderRef.current?.stop();
     } catch {
@@ -573,6 +578,12 @@ export function KissCamCameraClient() {
       onStandby: () => {
         stopPlaceholderTrack();
         // Keep local camera preview + wake lock so LED can switch back instantly.
+        wantLiveRecordRef.current = false;
+        try {
+          mediaRecorderRef.current?.stop();
+        } catch {
+          // ignore
+        }
         setLoadingScreen(false);
         setNeedsConnectTap(false);
         setStatus("standby");
@@ -671,6 +682,8 @@ export function KissCamCameraClient() {
         setNeedsConnectTap(false);
         setStatus("connected");
         setMessage(null);
+        wantLiveRecordRef.current = true;
+        void startRecordingRef.current();
         startingRef.current = false;
         return;
       }
@@ -689,6 +702,7 @@ export function KissCamCameraClient() {
       await conn.startPublishing(stream, { mode: claimMode });
       if (!conn.isPublishing) {
         // Stay connected with local preview — LED can promote this phone later.
+        wantLiveRecordRef.current = false;
         setNeedsConnectTap(false);
         setStatus("standby");
         setCameraOn(true);
@@ -700,7 +714,10 @@ export function KissCamCameraClient() {
       setNeedsConnectTap(false);
       setStatus("connected");
       setMessage(null);
+      wantLiveRecordRef.current = true;
+      void startRecordingRef.current();
     } catch (error) {
+      wantLiveRecordRef.current = false;
       const name = error instanceof DOMException ? error.name : "";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
         // Auto-connect often needs one user gesture on iOS — keep session joined.
@@ -728,9 +745,15 @@ export function KissCamCameraClient() {
 
   const switchCamera = useCallback(async () => {
     if (switchingRef.current || !cameraOn) return;
+    const wasLiveRecording = wantLiveRecordRef.current;
+    // Don't auto-roll a new clip while the lens swap tears down the stream.
+    wantLiveRecordRef.current = false;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      setMessage("Stop recording before switching cameras.");
-      return;
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        // ignore
+      }
     }
     switchingRef.current = true;
     setSwitching(true);
@@ -767,6 +790,9 @@ export function KissCamCameraClient() {
     } finally {
       switchingRef.current = false;
       setSwitching(false);
+      const stillLive = Boolean(wasLiveRecording && connRef.current?.isPublishing);
+      wantLiveRecordRef.current = stillLive;
+      if (stillLive) void startRecordingRef.current();
     }
   }, [bindPreview, cameraOn, requestWakeLock, stopTracksOnly]);
 
@@ -990,44 +1016,21 @@ export function KissCamCameraClient() {
     [sessionId],
   );
 
-  const stopRecording = useCallback(() => {
-    const recorder = mediaRecorderRef.current;
-    clearRecordTimers();
-    if (!recorder || recorder.state === "inactive") {
-      setRecording(false);
-      return;
-    }
-    try {
-      recorder.stop();
-    } catch {
-      setRecording(false);
-    }
-  }, [clearRecordTimers]);
-
   const startRecording = useCallback(async () => {
-    if (recording || recordBusy || switchingRef.current) return;
-    if (!sessionId) {
-      setMessage("Join a session before recording.");
-      return;
-    }
+    if (recordingRef.current || recordBusy || switchingRef.current) return;
+    if (!sessionId) return;
+    if (!wantLiveRecordRef.current) return;
 
     const stream = streamRef.current;
     const liveTrack = stream?.getVideoTracks()[0];
-    if (!stream || !liveTrack || liveTrack.readyState === "ended") {
-      setMessage("Turn on the camera (Go Live / Connect) before recording.");
-      return;
-    }
+    if (!stream || !liveTrack || liveTrack.readyState === "ended") return;
 
     const mimeType = pickRecorderMime();
-    if (!mimeType || typeof MediaRecorder === "undefined") {
-      setMessage("This phone browser cannot record video.");
-      return;
-    }
+    if (!mimeType || typeof MediaRecorder === "undefined") return;
 
     recordChunksRef.current = [];
     recordBytesRef.current = 0;
     setRecordElapsedMs(0);
-    setMessage(null);
 
     let recorder: MediaRecorder;
     try {
@@ -1039,7 +1042,6 @@ export function KissCamCameraClient() {
       try {
         recorder = new MediaRecorder(stream);
       } catch {
-        setMessage("Unable to start recording on this phone.");
         return;
       }
     }
@@ -1050,7 +1052,6 @@ export function KissCamCameraClient() {
       recordChunksRef.current.push(event.data);
       recordBytesRef.current += event.data.size;
       if (recordBytesRef.current >= KISS_CAM_RECORDING_MAX_BYTES) {
-        setMessage("Hit the 50MB limit — stopping recording.");
         try {
           recorder.stop();
         } catch {
@@ -1060,42 +1061,48 @@ export function KissCamCameraClient() {
     };
     recorder.onerror = () => {
       clearRecordTimers();
+      recordingRef.current = false;
       setRecording(false);
-      setMessage("Recording failed on this phone.");
     };
     recorder.onstop = () => {
       clearRecordTimers();
+      recordingRef.current = false;
       setRecording(false);
       mediaRecorderRef.current = null;
       const chunks = recordChunksRef.current;
       recordChunksRef.current = [];
       const type = chunks[0]?.type || mimeType || "video/webm";
       const blob = new Blob(chunks, { type });
-      void uploadRecording(blob);
+      void uploadRecording(blob).finally(() => {
+        // Still live → roll the next clip (50MB / 3:00 segments).
+        if (wantLiveRecordRef.current && connRef.current?.isPublishing) {
+          void startRecordingRef.current();
+        }
+      });
     };
 
     try {
       recorder.start(1000);
     } catch {
       mediaRecorderRef.current = null;
-      setMessage("Unable to start recording on this phone.");
       return;
     }
 
     recordStartedAtRef.current = Date.now();
+    recordingRef.current = true;
     setRecording(true);
     recordTickerRef.current = setInterval(() => {
       setRecordElapsedMs(Date.now() - recordStartedAtRef.current);
     }, 250);
     recordMaxTimerRef.current = setTimeout(() => {
-      setMessage("3:00 max clip length — stopping recording.");
       try {
         recorder.stop();
       } catch {
         // ignore
       }
     }, RECORD_MAX_MS);
-  }, [clearRecordTimers, recordBusy, recording, sessionId, uploadRecording]);
+  }, [clearRecordTimers, recordBusy, sessionId, uploadRecording]);
+  startRecordingRef.current = startRecording;
 
   const resolveCode = async () => {
     const code = codeInput.trim().toUpperCase();
@@ -1116,9 +1123,9 @@ export function KissCamCameraClient() {
 
   const controlsReady = Boolean(sessionId && connRef.current?.alive && status !== "error");
   const statusText = recording
-    ? `Recording ${formatRecordClock(recordElapsedMs)} · max 50MB`
+    ? `Live · recording ${formatRecordClock(recordElapsedMs)}`
     : recordBusy
-      ? "Uploading recording…"
+      ? "Saving recording…"
     : loadingScreen
     ? "Camera paused · Loading screen on LED"
     : status === "waiting"
@@ -1312,37 +1319,6 @@ export function KissCamCameraClient() {
             ♥ Love
           </Button>
         </div>
-
-        <Button
-          type="button"
-          size="lg"
-          className={`h-12 w-full touch-manipulation text-base font-semibold active:scale-[0.98] ${
-            recording
-              ? "border border-rose-200/40 bg-[#ff4d6d] text-white hover:bg-[#e83b5c]"
-              : "border border-rose-200/25 bg-[#5a2f38] text-[#fff5f7] hover:bg-[#7a3f4c]"
-          }`}
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            if (recording) stopRecording();
-            else void startRecording();
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            if (recording) stopRecording();
-            else void startRecording();
-          }}
-          disabled={!sessionId || recordBusy || switching || status === "connecting"}
-          aria-pressed={recording}
-        >
-          {recordBusy
-            ? "Uploading…"
-            : recording
-              ? `Stop · ${formatRecordClock(recordElapsedMs)}`
-              : cameraOn
-                ? "● Record Video"
-                : "● Record (camera first)"}
-        </Button>
 
         <div className="grid grid-cols-5 gap-1.5">
           {([1, 2, 3] as const).map((value) => (
