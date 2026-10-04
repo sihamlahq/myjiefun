@@ -98,6 +98,15 @@ export function cameraCodePath(shortCode: string, siteUrl?: string) {
   return `${base}/reception/kiss-cam/camera?code=${encodeURIComponent(shortCode.trim().toUpperCase())}`;
 }
 
+/** Absolute URL for the LED remote page — scan this on a phone to control the laptop. */
+export function remotePagePath(sessionId: string, shortCode?: string | null, siteUrl?: string) {
+  const base = canonicalSiteUrl(siteUrl);
+  const q = new URLSearchParams({ session: sessionId });
+  const code = shortCode?.trim().toUpperCase();
+  if (code) q.set("code", code);
+  return `${base}/reception/kiss-cam/remote?${q.toString()}`;
+}
+
 export function signalingChannelName(sessionId: string) {
   return `kiss-cam-${sessionId}`;
 }

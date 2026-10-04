@@ -15,6 +15,7 @@ import {
 import { useKissCamMusic } from "@/components/kiss-cam/kiss-cam-music";
 import { KissCamPhoneSwitcher } from "@/components/kiss-cam/kiss-cam-phone-switcher";
 import { KissCamQRCode } from "@/components/kiss-cam/kiss-cam-qr";
+import { KissCamRemoteQR } from "@/components/kiss-cam/kiss-cam-remote-qr";
 import { CameraStatusDot, KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
 import {
   clearStoredSession,
@@ -671,6 +672,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
             }}
           />
 
+          <KissCamRemoteQR sessionId={state.sessionId} shortCode={state.shortCode} />
+
           <KissCamPhoneSwitcher
             cameras={cameraPeers}
             publisherId={publisherId}
@@ -688,24 +691,15 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
               Controls
             </p>
             <p className="mt-2 text-[11px] leading-snug text-[#f7f1e8]/60">
-              Scan QR on each phone. Use Camera phones above to switch the live heart view — standby
-              phones stay connected.
+              Scan the camera QR on phones for the live heart. Scan{" "}
+              <strong className="font-semibold text-[#ffd6e0]">LED remote</strong> on a second phone
+              for the same controls as this laptop panel.
             </p>
             <p className="mt-2 rounded-lg border border-[#ffc9d4]/25 bg-black/25 px-2.5 py-2 text-[11px] leading-snug text-[#ffd6e0]/90">
               <strong className="font-semibold text-[#fff5f7]">Clean projector:</strong> Fullscreen →
               Hide panel. Run Love / 1·2·3 / Loading / Go Live from the phone so settings never stay
               on the LCD. Press <kbd className="rounded bg-white/10 px-1">H</kbd> to peek the panel.
             </p>
-            {state.sessionId ? (
-              <Link
-                href={`/reception/kiss-cam/remote?session=${encodeURIComponent(state.sessionId)}${
-                  state.shortCode ? `&code=${encodeURIComponent(state.shortCode)}` : ""
-                }`}
-                className="mt-2 flex h-10 w-full items-center justify-center rounded-xl border border-[#ffc9d4]/35 bg-[#c45a78]/20 text-sm font-semibold text-[#fff5f7] hover:bg-[#c45a78]/30"
-              >
-                Open mobile remote
-              </Link>
-            ) : null}
             <div className="mt-3 grid gap-2">
               <Button
                 size="lg"
