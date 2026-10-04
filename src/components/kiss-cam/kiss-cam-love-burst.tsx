@@ -77,13 +77,6 @@ export function KissCamLoveBurst({
       className={`pointer-events-none absolute inset-0 z-40 overflow-hidden ${className}`}
       aria-hidden
     >
-      {/* Soft radial spark only — intentionally no frosted / milky plate. */}
-      <div
-        className={`kiss-cam-love-bloom absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
-          size === "stage" ? "scale-125" : ""
-        }`}
-      />
-
       {sparks.map((spark) => {
         const style: SparkStyle = {
           width: size === "stage" ? 5 : 3,
@@ -130,15 +123,18 @@ export function KissCamLoveBurst({
         );
       })}
 
-      <p
-        className={`kiss-cam-love-word font-kiss absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${
-          size === "stage"
-            ? "text-[clamp(4.5rem,14vw,9.5rem)] tracking-[0.06em]"
-            : "text-[clamp(2rem,12vw,2.75rem)] tracking-[0.04em]"
-        }`}
-      >
-        {word}
-      </p>
+      {/* Tight w-max box — avoids a huge opacity compositor plate behind cursive LOVE. */}
+      <div className="kiss-cam-love-word absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+        <p
+          className={`font-kiss m-0 w-max leading-none text-[#fff8fb] ${
+            size === "stage"
+              ? "text-[clamp(4.5rem,14vw,9.5rem)] tracking-[0.06em]"
+              : "text-[clamp(2rem,12vw,2.75rem)] tracking-[0.04em]"
+          }`}
+        >
+          {word}
+        </p>
+      </div>
     </div>
   );
 }

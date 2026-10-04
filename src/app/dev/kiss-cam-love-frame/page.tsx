@@ -11,10 +11,13 @@ import {
  * Dev visual test for frame-in-front layering:
  * 1) Idle — couple mp4 full-bleed (not clipped into a heart mask)
  * 2) Live — fake camera under love-frame.png (feed through heart hole)
+ * 3) Love burst — soft glow (no milky plate) over live frame
  */
 export default function KissCamLoveFrameTestPage() {
   const [mode, setMode] = useState<"idle" | "live">("idle");
   const [fakeStream, setFakeStream] = useState<MediaStream | null>(null);
+  const [loveBurst, setLoveBurst] = useState(false);
+  const [loveBurstId, setLoveBurstId] = useState(0);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -58,6 +61,13 @@ export default function KissCamLoveFrameTestPage() {
     };
   }, [mode]);
 
+  const triggerLove = () => {
+    setMode("live");
+    setLoveBurstId((n) => n + 1);
+    setLoveBurst(true);
+    window.setTimeout(() => setLoveBurst(false), 2200);
+  };
+
   return (
     <main className="min-h-dvh bg-[#1a1014] p-4 text-[#fff5f7]">
       <h1 className="mb-2 text-center text-lg font-semibold tracking-wide">
@@ -66,7 +76,7 @@ export default function KissCamLoveFrameTestPage() {
       <p className="mb-3 text-center text-sm text-white/70">
         Idle = full-bleed couple video. Live = camera under love-frame.png.
       </p>
-      <div className="mb-4 flex justify-center gap-2">
+      <div className="mb-4 flex flex-wrap justify-center gap-2">
         <button
           type="button"
           className={`rounded-lg px-4 py-2 text-sm font-semibold ${
@@ -79,11 +89,20 @@ export default function KissCamLoveFrameTestPage() {
         <button
           type="button"
           className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-            mode === "live" ? "bg-[#c45a78]" : "bg-white/10"
+            mode === "live" && !loveBurst ? "bg-[#c45a78]" : "bg-white/10"
           }`}
           onClick={() => setMode("live")}
         >
           Live (through heart)
+        </button>
+        <button
+          type="button"
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            loveBurst ? "bg-[#ff8fab] text-[#2a1a22]" : "bg-white/10"
+          }`}
+          onClick={triggerLove}
+        >
+          ♥ Love burst
         </button>
       </div>
       <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-xl">
@@ -96,11 +115,13 @@ export default function KissCamLoveFrameTestPage() {
           remoteStream={mode === "live" ? fakeStream : null}
           fallbackVideoSrc={KISS_CAM_COUPLE_VIDEO_SRC}
           celebrate={false}
+          loveBurst={loveBurst}
           fillViewport={false}
         />
       </div>
       <p className="mt-3 text-center text-xs text-white/55">
         Frame asset: {KISS_CAM_LOVE_FRAME_SRC}
+        {loveBurstId > 0 ? ` · love burst #${loveBurstId}` : ""}
       </p>
     </main>
   );
