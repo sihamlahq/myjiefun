@@ -173,6 +173,54 @@ async function upsertPartyGuest(
   return "created";
 }
 
+/** Keep only V3 dinner tables (VIP + 1–22). Unassign guests, then delete the rest. */
+async function pruneTablesNotInPlan(
+  supabase: SupabaseClient,
+  plan: WeddingSeatingPlan,
+): Promise<{ tablesRemoved: number; removedTableNumbers: string[]; errors: string[] }> {
+  const keep = new Set(plan.tables.map((t) => t.table_number));
+  const errors: string[] = [];
+  const removedTableNumbers: string[] = [];
+
+  const { data: allTables, error: listError } = await supabase
+    .from("reception_tables")
+    .select("id, table_number");
+  if (listError) {
+    return {
+      tablesRemoved: 0,
+      removedTableNumbers: [],
+      errors: [`List tables for prune: ${listError.message}`],
+    };
+  }
+
+  for (const row of allTables ?? []) {
+    const tableNumber = String(row.table_number ?? "");
+    if (keep.has(tableNumber)) continue;
+    try {
+      await supabase
+        .from("guests")
+        .update({ table_id: null, seat_id: null })
+        .eq("table_id", row.id);
+      const { error } = await supabase.from("reception_tables").delete().eq("id", row.id);
+      if (error) throw new Error(error.message);
+      removedTableNumbers.push(tableNumber || row.id);
+    } catch (error) {
+      errors.push(
+        `Remove table ${tableNumber || row.id}: ${
+          error instanceof Error ? error.message : "failed"
+        }`,
+      );
+    }
+  }
+
+  removedTableNumbers.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return {
+    tablesRemoved: removedTableNumbers.length,
+    removedTableNumbers,
+    errors,
+  };
+}
+
 export async function applyWeddingDinnerSeatingV3Plan(
   supabase: SupabaseClient,
   opts?: { plan?: WeddingSeatingPlan },
@@ -207,6 +255,9 @@ export async function applyWeddingDinnerSeatingV3Plan(
     }
   }
 
+  const prune = await pruneTablesNotInPlan(supabase, plan);
+  errors.push(...prune.errors);
+
   const totalPax = plan.tables.reduce(
     (sum, table) =>
       sum + table.parties.reduce((s, party) => s + partyOf(party), 0),
@@ -216,6 +267,8 @@ export async function applyWeddingDinnerSeatingV3Plan(
   return {
     version: plan.version,
     tablesUpserted,
+    tablesRemoved: prune.tablesRemoved,
+    removedTableNumbers: prune.removedTableNumbers,
     guestsCreated,
     guestsUpdated,
     totalPax,

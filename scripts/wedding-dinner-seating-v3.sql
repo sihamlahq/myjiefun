@@ -5102,12 +5102,26 @@ begin
   end if;
 end $$;
 
+-- Remove every table not in Wedding dinner table V3 (keep VIP + 1–22 only).
+update public.guests g
+set table_id = null, seat_id = null, updated_at = now()
+where g.table_id in (
+  select id from public.reception_tables
+  where table_number not in (
+    'VIP','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22'
+  )
+);
+
+delete from public.reception_tables
+where table_number not in (
+  'VIP','1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22'
+);
+
 commit;
 
--- Verify:
+-- Verify (should be exactly VIP + 1–22):
 select t.table_number, count(g.id) as parties, coalesce(sum(g.expected_count),0) as pax, t.capacity
 from public.reception_tables t
 left join public.guests g on g.table_id = t.id
-where t.notes = 'Wedding dinner table V3'
 group by t.table_number, t.capacity, t.sort_order
 order by t.sort_order, t.table_number;

@@ -145,4 +145,23 @@ for (const table of plan.tables) {
   }
 }
 
-console.log(`Done. created=${created} updated=${updated} tables=${plan.tables.length}`);
+const keep = new Set(plan.tables.map((t) => t.table_number));
+const { data: allTables, error: listError } = await supabase
+  .from("reception_tables")
+  .select("id, table_number");
+if (listError) throw new Error(listError.message);
+const removed = [];
+for (const row of allTables ?? []) {
+  if (keep.has(row.table_number)) continue;
+  await supabase.from("guests").update({ table_id: null, seat_id: null }).eq("table_id", row.id);
+  const { error } = await supabase.from("reception_tables").delete().eq("id", row.id);
+  if (error) throw new Error(error.message);
+  removed.push(row.table_number);
+}
+removed.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+
+console.log(
+  `Done. created=${created} updated=${updated} tables=${plan.tables.length} removed=${removed.length}${
+    removed.length ? ` (${removed.join(", ")})` : ""
+  }`,
+);

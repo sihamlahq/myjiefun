@@ -14,8 +14,8 @@ export function ApplyWeddingSeatingButton() {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-[var(--foreground)]">Wedding dinner table V3</p>
         <p className="text-xs text-[var(--foreground)]/65">
-          Import tables + parties from the seating PDF. Repeat count = pax (e.g. Yee Wen Family ×9).
-          Table 3A→4, 13A→14.
+          Import VIP + tables 1–22 from the V3 guest list (repeat count = pax). Removes any other
+          tables. 3A→4, 13A→14.
         </p>
         {last ? <p className="mt-1 text-xs text-emerald-700">{last}</p> : null}
       </div>
@@ -25,7 +25,7 @@ export function ApplyWeddingSeatingButton() {
         onClick={() => {
           if (
             !confirm(
-              "Apply Wedding dinner table V3 now?\n\nThis creates/updates tables and seats party blocks (repeat count = pax).",
+              "Apply Wedding dinner table V3 now?\n\nKeeps only VIP + tables 1–22 from the V3 guest list and removes every other table. Party repeat count = pax.",
             )
           ) {
             return;
@@ -33,7 +33,11 @@ export function ApplyWeddingSeatingButton() {
           startTransition(async () => {
             try {
               const result = await applyWeddingDinnerSeatingV3();
-              const msg = `Tables ${result.tablesUpserted} · added ${result.guestsCreated} · updated ${result.guestsUpdated} · ${result.totalPax} pax`;
+              const removed =
+                result.tablesRemoved > 0
+                  ? ` · removed ${result.tablesRemoved} (${result.removedTableNumbers.join(", ")})`
+                  : "";
+              const msg = `Tables ${result.tablesUpserted}${removed} · added ${result.guestsCreated} · updated ${result.guestsUpdated} · ${result.totalPax} pax`;
               setLast(msg);
               if (result.errors.length) {
                 toast.error(`Applied with ${result.errors.length} issue(s). ${msg}`);
