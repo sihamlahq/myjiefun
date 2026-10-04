@@ -12,6 +12,10 @@ type KissCamQRProps = {
   refreshing?: boolean;
   /** Create a brand-new QR / pairing session. */
   onRefresh: () => void;
+  /** Hide refresh when this QR is a read-only mirror (e.g. mobile remote). */
+  hideRefresh?: boolean;
+  /** Optional footnote under the QR. */
+  footnote?: string;
 };
 
 export function KissCamQRCode({
@@ -19,6 +23,8 @@ export function KissCamQRCode({
   shortCode,
   refreshing = false,
   onRefresh,
+  hideRefresh = false,
+  footnote,
 }: KissCamQRProps) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
@@ -80,17 +86,20 @@ export function KissCamQRCode({
           </Link>
         </div>
       ) : null}
-      <Button
-        type="button"
-        variant="secondary"
-        className="h-10 w-full"
-        disabled={refreshing}
-        onClick={() => onRefresh()}
-      >
-        {refreshing ? "Refreshing…" : "Refresh QR code"}
-      </Button>
+      {!hideRefresh ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-10 w-full"
+          disabled={refreshing}
+          onClick={() => onRefresh()}
+        >
+          {refreshing ? "Refreshing…" : "Refresh QR code"}
+        </Button>
+      ) : null}
       <p className="text-center text-[11px] leading-snug text-[var(--foreground)]/50">
-        First free phone goes live. Extra phones stay connected in standby — switch from the LED.
+        {footnote ??
+          "First free phone goes live. Extra phones stay connected in standby — switch from the LED."}
       </p>
     </div>
   );

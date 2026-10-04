@@ -536,6 +536,16 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
               Hide panel. Run Love / 1·2·3 / Loading / Go Live from the phone so settings never stay
               on the LCD. Press <kbd className="rounded bg-white/10 px-1">H</kbd> to peek the panel.
             </p>
+            {state.sessionId ? (
+              <Link
+                href={`/reception/kiss-cam/remote?session=${encodeURIComponent(state.sessionId)}${
+                  state.shortCode ? `&code=${encodeURIComponent(state.shortCode)}` : ""
+                }`}
+                className="mt-2 flex h-10 w-full items-center justify-center rounded-xl border border-[#ffc9d4]/35 bg-[#c45a78]/20 text-sm font-semibold text-[#fff5f7] hover:bg-[#c45a78]/30"
+              >
+                Open mobile remote
+              </Link>
+            ) : null}
             <div className="mt-3 grid gap-2">
               <Button
                 size="lg"

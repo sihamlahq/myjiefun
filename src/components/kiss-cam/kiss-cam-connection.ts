@@ -24,7 +24,7 @@ export type KissCamControlAction =
   | "countdown-2"
   | "countdown-3";
 
-type ClientRole = "display" | "camera";
+type ClientRole = "display" | "camera" | "remote";
 
 type SignalEnvelope = { from: string };
 
@@ -45,6 +45,8 @@ type SignalMessage = SignalEnvelope &
     | { type: "standby" }
     | { type: "publisher"; clientId: string | null }
     | { type: "promote"; clientId: string }
+    /** Mobile remote asks the LED to switch the live camera. */
+    | { type: "remote-promote"; clientId: string }
     | { type: "roster"; cameras: Array<{ clientId: string; label: string; publishing: boolean }> }
     | { type: "offer"; sdp: RTCSessionDescriptionInit }
     | { type: "answer"; sdp: RTCSessionDescriptionInit }
@@ -145,7 +147,7 @@ export class KissCamConnection {
   constructor(
     private supabase: SupabaseClient,
     private sessionId: string,
-    private role: "display" | "camera",
+    private role: "display" | "camera" | "remote",
     private handlers: Handlers = {},
   ) {}
 
@@ -161,6 +163,10 @@ export class KissCamConnection {
     return this.publisherId;
   }
 
+  get isRemote() {
+    return this.role === "remote";
+  }
+
   getCameraRoster(): KissCamCameraPeer[] {
     return this.rosterList();
   }
@@ -173,6 +179,7 @@ export class KissCamConnection {
 
     // Display always has a peer; camera phones join signaling first and only
     // open WebRTC after they claim the live publisher slot.
+    // Remote is signaling-only (no WebRTC) so it never steals the LED stream.
     if (this.role === "display") {
       this.createPeerConnection();
     }
@@ -203,6 +210,7 @@ export class KissCamConnection {
             type: "hello",
             role: this.role,
             ...(this.role === "camera" ? { label: this.phoneLabel } : {}),
+            ...(this.role === "remote" ? { label: "Mobile remote" } : {}),
           });
           this.startHeartbeat();
           if (!settled) {
@@ -230,7 +238,9 @@ export class KissCamConnection {
       await this.startPublishing(this.localStream);
     }
 
-    this.startStats();
+    if (this.role !== "remote") {
+      this.startStats();
+    }
   }
 
   get alive() {
@@ -371,7 +381,12 @@ export class KissCamConnection {
 
   /** LED: make a standby phone the live camera without dropping its signaling. */
   async promoteCamera(clientId: string) {
-    if (this.role !== "display" || this.disposed || !clientId) return;
+    if (this.disposed || !clientId) return;
+    if (this.role === "remote") {
+      await this.send({ type: "remote-promote", clientId });
+      return;
+    }
+    if (this.role !== "display") return;
     await this.setPublisher(clientId);
     await this.send({ type: "promote", clientId });
   }
@@ -632,7 +647,7 @@ export class KissCamConnection {
   }
 
   private notePresence(message: SignalMessage) {
-    if (this.role === "camera") {
+    if (this.role === "camera" || this.role === "remote") {
       if ("role" in message && message.role === "display") {
         this.lastPeerBeat = Date.now();
         this.handlers.onPeerPresence?.(true);
@@ -656,7 +671,11 @@ export class KissCamConnection {
           this.upsertCamera(message.from, message.label, false);
           await this.broadcastRoster();
         }
+        // Always ack publisher; remotes also get a fresh roster for phone switching.
         await this.send({ type: "publisher", clientId: this.publisherId });
+        if (message.role === "remote") {
+          await this.broadcastRoster();
+        }
       }
       // Realtime often re-hellos after a brief channel blip. Re-offering while
       // already connected causes renegotiation storms and looks like drop loops.
@@ -702,6 +721,11 @@ export class KissCamConnection {
       return;
     }
 
+    if (message.type === "remote-promote" && this.role === "display") {
+      await this.promoteCamera(message.clientId);
+      return;
+    }
+
     if (message.type === "promote" && this.role === "camera") {
       if (message.clientId === this.clientId) {
         this.handlers.onPromote?.();
@@ -709,18 +733,41 @@ export class KissCamConnection {
       return;
     }
 
-    if (message.type === "roster" && this.role === "camera") {
-      // Phones don't need the full roster for switching — LED owns that UI.
+    if (message.type === "roster") {
+      if (this.role === "remote") {
+        const cameras: KissCamCameraPeer[] = (message.cameras ?? []).map((cam) => ({
+          clientId: cam.clientId,
+          label: cam.label,
+          publishing: cam.publishing,
+          lastBeat: Date.now(),
+        }));
+        for (const cam of cameras) {
+          this.cameras.set(cam.clientId, {
+            label: cam.label,
+            publishing: cam.publishing,
+            lastBeat: cam.lastBeat,
+          });
+        }
+        // Drop cameras no longer listed.
+        for (const id of [...this.cameras.keys()]) {
+          if (!cameras.some((c) => c.clientId === id)) this.cameras.delete(id);
+        }
+        this.handlers.onRoster?.(this.rosterList(), this.publisherId);
+      }
       return;
     }
 
-    if (message.type === "publisher" && this.role === "camera") {
+    if (message.type === "publisher" && (this.role === "camera" || this.role === "remote")) {
       this.publisherId = message.clientId;
       this.lastPeerBeat = Date.now();
       this.handlers.onPeerPresence?.(true);
       const selfIsPublisher = message.clientId === this.clientId;
       this.handlers.onPublisherChange?.(selfIsPublisher, message.clientId);
       this.resolvePublisherWaiters(message.clientId);
+      if (this.role === "remote") {
+        this.handlers.onRoster?.(this.rosterList(), message.clientId);
+        return;
+      }
       if (!selfIsPublisher && this.publishing) {
         this.publishing = false;
         this.closePeerConnection();
