@@ -18,6 +18,7 @@ export const NAV_ITEMS = [
   { href: "/check-in", label: "Check-In", minRole: "checkin_staff" as AppRole },
   { href: "/seating", label: "Seating", minRole: "manager" as AppRole },
   { href: "/red-packet", label: "Red Packet", minRole: "manager" as AppRole },
+  { href: "/kiss-cam-videos", label: "Kiss Cam Videos", minRole: "viewer" as AppRole },
   { href: "/floor-plan", label: "Floor Plan", minRole: "viewer" as AppRole },
   { href: "/tables", label: "Tables", minRole: "manager" as AppRole },
   { href: "/reports", label: "Reports", minRole: "viewer" as AppRole },

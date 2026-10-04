@@ -8,3 +8,14 @@ export const KISS_CAM_RECORDING_MIME = [
   "video/mp4",
   "video/quicktime",
 ] as const;
+
+export type KissCamRecordingListItem = {
+  id: string;
+  sessionId: string;
+  shortCode: string | null;
+  storagePath: string;
+  bytes: number | null;
+  mimeType: string | null;
+  status: "pending" | "ready" | "failed";
+  createdAt: string;
+};

@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   Gift,
+  Heart,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -31,6 +32,7 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/check-in": ClipboardCheck,
   "/seating": Armchair,
   "/red-packet": Gift,
+  "/kiss-cam-videos": Heart,
   "/floor-plan": Map,
   "/tables": Table2,
   "/reports": BarChart3,
