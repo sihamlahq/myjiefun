@@ -90,7 +90,7 @@ export function KissCamQRCode({
         {refreshing ? "Refreshing…" : "Refresh QR code"}
       </Button>
       <p className="text-center text-[11px] leading-snug text-[var(--foreground)]/50">
-        First free phone goes live. Extra phones stay connected in standby — switch from the LED.
+        QR stays the same until you refresh. First free phone goes live; extras stay in standby.
       </p>
     </div>
   );

@@ -16,7 +16,13 @@ import { useKissCamMusic } from "@/components/kiss-cam/kiss-cam-music";
 import { KissCamPhoneSwitcher } from "@/components/kiss-cam/kiss-cam-phone-switcher";
 import { KissCamQRCode } from "@/components/kiss-cam/kiss-cam-qr";
 import { CameraStatusDot, KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
-import { SESSION_TTL_MS } from "@/components/kiss-cam/kiss-cam-session";
+import {
+  clearStoredSession,
+  readStoredSession,
+  SESSION_RENEW_WITHIN_MS,
+  SESSION_TTL_MS,
+  writeStoredSession,
+} from "@/components/kiss-cam/kiss-cam-session";
 import {
   defaultKissCamState,
   phaseAtElapsed,
@@ -27,6 +33,63 @@ import {
   type KissCamState,
 } from "@/components/kiss-cam/kiss-cam-types";
 import { cn } from "@/lib/utils";
+
+type SessionApiResponse = {
+  id: string;
+  shortCode: string;
+  expiresAt: string;
+  reused?: boolean;
+};
+
+/** Dedupe concurrent ensure calls (React Strict Mode remounts). */
+let ensureSessionShared: Promise<SessionApiResponse> | null = null;
+
+async function requestEnsureSession(): Promise<SessionApiResponse> {
+  if (ensureSessionShared) return ensureSessionShared;
+
+  ensureSessionShared = (async () => {
+    const stored = readStoredSession();
+    const now = Date.now();
+    const stillFresh =
+      Boolean(stored) &&
+      stored!.expiresAt - now > SESSION_RENEW_WITHIN_MS &&
+      Boolean(stored!.id) &&
+      Boolean(stored!.shortCode);
+
+    if (stillFresh && stored) {
+      return {
+        id: stored.id,
+        shortCode: stored.shortCode,
+        expiresAt: new Date(stored.expiresAt).toISOString(),
+        reused: true,
+      };
+    }
+
+    const res = await fetch("/api/kiss-cam/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        stored?.id
+          ? { sessionId: stored.id, shortCode: stored.shortCode }
+          : { refresh: true },
+      ),
+    });
+    const json = (await res.json()) as SessionApiResponse;
+    if (!res.ok || !json.id) {
+      throw new Error("Unable to create session");
+    }
+    writeStoredSession({
+      id: json.id,
+      shortCode: json.shortCode,
+      expiresAt: new Date(json.expiresAt).getTime() || Date.now() + SESSION_TTL_MS,
+    });
+    return json;
+  })().finally(() => {
+    ensureSessionShared = null;
+  });
+
+  return ensureSessionShared;
+}
 
 type KissCamControllerProps = {
   coupleNames: string;
@@ -73,41 +136,105 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       ? weddingTitle
       : "Forever Starts Here";
 
+  const applySession = useCallback(
+    (
+      json: { id: string; shortCode: string; expiresAt: string },
+      opts?: { resetPeers?: boolean },
+    ) => {
+      const expiresAt =
+        new Date(json.expiresAt).getTime() || Date.now() + SESSION_TTL_MS;
+      writeStoredSession({
+        id: json.id,
+        shortCode: json.shortCode,
+        expiresAt,
+      });
+      setState((s) => ({
+        ...s,
+        sessionId: json.id,
+        shortCode: json.shortCode,
+        sessionExpiresAt: expiresAt,
+        ...(opts?.resetPeers ? { cameraState: "waiting" as const } : null),
+      }));
+      if (opts?.resetPeers) {
+        setCameraPeers([]);
+        setPublisherId(null);
+        setRemoteStream(null);
+        setSwitchingPhone(false);
+      }
+    },
+    [],
+  );
+
+  /** Mint a brand-new QR — only when staff taps Refresh. */
   const refreshSession = useCallback(async () => {
     if (creatingSession.current) return;
     creatingSession.current = true;
     setSessionRefreshing(true);
     setError(null);
     try {
-      const res = await fetch("/api/kiss-cam/session", { method: "POST" });
+      clearStoredSession();
+      const res = await fetch("/api/kiss-cam/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh: true }),
+      });
       const json = (await res.json()) as {
         id: string;
         shortCode: string;
         expiresAt: string;
       };
-      setState((s) => ({
-        ...s,
-        sessionId: json.id,
-        shortCode: json.shortCode,
-        sessionExpiresAt: new Date(json.expiresAt).getTime() || Date.now() + SESSION_TTL_MS,
-        // New QR = new pairing session; phone must scan again.
-        cameraState: "waiting",
-      }));
-      setCameraPeers([]);
-      setPublisherId(null);
-      setRemoteStream(null);
-      setSwitchingPhone(false);
+      if (!res.ok || !json.id) {
+        throw new Error("Unable to refresh the QR code");
+      }
+      applySession(json, { resetPeers: true });
     } catch {
       setError("Unable to refresh the QR code. Please try again.");
     } finally {
       creatingSession.current = false;
       setSessionRefreshing(false);
     }
-  }, []);
+  }, [applySession]);
+
+  /**
+   * Restore the same QR across reloads / remounts.
+   * Only creates a new session when nothing usable is stored.
+   */
+  const ensureSession = useCallback(async () => {
+    if (creatingSession.current) return;
+    creatingSession.current = true;
+    setSessionRefreshing(true);
+    setError(null);
+    try {
+      const previousId = readStoredSession()?.id ?? null;
+      const json = await requestEnsureSession();
+      const isSameQr = Boolean(previousId && previousId === json.id);
+      applySession(json, { resetPeers: !isSameQr });
+    } catch {
+      setError("Unable to prepare the camera QR code. Please try again.");
+    } finally {
+      creatingSession.current = false;
+      setSessionRefreshing(false);
+    }
+  }, [applySession]);
 
   useEffect(() => {
-    void refreshSession();
-  }, [refreshSession]);
+    void ensureSession();
+  }, [ensureSession]);
+
+  // Quietly extend expiry before the pairing session dies — QR does not change.
+  useEffect(() => {
+    if (!state.sessionId || !state.sessionExpiresAt) return;
+    const msLeft = state.sessionExpiresAt - Date.now();
+    if (msLeft <= 0) {
+      void ensureSession();
+      return;
+    }
+    const wait = Math.max(30_000, msLeft - SESSION_RENEW_WITHIN_MS);
+    const timer = window.setTimeout(() => {
+      void ensureSession();
+    }, wait);
+    return () => window.clearTimeout(timer);
+  }, [ensureSession, state.sessionExpiresAt, state.sessionId]);
 
   useEffect(() => {
     void fetch("/api/kiss-cam/ice")
