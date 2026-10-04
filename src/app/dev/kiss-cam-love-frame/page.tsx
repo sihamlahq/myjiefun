@@ -12,12 +12,14 @@ import {
  * 1) Idle — couple mp4 full-bleed (not clipped into a heart mask)
  * 2) Live — fake camera under love-frame.png (feed through heart hole)
  * 3) Love burst — soft glow (no milky plate) over live frame
+ * 4) Loading — soft spark only (no milky white plate)
  */
 export default function KissCamLoveFrameTestPage() {
   const [mode, setMode] = useState<"idle" | "live">("idle");
   const [fakeStream, setFakeStream] = useState<MediaStream | null>(null);
   const [loveBurst, setLoveBurst] = useState(false);
   const [loveBurstId, setLoveBurstId] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (mode !== "live") {
