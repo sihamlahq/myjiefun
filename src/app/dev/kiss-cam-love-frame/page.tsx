@@ -106,6 +106,19 @@ export default function KissCamLoveFrameTestPage() {
         >
           ♥ Love burst
         </button>
+        <button
+          type="button"
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            loading ? "bg-[#ff8fab] text-[#2a1a22]" : "bg-white/10"
+          }`}
+          onClick={() => {
+            setLoveBurst(false);
+            setLoading((v) => !v);
+          }}
+          aria-pressed={loading}
+        >
+          {loading ? "Clear Loading" : "Loading Screen"}
+        </button>
       </div>
       <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-xl">
         <KissCamDisplay
@@ -118,6 +131,7 @@ export default function KissCamLoveFrameTestPage() {
           fallbackVideoSrc={KISS_CAM_COUPLE_VIDEO_SRC}
           celebrate={false}
           loveBurst={loveBurst}
+          loading={loading}
           fillViewport={false}
         />
       </div>
