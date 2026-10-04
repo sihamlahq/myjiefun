@@ -64,7 +64,10 @@ export function KissCamDisplay({
   const [autoLoveId, setAutoLoveId] = useState(0);
   const [coupleReady, setCoupleReady] = useState(false);
   const [couplePlaying, setCouplePlaying] = useState(false);
+  /** True after the designed mp4 finishes — keep last frame (black heart) on screen. */
+  const [coupleFrozen, setCoupleFrozen] = useState(false);
   const lastPhaseRef = useRef(phase);
+  const coupleHoldLastRef = useRef(false);
 
   const livePhone = Boolean(remoteStream);
   const loveLayout = cameraLayout === "love";
@@ -86,6 +89,8 @@ export function KissCamDisplay({
     }
 
     setCouplePlaying(false);
+    setCoupleFrozen(false);
+    coupleHoldLastRef.current = false;
     setFadeIn(true);
     video.muted = true;
     if (video.srcObject !== remoteStream) {
@@ -106,12 +111,14 @@ export function KissCamDisplay({
     };
   }, [remoteStream]);
 
-  // Couple mp4 — full-bleed IN FRONT (not clipped behind a love mask).
+  // Couple mp4 — play once, then freeze on the last frame (black heart scene).
   useEffect(() => {
     const video = coupleVideoRef.current;
     if (!video || !showCoupleFullscreen || !fallbackVideoSrc) {
       setCoupleReady(false);
       setCouplePlaying(false);
+      setCoupleFrozen(false);
+      coupleHoldLastRef.current = false;
       return;
     }
 
@@ -123,16 +130,37 @@ export function KissCamDisplay({
       if (!cancelled) {
         setCoupleReady(false);
         setCouplePlaying(false);
+        setCoupleFrozen(false);
+        coupleHoldLastRef.current = false;
       }
     };
     const onPlay = () => {
-      if (!cancelled) setCouplePlaying(true);
+      if (cancelled) return;
+      coupleHoldLastRef.current = false;
+      setCoupleFrozen(false);
+      setCouplePlaying(true);
     };
     const onPause = () => {
-      if (!cancelled) setCouplePlaying(false);
+      // Ignore pause when we intentionally hold the last frame.
+      if (!cancelled && !coupleHoldLastRef.current) setCouplePlaying(false);
+    };
+    const onEnded = () => {
+      if (cancelled) return;
+      coupleHoldLastRef.current = true;
+      // Nudge to the final frame so the black-heart end card stays visible.
+      if (Number.isFinite(video.duration) && video.duration > 0) {
+        try {
+          video.currentTime = Math.max(0, video.duration - 0.05);
+        } catch {
+          // ignore seek errors on some mobile browsers
+        }
+      }
+      video.pause();
+      setCoupleFrozen(true);
+      setCouplePlaying(true);
     };
 
-    video.loop = true;
+    video.loop = false;
     video.playsInline = true;
     video.muted = true;
     if (video.getAttribute("src") !== fallbackVideoSrc) {
@@ -143,6 +171,7 @@ export function KissCamDisplay({
     video.addEventListener("error", onError);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
+    video.addEventListener("ended", onEnded);
     // Autoplay muted so the designed video is visible immediately in front.
     void video.play().then(onReady).catch(() => {
       video.pause();
@@ -157,6 +186,7 @@ export function KissCamDisplay({
       video.removeEventListener("error", onError);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
+      video.removeEventListener("ended", onEnded);
     };
   }, [showCoupleFullscreen, fallbackVideoSrc]);
 
@@ -188,6 +218,16 @@ export function KissCamDisplay({
   const playCoupleVideo = useCallback(() => {
     const video = coupleVideoRef.current;
     if (!video) return;
+    coupleHoldLastRef.current = false;
+    setCoupleFrozen(false);
+    // Replay from the start if we were holding the end card.
+    try {
+      if (video.ended || video.currentTime >= Math.max(0, (video.duration || 0) - 0.2)) {
+        video.currentTime = 0;
+      }
+    } catch {
+      // ignore
+    }
     video.muted = false;
     void video
       .play()
@@ -200,7 +240,7 @@ export function KissCamDisplay({
 
   const finalFrame = phase === "final" || phase === "celebration";
   const showBigLove = loveBurst || autoLove;
-  const stageFilled = livePhone || (showCoupleFullscreen && couplePlaying);
+  const stageFilled = livePhone || (showCoupleFullscreen && (couplePlaying || coupleFrozen));
   const overlayCountdown = loading
     ? null
     : (remoteCountdown ?? (phase === "countdown" ? countdownValue : null));
@@ -210,7 +250,12 @@ export function KissCamDisplay({
       : `auto-${countdownValue}`;
   const showIdleHeader = false; // Designed video/frame owns the branding.
   const showPlayButton =
-    showCoupleFullscreen && coupleReady && !couplePlaying && !loading && !livePhone;
+    showCoupleFullscreen &&
+    coupleReady &&
+    !couplePlaying &&
+    !coupleFrozen &&
+    !loading &&
+    !livePhone;
 
   return (
     <div
@@ -269,13 +314,12 @@ export function KissCamDisplay({
         />
       )}
 
-      {/* Designed couple video — full-bleed IN FRONT (never clipped behind a love mask) */}
+      {/* Designed couple video — play once, freeze on last black-heart frame */}
       {showCoupleFullscreen ? (
         <video
           ref={coupleVideoRef}
           className="absolute inset-0 z-[4] h-full w-full object-cover"
           playsInline
-          loop
           preload="auto"
           disablePictureInPicture
           aria-label="Kiss Cam couple video"
