@@ -52,6 +52,8 @@ type SignalMessage = SignalEnvelope &
     | { type: "remote-promote"; clientId: string }
     /** LED tells remotes the active pairing QR (id + short code). */
     | { type: "session-info"; sessionId: string; shortCode: string }
+    /** Remote asks the LED to re-send the active pairing QR. */
+    | { type: "session-info-request" }
     | { type: "roster"; cameras: Array<{ clientId: string; label: string; publishing: boolean }> }
     | { type: "offer"; sdp: RTCSessionDescriptionInit }
     | { type: "answer"; sdp: RTCSessionDescriptionInit }
@@ -136,6 +138,8 @@ export class KissCamConnection {
   private cameras = new Map<string, { label: string; publishing: boolean; lastBeat: number }>();
   /** LED pairing short code — remotes mirror this so mobile QR matches desktop. */
   private pairingShortCode: string | null = null;
+  /** Throttle session-info on display heartbeats (~every 10s). */
+  private pairingBroadcastTick = 0;
   private phoneLabel =
     typeof navigator !== "undefined"
       ? `Phone ${(navigator.userAgent.match(/iPhone|Android|Mobile/i)?.[0] ?? "Cam").slice(0, 8)}-${this.clientId.slice(0, 4)}`
@@ -412,6 +416,12 @@ export class KissCamConnection {
       sessionId: this.sessionId,
       shortCode: this.pairingShortCode,
     });
+  }
+
+  /** Remote: ask the LED to push the active pairing QR again. */
+  async requestSessionInfo() {
+    if (this.role !== "remote" || this.disposed) return;
+    await this.send({ type: "session-info-request" });
   }
 
   async attachLocalStream(stream: MediaStream) {
@@ -758,6 +768,11 @@ export class KissCamConnection {
       return;
     }
 
+    if (message.type === "session-info-request" && this.role === "display") {
+      await this.broadcastSessionInfo();
+      return;
+    }
+
     if (message.type === "promote" && this.role === "camera") {
       if (message.clientId === this.clientId) {
         this.handlers.onPromote?.();
@@ -994,6 +1009,11 @@ export class KissCamConnection {
           }
         }
         if (changed) void this.broadcastRoster();
+        // Keep remotes mirrored to the LED pairing QR (~every 10s).
+        this.pairingBroadcastTick += 1;
+        if (this.pairingBroadcastTick % 4 === 0) {
+          void this.broadcastSessionInfo();
+        }
       }
       // Signaling silence only updates presence — never force a WebRTC reconnect.
       // Missed Realtime beats are common on venue Wi‑Fi while media stays up.

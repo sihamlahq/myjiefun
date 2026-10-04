@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { cameraPagePath } from "@/components/kiss-cam/kiss-cam-session";
+import { cameraPagePath, canonicalSiteUrl } from "@/components/kiss-cam/kiss-cam-session";
 
 type KissCamQRProps = {
   sessionId: string | null;
@@ -28,14 +28,11 @@ export function KissCamQRCode({
 }: KissCamQRProps) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
+  // Same absolute URL on laptop LED and phone remote (canonical site + session + code).
   const url = useMemo(() => {
     if (!sessionId) return "";
-    // Prefer the public site URL so desktop LED and mobile remote encode the same QR.
-    const site =
-      (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
-      (typeof window !== "undefined" ? window.location.origin : undefined);
-    return cameraPagePath(sessionId, site);
-  }, [sessionId]);
+    return cameraPagePath(sessionId, canonicalSiteUrl(), shortCode);
+  }, [sessionId, shortCode]);
 
   const codeUrl = useMemo(() => {
     if (!sessionId) return "/reception/kiss-cam/camera";

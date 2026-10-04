@@ -16,14 +16,15 @@ import { cn } from "@/lib/utils";
 /**
  * Mobile remote — controls the desktop/LED Kiss Cam page only.
  * Signaling-only: never takes WebRTC video, never fullscreens this phone.
+ * Camera QR is a read-only mirror of the laptop LED pairing code.
  */
 export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
   const search = useSearchParams();
   const sessionFromUrl = (search.get("session") || "").trim();
   const codeFromUrl = (search.get("code") || "").trim().toUpperCase();
 
-  const [sessionId, setSessionId] = useState<string | null>(sessionFromUrl || null);
-  const [shortCode, setShortCode] = useState<string | null>(codeFromUrl || null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [shortCode, setShortCode] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState(codeFromUrl);
   const [status, setStatus] = useState<"idle" | "connecting" | "ready" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -33,47 +34,98 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
   const [loadingOn, setLoadingOn] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [ledFullscreen, setLedFullscreen] = useState(false);
+  /** Only show the camera QR after the LED (or code lookup) confirmed the pairing. */
+  const [qrMirrored, setQrMirrored] = useState(false);
   const connRef = useRef<KissCamConnection | null>(null);
+  const bootstrappedRef = useRef(false);
 
-  const resolveSession = useCallback(async (code: string) => {
-    const trimmed = code.trim().toUpperCase();
-    if (!trimmed) {
-      setMessage("Enter the short code shown on the LED Kiss Cam panel.");
-      return;
-    }
-    setStatus("connecting");
-    setMessage("Looking up LED session…");
-    try {
-      const res = await fetch(
-        `/api/kiss-cam/session/lookup?code=${encodeURIComponent(trimmed)}`,
-      );
-      const json = (await res.json()) as {
-        id?: string;
-        shortCode?: string;
-        error?: string;
-      };
-      if (!res.ok || !json.id) {
-        throw new Error(json.error || "Session not found or expired");
-      }
-      setSessionId(json.id);
-      setShortCode(json.shortCode || trimmed);
-      setMessage(null);
-    } catch (err) {
-      setStatus("error");
-      setMessage(err instanceof Error ? err.message : "Unable to find LED session");
-    }
+  const applyPairing = useCallback((id: string, code: string, mirrored: boolean) => {
+    const nextCode = code.trim().toUpperCase();
+    setSessionId(id);
+    setShortCode(nextCode);
+    setCodeInput(nextCode);
+    if (mirrored) setQrMirrored(true);
   }, []);
 
+  const resolveSession = useCallback(
+    async (code: string) => {
+      const trimmed = code.trim().toUpperCase();
+      if (!trimmed) {
+        setMessage("Enter the short code shown on the LED Kiss Cam panel.");
+        return;
+      }
+      setStatus("connecting");
+      setMessage("Looking up LED session…");
+      setQrMirrored(false);
+      try {
+        const res = await fetch(
+          `/api/kiss-cam/session/lookup?code=${encodeURIComponent(trimmed)}`,
+        );
+        const json = (await res.json()) as {
+          id?: string;
+          shortCode?: string;
+          error?: string;
+        };
+        if (!res.ok || !json.id) {
+          throw new Error(json.error || "Session not found or expired");
+        }
+        // Code lookup is the laptop LED short code — treat as mirrored pairing.
+        applyPairing(json.id, json.shortCode || trimmed, true);
+        setMessage(null);
+      } catch (err) {
+        setStatus("error");
+        setMessage(err instanceof Error ? err.message : "Unable to find LED session");
+      }
+    },
+    [applyPairing],
+  );
+
+  // Bootstrap from URL: prefer LED short code lookup so phone never keeps a stale session id.
   useEffect(() => {
-    if (sessionFromUrl) {
-      setSessionId(sessionFromUrl);
-      if (codeFromUrl) setShortCode(codeFromUrl);
-      return;
-    }
-    if (codeFromUrl) {
-      void resolveSession(codeFromUrl);
-    }
-  }, [codeFromUrl, resolveSession, sessionFromUrl]);
+    if (bootstrappedRef.current) return;
+    bootstrappedRef.current = true;
+
+    const boot = async () => {
+      if (codeFromUrl) {
+        setStatus("connecting");
+        setMessage("Looking up LED session…");
+        setQrMirrored(false);
+        try {
+          const res = await fetch(
+            `/api/kiss-cam/session/lookup?code=${encodeURIComponent(codeFromUrl)}`,
+          );
+          const json = (await res.json()) as {
+            id?: string;
+            shortCode?: string;
+            error?: string;
+          };
+          if (res.ok && json.id) {
+            applyPairing(json.id, json.shortCode || codeFromUrl, true);
+            setMessage(null);
+            return;
+          }
+        } catch {
+          // Fall through — ephemeral LED sessions may only exist on the laptop link.
+        }
+        if (sessionFromUrl) {
+          applyPairing(sessionFromUrl, codeFromUrl, false);
+          setMessage("Linking to LED…");
+          return;
+        }
+        setStatus("error");
+        setMessage("Session not found or expired. Use Open mobile remote from the LED.");
+        return;
+      }
+      if (sessionFromUrl) {
+        setSessionId(sessionFromUrl);
+        setQrMirrored(false);
+        setStatus("connecting");
+        setMessage("Linking to LED…");
+      }
+    };
+
+    void boot();
+  }, [applyPairing, codeFromUrl, sessionFromUrl]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -97,6 +149,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
           if (present) {
             setStatus("ready");
             setMessage(null);
+            void conn.requestSessionInfo();
           }
         },
         onRoster: (cameras, liveId) => {
@@ -106,6 +159,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
           setSwitchingPhone(false);
           setStatus("ready");
           setMessage(null);
+          void conn.requestSessionInfo();
         },
         onPublisherChange: (_self, liveId) => {
           if (cancelled) return;
@@ -114,9 +168,10 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
         },
         onSessionInfo: (info) => {
           if (cancelled) return;
-          // Mirror LED pairing QR — same session id + short code as desktop.
-          setShortCode(info.shortCode);
-          setSessionId((prev) => (prev === info.sessionId ? prev : info.sessionId));
+          // Laptop LED is source of truth — always mirror its pairing QR.
+          applyPairing(info.sessionId, info.shortCode, true);
+          setStatus("ready");
+          setMessage(null);
         },
         onError: (msg) => {
           if (cancelled) return;
@@ -130,6 +185,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
         if (!cancelled) {
           setStatus("ready");
           setMessage(null);
+          await conn.requestSessionInfo();
         }
       } catch (err) {
         if (cancelled) return;
@@ -147,7 +203,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
       void connRef.current?.dispose();
       connRef.current = null;
     };
-  }, [sessionId]);
+  }, [applyPairing, sessionId]);
 
   const sendAction = useCallback(async (action: KissCamControlAction) => {
     if (!connRef.current?.alive) {
@@ -235,14 +291,23 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
         </div>
       </header>
 
-      <KissCamQRCode
-        sessionId={sessionId}
-        shortCode={shortCode}
-        refreshing={false}
-        hideRefresh
-        onRefresh={() => undefined}
-        footnote="Same camera QR as the desktop LED. Refresh the code only on the LED screen."
-      />
+      {qrMirrored && sessionId && shortCode ? (
+        <KissCamQRCode
+          sessionId={sessionId}
+          shortCode={shortCode}
+          refreshing={false}
+          hideRefresh
+          onRefresh={() => undefined}
+          footnote="Same camera QR as the laptop LED. Refresh the code only on the LED screen."
+        />
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-[#3a2f28]/92 p-4 text-center text-sm text-[#f7f1e8]/70">
+          Syncing camera QR from the laptop LED…
+          {shortCode ? (
+            <p className="mt-2 font-heading text-xl tracking-[0.2em] text-[#fff5f7]">{shortCode}</p>
+          ) : null}
+        </div>
+      )}
 
       <KissCamPhoneSwitcher
         cameras={cameraPeers}

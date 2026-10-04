@@ -76,20 +76,26 @@ export function clearStoredSession() {
   }
 }
 
-export function cameraPagePath(sessionId: string, siteUrl?: string) {
-  const base = (siteUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://tablewedding.com").replace(
-    /\/$/,
-    "",
-  );
-  return `${base}/reception/kiss-cam/camera?session=${encodeURIComponent(sessionId)}`;
+/** Public origin used in every Kiss Cam QR — never window.location (differs phone vs laptop). */
+export function canonicalSiteUrl(siteUrl?: string) {
+  const raw =
+    (siteUrl && siteUrl.trim()) ||
+    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL?.trim()) ||
+    "https://tablewedding.com";
+  return raw.replace(/\/$/, "");
+}
+
+export function cameraPagePath(sessionId: string, siteUrl?: string, shortCode?: string | null) {
+  const base = canonicalSiteUrl(siteUrl);
+  const q = new URLSearchParams({ session: sessionId });
+  const code = shortCode?.trim().toUpperCase();
+  if (code) q.set("code", code);
+  return `${base}/reception/kiss-cam/camera?${q.toString()}`;
 }
 
 export function cameraCodePath(shortCode: string, siteUrl?: string) {
-  const base = (siteUrl || process.env.NEXT_PUBLIC_SITE_URL || "https://tablewedding.com").replace(
-    /\/$/,
-    "",
-  );
-  return `${base}/reception/kiss-cam/camera?code=${encodeURIComponent(shortCode)}`;
+  const base = canonicalSiteUrl(siteUrl);
+  return `${base}/reception/kiss-cam/camera?code=${encodeURIComponent(shortCode.trim().toUpperCase())}`;
 }
 
 export function signalingChannelName(sessionId: string) {
