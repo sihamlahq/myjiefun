@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -15,8 +14,8 @@ import { KissCamQRCode } from "@/components/kiss-cam/kiss-cam-qr";
 import { cn } from "@/lib/utils";
 
 /**
- * Mobile remote: the Kiss Cam right-side control panel only.
- * Joins the LED session as a signaling-only "remote" — never steals WebRTC video.
+ * Mobile remote — controls the desktop/LED Kiss Cam page only.
+ * Signaling-only: never takes WebRTC video, never fullscreens this phone.
  */
 export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
   const search = useSearchParams();
@@ -33,16 +32,17 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
   const [switchingPhone, setSwitchingPhone] = useState(false);
   const [loadingOn, setLoadingOn] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [ledFullscreen, setLedFullscreen] = useState(false);
   const connRef = useRef<KissCamConnection | null>(null);
 
   const resolveSession = useCallback(async (code: string) => {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) {
-      setMessage("Enter the Kiss Cam short code from the LED panel.");
+      setMessage("Enter the short code shown on the LED Kiss Cam panel.");
       return;
     }
     setStatus("connecting");
-    setMessage("Looking up session…");
+    setMessage("Looking up LED session…");
     try {
       const res = await fetch(
         `/api/kiss-cam/session/lookup?code=${encodeURIComponent(trimmed)}`,
@@ -60,7 +60,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
       setMessage(null);
     } catch (err) {
       setStatus("error");
-      setMessage(err instanceof Error ? err.message : "Unable to find session");
+      setMessage(err instanceof Error ? err.message : "Unable to find LED session");
     }
   }, []);
 
@@ -78,11 +78,11 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
-    let supabase: ReturnType<typeof createClient> | null = null;
 
     const run = async () => {
       setStatus("connecting");
-      setMessage("Connecting to LED…");
+      setMessage("Linking to LED…");
+      let supabase: ReturnType<typeof createClient>;
       try {
         supabase = createClient();
       } catch {
@@ -112,10 +112,16 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
           setPublisherId(liveId);
           setSwitchingPhone(false);
         },
+        onSessionInfo: (info) => {
+          if (cancelled) return;
+          // Mirror LED pairing QR — same session id + short code as desktop.
+          setShortCode(info.shortCode);
+          setSessionId((prev) => (prev === info.sessionId ? prev : info.sessionId));
+        },
         onError: (msg) => {
           if (cancelled) return;
           console.warn("[kiss-cam remote]", msg);
-          setMessage("Connection is unstable. Trying to reconnect…");
+          setMessage("Connection unstable — still trying to reach the LED…");
         },
       });
       connRef.current = conn;
@@ -129,7 +135,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
         if (cancelled) return;
         setStatus("error");
         setMessage(
-          err instanceof Error ? err.message : "Unable to connect to the LED session",
+          err instanceof Error ? err.message : "Unable to link to the LED session",
         );
       }
     };
@@ -145,7 +151,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
 
   const sendAction = useCallback(async (action: KissCamControlAction) => {
     if (!connRef.current?.alive) {
-      setMessage("Not connected to the LED yet.");
+      setMessage("Not linked to the LED yet.");
       return;
     }
     setBusyAction(action);
@@ -153,17 +159,15 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
       await connRef.current.sendControl(action);
       if (action === "loading-on") setLoadingOn(true);
       if (action === "loading-off") setLoadingOn(false);
+      if (action === "fullscreen-on") setLedFullscreen(true);
+      if (action === "fullscreen-off") setLedFullscreen(false);
+      if (action === "fullscreen-toggle") setLedFullscreen((v) => !v);
     } catch {
-      setMessage("Unable to send control to the LED.");
+      setMessage("Unable to send command to the LED.");
     } finally {
       setBusyAction(null);
     }
   }, []);
-
-  const ledHref = useMemo(() => {
-    if (!sessionId) return "/reception/kiss-cam";
-    return "/reception/kiss-cam";
-  }, [sessionId]);
 
   if (!sessionId) {
     return (
@@ -172,13 +176,14 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ffc9d4]/90">
             TableWedding
           </p>
-          <h1 className="kiss-cam-love-title mt-1 text-[2.2rem] leading-none">Kiss Cam Remote</h1>
+          <h1 className="kiss-cam-love-title mt-1 text-[2.2rem] leading-none">LED Remote</h1>
           <p className="mt-2 text-sm text-[#f7f1e8]/70">
-            Control the LED panel from this phone — enter the short code shown next to the QR.
+            This phone only controls the desktop Kiss Cam LED. Enter the short code from the LED
+            panel (or open <span className="font-semibold">Open mobile remote</span> from the LED).
           </p>
         </header>
         <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ffc9d4]/85">
-          Short code
+          LED short code
         </label>
         <input
           value={codeInput}
@@ -194,15 +199,9 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
           onClick={() => void resolveSession(codeInput)}
           disabled={status === "connecting"}
         >
-          {status === "connecting" ? "Connecting…" : "Connect remote"}
+          {status === "connecting" ? "Linking…" : "Link to LED"}
         </Button>
         {message ? <p className="mt-3 text-sm text-rose-200">{message}</p> : null}
-        <Link
-          href="/reception/kiss-cam"
-          className="mt-8 text-center text-sm text-[#ffd6e0] underline-offset-2 hover:underline"
-        >
-          Open full Kiss Cam LED
-        </Link>
       </main>
     );
   }
@@ -212,7 +211,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
       <header className="flex items-start justify-between gap-3 px-1">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ffc9d4]/90">
-            Mobile remote
+            LED remote only
           </p>
           <h1 className="kiss-cam-love-title mt-0.5 text-[2rem] leading-none">Kiss Cam</h1>
           <p className="mt-1 truncate text-xs text-[#f7f1e8]/65">{coupleNames}</p>
@@ -228,11 +227,11 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
                   : "text-amber-200",
             )}
           >
-            {status === "ready" ? "Linked to LED" : status === "error" ? "Offline" : "Connecting…"}
+            {status === "ready" ? "Controlling LED" : status === "error" ? "Offline" : "Linking…"}
           </p>
-          <Link href={ledHref} className="mt-1 inline-block text-[#ffd6e0] underline-offset-2 hover:underline">
-            LED page
-          </Link>
+          {ledFullscreen ? (
+            <p className="mt-1 text-[#ffd6e0]/80">LED fullscreen on</p>
+          ) : null}
         </div>
       </header>
 
@@ -242,7 +241,7 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
         refreshing={false}
         hideRefresh
         onRefresh={() => undefined}
-        footnote="Same camera QR as the LED. Refresh the code only from the LED screen."
+        footnote="Same camera QR as the desktop LED. Refresh the code only on the LED screen."
       />
 
       <KissCamPhoneSwitcher
@@ -253,18 +252,18 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
           setSwitchingPhone(true);
           void connRef.current?.promoteCamera(clientId).catch(() => {
             setSwitchingPhone(false);
-            setMessage("Unable to switch camera phone.");
+            setMessage("Unable to switch the LED camera phone.");
           });
         }}
       />
 
       <div className="rounded-2xl border border-white/10 bg-[#3a2f28]/92 p-4 shadow-[0_16px_40px_rgba(0,0,0,.35)] backdrop-blur-md">
         <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#ffc9d4]/90">
-          Controls
+          LED controls
         </p>
         <p className="mt-2 text-[11px] leading-snug text-[#f7f1e8]/60">
-          These buttons drive the LED wall. The projector page stays clean — this phone is the
-          remote.
+          Every button here runs on the desktop LED website only — this phone never goes fullscreen
+          or shows the stage.
         </p>
 
         <div className="mt-3 grid gap-2">
@@ -307,12 +306,20 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
             </Button>
             <Button
               variant="gold"
-              disabled={status !== "ready"}
-              onClick={() => void sendAction("love")}
+              disabled={status !== "ready" || busyAction === "fullscreen-toggle"}
+              onClick={() => void sendAction("fullscreen-toggle")}
+              aria-pressed={ledFullscreen}
             >
-              ♥ Love
+              {ledFullscreen ? "Exit FS" : "Fullscreen"}
             </Button>
           </div>
+          <Button
+            className="h-12 w-full bg-[#c45a78]/85 text-white hover:bg-[#a84864]"
+            disabled={status !== "ready"}
+            onClick={() => void sendAction("love")}
+          >
+            ♥ Love
+          </Button>
           <div className="grid grid-cols-3 gap-2">
             {([3, 2, 1] as const).map((n) => (
               <Button

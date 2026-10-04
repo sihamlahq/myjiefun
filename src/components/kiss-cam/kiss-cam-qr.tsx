@@ -28,13 +28,14 @@ export function KissCamQRCode({
 }: KissCamQRProps) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
-  const url = useMemo(
-    () =>
-      sessionId
-        ? cameraPagePath(sessionId, typeof window !== "undefined" ? window.location.origin : undefined)
-        : "",
-    [sessionId],
-  );
+  const url = useMemo(() => {
+    if (!sessionId) return "";
+    // Prefer the public site URL so desktop LED and mobile remote encode the same QR.
+    const site =
+      (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL) ||
+      (typeof window !== "undefined" ? window.location.origin : undefined);
+    return cameraPagePath(sessionId, site);
+  }, [sessionId]);
 
   const codeUrl = useMemo(() => {
     if (!sessionId) return "/reception/kiss-cam/camera";

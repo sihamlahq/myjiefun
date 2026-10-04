@@ -118,11 +118,13 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [switchingPhone, setSwitchingPhone] = useState(false);
   const coupleVideoObjectUrl = useRef<string | null>(null);
   const connRef = useRef<KissCamConnection | null>(null);
+  const pairingCodeRef = useRef<string | null>(null);
   const rafRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const creatingSession = useRef(false);
   const startAnimationRef = useRef<(mode: "running" | "preview") => void>(() => undefined);
   const resetAnimationRef = useRef<() => void>(() => undefined);
+  const toggleFullscreenRef = useRef<() => void>(() => undefined);
   const remoteCountdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const musicFileInputRef = useRef<HTMLInputElement | null>(null);
   const coupleVideoInputRef = useRef<HTMLInputElement | null>(null);
@@ -130,6 +132,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const music = useKissCamMusic();
   const musicPlayRef = useRef(music.play);
   musicPlayRef.current = music.play;
+  pairingCodeRef.current = state.shortCode;
 
   const tagline =
     weddingTitle && weddingTitle.trim() && weddingTitle !== coupleNames
@@ -356,6 +359,24 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
               remoteCountdownTimerRef.current = null;
             }, 1200);
           }
+          // Mobile remote Fullscreen must drive the LED wall — never the phone browser.
+          if (
+            action === "fullscreen-toggle" ||
+            action === "fullscreen-on" ||
+            action === "fullscreen-off"
+          ) {
+            const root = document.getElementById("kiss-cam-root");
+            const isFs = Boolean(document.fullscreenElement);
+            if (action === "fullscreen-on" && !isFs) {
+              void root?.requestFullscreen?.().catch(() => undefined);
+              setState((s) => ({ ...s, fullscreen: true }));
+            } else if (action === "fullscreen-off" && isFs) {
+              void document.exitFullscreen?.().catch(() => undefined);
+              setState((s) => ({ ...s, fullscreen: false }));
+            } else if (action === "fullscreen-toggle") {
+              toggleFullscreenRef.current();
+            }
+          }
         },
         onError: (message) => {
           if (!cancelled) {
@@ -365,7 +386,9 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         },
       });
       connRef.current = conn;
+      conn.setPairingInfo(pairingCodeRef.current);
       await conn.connect();
+      await conn.broadcastSessionInfo();
     };
 
     void run();
@@ -380,6 +403,13 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       connRef.current = null;
     };
   }, [state.sessionId]);
+
+  // Keep remotes mirrored when the LED pairing code is restored / refreshed.
+  useEffect(() => {
+    if (!state.sessionId || !state.shortCode || !connRef.current?.alive) return;
+    connRef.current.setPairingInfo(state.shortCode);
+    void connRef.current.broadcastSessionInfo();
+  }, [state.sessionId, state.shortCode]);
 
   const startAnimation = useCallback((mode: "running" | "preview") => {
     startedAtRef.current = performance.now();
@@ -405,9 +435,6 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       countdownValue: null,
     }));
   }, []);
-
-  startAnimationRef.current = startAnimation;
-  resetAnimationRef.current = resetAnimation;
 
   // Animation clock — decoupled from camera
   useEffect(() => {
@@ -460,6 +487,12 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
       setState((s) => ({ ...s, fullscreen: false }));
     }
   }, []);
+
+  startAnimationRef.current = startAnimation;
+  resetAnimationRef.current = resetAnimation;
+  toggleFullscreenRef.current = () => {
+    void toggleFullscreen();
+  };
 
   useEffect(() => {
     const onFs = () => setState((s) => ({ ...s, fullscreen: Boolean(document.fullscreenElement) }));

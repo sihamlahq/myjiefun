@@ -22,7 +22,10 @@ export type KissCamControlAction =
   | "loading-off"
   | "countdown-1"
   | "countdown-2"
-  | "countdown-3";
+  | "countdown-3"
+  | "fullscreen-on"
+  | "fullscreen-off"
+  | "fullscreen-toggle";
 
 type ClientRole = "display" | "camera" | "remote";
 
@@ -47,6 +50,8 @@ type SignalMessage = SignalEnvelope &
     | { type: "promote"; clientId: string }
     /** Mobile remote asks the LED to switch the live camera. */
     | { type: "remote-promote"; clientId: string }
+    /** LED tells remotes the active pairing QR (id + short code). */
+    | { type: "session-info"; sessionId: string; shortCode: string }
     | { type: "roster"; cameras: Array<{ clientId: string; label: string; publishing: boolean }> }
     | { type: "offer"; sdp: RTCSessionDescriptionInit }
     | { type: "answer"; sdp: RTCSessionDescriptionInit }
@@ -75,6 +80,8 @@ type Handlers = {
   onRoster?: (cameras: KissCamCameraPeer[], publisherId: string | null) => void;
   /** Phone: LED asked this device to become the live camera. */
   onPromote?: () => void;
+  /** Remote: LED pairing QR metadata so mobile shows the same code. */
+  onSessionInfo?: (info: { sessionId: string; shortCode: string }) => void;
 };
 
 function createClientId() {
@@ -127,6 +134,8 @@ export class KissCamConnection {
   private publisherWaiters: Array<(id: string | null) => void> = [];
   /** Display roster of camera phones still on signaling. */
   private cameras = new Map<string, { label: string; publishing: boolean; lastBeat: number }>();
+  /** LED pairing short code — remotes mirror this so mobile QR matches desktop. */
+  private pairingShortCode: string | null = null;
   private phoneLabel =
     typeof navigator !== "undefined"
       ? `Phone ${(navigator.userAgent.match(/iPhone|Android|Mobile/i)?.[0] ?? "Cam").slice(0, 8)}-${this.clientId.slice(0, 4)}`
@@ -389,6 +398,20 @@ export class KissCamConnection {
     if (this.role !== "display") return;
     await this.setPublisher(clientId);
     await this.send({ type: "promote", clientId });
+  }
+
+  /** LED: publish the active pairing code so mobile remotes show the same QR. */
+  setPairingInfo(shortCode: string | null) {
+    this.pairingShortCode = shortCode ? shortCode.trim().toUpperCase() : null;
+  }
+
+  async broadcastSessionInfo() {
+    if (this.role !== "display" || this.disposed || !this.pairingShortCode) return;
+    await this.send({
+      type: "session-info",
+      sessionId: this.sessionId,
+      shortCode: this.pairingShortCode,
+    });
   }
 
   async attachLocalStream(stream: MediaStream) {
@@ -675,6 +698,7 @@ export class KissCamConnection {
         await this.send({ type: "publisher", clientId: this.publisherId });
         if (message.role === "remote") {
           await this.broadcastRoster();
+          await this.broadcastSessionInfo();
         }
       }
       // Realtime often re-hellos after a brief channel blip. Re-offering while
@@ -723,6 +747,14 @@ export class KissCamConnection {
 
     if (message.type === "remote-promote" && this.role === "display") {
       await this.promoteCamera(message.clientId);
+      return;
+    }
+
+    if (message.type === "session-info" && this.role === "remote") {
+      this.handlers.onSessionInfo?.({
+        sessionId: message.sessionId,
+        shortCode: message.shortCode,
+      });
       return;
     }
 
