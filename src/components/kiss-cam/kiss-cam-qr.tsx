@@ -98,12 +98,8 @@ export function KissCamQRCode({
         </Button>
       ) : null}
       <p className="text-center text-[11px] leading-snug text-[var(--foreground)]/50">
-<<<<<<< HEAD
         {footnote ??
-          "First free phone goes live. Extra phones stay connected in standby — switch from the LED."}
-=======
-        QR stays the same until you refresh. First free phone goes live; extras stay in standby.
->>>>>>> origin/main
+          "QR stays the same until you refresh. First free phone goes live; extras stay in standby."}
       </p>
     </div>
   );
