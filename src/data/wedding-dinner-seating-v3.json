@@ -1,6 +1,6 @@
 {
   "version": "wedding-dinner-table-v3",
-  "notes": "Repeat count = pax. Table 3A→4, 13A→14. 李永江夫妇=2.",
+  "notes": "Repeat count = pax. Table 3A→4, 13A→14. PDF seat 10 on table 4 (3A) open — 李永江夫妇=1.",
   "tables": [
     {
       "table_number": "VIP",
@@ -190,11 +190,11 @@
         {
           "name": "李永江夫妇",
           "name_zh": "李永江夫妇",
-          "expected_count": 2,
+          "expected_count": 1,
           "is_vip": false
         }
       ],
-      "open_seats": 0
+      "open_seats": 1
     },
     {
       "table_number": "5",

@@ -1437,13 +1437,13 @@ begin
     ) values (
       'G-' || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 8)),
       '李永江夫妇', '李永江夫妇', '', '', '',
-      'confirmed'::public.rsvp_status, 2, 'not_arrived'::public.attendance_status, v_table_id, null,
+      'confirmed'::public.rsvp_status, 1, 'not_arrived'::public.attendance_status, v_table_id, null,
       false, false, '', '', 'wedding-dinner-v3', 'Imported from Wedding dinner table V3', '{}'::jsonb
     );
   else
     update public.guests set
       name_zh = case when '李永江夫妇' <> '' then '李永江夫妇' else name_zh end,
-      expected_count = 2,
+      expected_count = 1,
       rsvp_status = 'confirmed'::public.rsvp_status,
       table_id = v_table_id,
       is_vip = false,
