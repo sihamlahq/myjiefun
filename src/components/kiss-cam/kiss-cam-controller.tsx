@@ -104,6 +104,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const [error, setError] = useState<string | null>(null);
   const [loveBurst, setLoveBurst] = useState(false);
   const [loadingScreen, setLoadingScreen] = useState(false);
+  const [playRequestId, setPlayRequestId] = useState(0);
   const [remoteCountdown, setRemoteCountdown] = useState<1 | 2 | 3 | null>(null);
   const [remoteCountdownTick, setRemoteCountdownTick] = useState(0);
   const [sessionRefreshing, setSessionRefreshing] = useState(false);
@@ -125,6 +126,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
   const creatingSession = useRef(false);
   const startAnimationRef = useRef<(mode: "running" | "preview") => void>(() => undefined);
   const resetAnimationRef = useRef<() => void>(() => undefined);
+  const playCoupleVideoRef = useRef<() => void>(() => undefined);
   const toggleFullscreenRef = useRef<() => void>(() => undefined);
   const remoteCountdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const musicFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -330,7 +332,8 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
         },
         onControl: (action) => {
           if (cancelled) return;
-          if (action === "start") startAnimationRef.current("running");
+          // Start Kiss Cam plays the designed couple video on the LED (not the old animation).
+          if (action === "start") playCoupleVideoRef.current();
           if (action === "preview") startAnimationRef.current("preview");
           if (action === "reset") resetAnimationRef.current();
           if (action === "love") {
@@ -424,6 +427,13 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
     void musicPlayRef.current();
   }, []);
 
+  /** Start Kiss Cam → play / replay the designed couple mp4 on the LED stage. */
+  const playCoupleVideo = useCallback(() => {
+    setLoadingScreen(false);
+    setPlayRequestId((n) => n + 1);
+    void musicPlayRef.current();
+  }, []);
+
   const resetAnimation = useCallback(() => {
     startedAtRef.current = null;
     cancelAnimationFrame(rafRef.current);
@@ -491,6 +501,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
 
   startAnimationRef.current = startAnimation;
   resetAnimationRef.current = resetAnimation;
+  playCoupleVideoRef.current = playCoupleVideo;
   toggleFullscreenRef.current = () => {
     void toggleFullscreen();
   };
@@ -600,6 +611,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
           celebrate={celebrate}
           loveBurst={loveBurst}
           loading={loadingScreen}
+          playRequestId={playRequestId}
           fillViewport
           className="h-full w-full"
         />
@@ -704,7 +716,7 @@ export function KissCamController({ coupleNames, weddingTitle }: KissCamControll
               <Button
                 size="lg"
                 className="h-12 w-full bg-[#c45a78] text-white hover:bg-[#a84864]"
-                onClick={() => startAnimation("running")}
+                onClick={playCoupleVideo}
               >
                 Start Kiss Cam
               </Button>

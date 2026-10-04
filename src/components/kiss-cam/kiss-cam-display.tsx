@@ -35,6 +35,8 @@ type KissCamDisplayProps = {
   celebrate: boolean;
   loveBurst?: boolean;
   loading?: boolean;
+  /** Bump to play / replay the designed couple mp4 (Start Kiss Cam). */
+  playRequestId?: number;
   fillViewport?: boolean;
   className?: string;
 };
@@ -53,6 +55,7 @@ export function KissCamDisplay({
   celebrate,
   loveBurst = false,
   loading = false,
+  playRequestId = 0,
   fillViewport = false,
   className = "",
 }: KissCamDisplayProps) {
@@ -237,6 +240,12 @@ export function KissCamDisplay({
         void video.play().then(() => setCouplePlaying(true)).catch(() => undefined);
       });
   }, []);
+
+  // External Start Kiss Cam / remote "start" → play the designed couple video.
+  useEffect(() => {
+    if (!playRequestId) return;
+    playCoupleVideo();
+  }, [playCoupleVideo, playRequestId]);
 
   const finalFrame = phase === "final" || phase === "celebration";
   const showBigLove = loveBurst || autoLove;
