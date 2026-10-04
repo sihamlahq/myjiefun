@@ -308,26 +308,31 @@ h3,
 
 .kiss-cam-double-love {
   position: relative;
-  /* Flex spacer that centers a true 16:9 heart (never stretch/squash the mask) */
+  /* Use leftover height between header and controls — no empty top/bottom gaps */
   flex: 1 1 0;
   min-height: 0;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   container-type: size;
   aspect-ratio: auto;
 }
 
 .kiss-cam-double-love-plane {
   position: relative;
-  /* Match live-heart-mask.png / love-frame.png (16:9) — contain inside leftover space */
-  width: min(100cqw, calc(100cqh * 16 / 9));
-  max-width: 100%;
-  max-height: 100%;
+  /*
+   * Cover the leftover box while keeping the designed 16:9 aspect.
+   * Fills height on tall phones (crops left/right slightly) so gaps disappear
+   * without stretching/squashing the heart.
+   */
+  width: max(100cqw, calc(100cqh * 16 / 9));
+  height: max(100cqh, calc(100cqw * 9 / 16));
   aspect-ratio: 16 / 9;
-  height: auto;
   flex: 0 0 auto;
+  max-width: none;
+  max-height: none;
 }
 
 .kiss-cam-double-love-media {
