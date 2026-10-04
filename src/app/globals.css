@@ -964,6 +964,10 @@ h3,
   justify-content: center;
   container-type: size;
   pointer-events: none;
+  /* Letterbox matches the designed pink stage (not cream whitespace) */
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 45%, rgba(255, 214, 224, 0.55), transparent 70%),
+    #fff0f3;
 }
 
 .kiss-cam-designed-plane {
