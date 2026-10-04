@@ -1,4 +1,5 @@
 import { PageHeader, SetupCard } from "@/components/page-chrome";
+import { ApplyWeddingSeatingButton } from "@/components/apply-wedding-seating-button";
 import { SeatingBoard } from "@/components/seating-board";
 import { loadGuestsAndTables } from "@/lib/wedding-data";
 
@@ -13,6 +14,7 @@ export default async function SeatingPage() {
         description="On each table, pick guests from the list to seat them. On phone you can also move guests with the table menu."
       />
       {data.setupError ? <SetupCard message={data.setupError} /> : null}
+      <ApplyWeddingSeatingButton />
       <SeatingBoard guests={data.guests} tables={data.tables} />
     </div>
   );

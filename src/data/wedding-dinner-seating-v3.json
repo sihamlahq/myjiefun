@@ -1,0 +1,956 @@
+{
+  "version": "wedding-dinner-table-v3",
+  "notes": "Repeat count = pax. Table 3A→4, 13A→14. 李永江夫妇=2.",
+  "tables": [
+    {
+      "table_number": "VIP",
+      "name": "VIP",
+      "table_type": "vip",
+      "capacity": 12,
+      "sort_order": 0,
+      "parties": [
+        {
+          "name": "Ling Ah Meng",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Soh Soo Yen",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Ling Chia Jun",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Ling Chia Wee",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Ling May Loong",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Ling Mey Seng",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Ah Thye",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Daniel Chin",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Esther Lee",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Lee Yih Chyun",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Chew Yong Kiew",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        },
+        {
+          "name": "Lee Yeep Choon",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": true
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "1",
+      "name": "Table 1",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 1,
+      "parties": [
+        {
+          "name": "李业坚",
+          "name_zh": "李业坚",
+          "expected_count": 6,
+          "is_vip": false
+        },
+        {
+          "name": "Lee Tai",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Pot Lee",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "2",
+      "name": "Table 2",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 2,
+      "parties": [
+        {
+          "name": "李彩玲",
+          "name_zh": "李彩玲",
+          "expected_count": 8,
+          "is_vip": false
+        },
+        {
+          "name": "Wen Ley & Yih Tyng",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "3",
+      "name": "Table 3",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 3,
+      "parties": [
+        {
+          "name": "李永平",
+          "name_zh": "李永平",
+          "expected_count": 7,
+          "is_vip": false
+        },
+        {
+          "name": "李云仙",
+          "name_zh": "李云仙",
+          "expected_count": 3,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "4",
+      "name": "Table 4 (was 3A)",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 4,
+      "parties": [
+        {
+          "name": "李永和夫妇",
+          "name_zh": "李永和夫妇",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "李彩风夫妇",
+          "name_zh": "李彩风夫妇",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "李永龙夫妇",
+          "name_zh": "李永龙夫妇",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "李永成夫妇",
+          "name_zh": "李永成夫妇",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "李永江夫妇",
+          "name_zh": "李永江夫妇",
+          "expected_count": 2,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "5",
+      "name": "Table 5",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 5,
+      "parties": [
+        {
+          "name": "Victor Chew & Yih Shyan's Family",
+          "name_zh": "",
+          "expected_count": 9,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 1
+    },
+    {
+      "table_number": "6",
+      "name": "Table 6",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 6,
+      "parties": [
+        {
+          "name": "Yap Yong Han",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Agnes Lee",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "康宏宇",
+          "name_zh": "康宏宇",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Eric Thong",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Lim Eng Sing",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "许颂夫妇",
+          "name_zh": "许颂夫妇",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Naa At Baan",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Chin KH秦閣宏",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "CHENG LONG",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "7",
+      "name": "Table 7",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 7,
+      "parties": [
+        {
+          "name": "Emily Tee 郑慧琪合家",
+          "name_zh": "",
+          "expected_count": 3,
+          "is_vip": false
+        },
+        {
+          "name": "Liew De Lung夫妇",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Vicky Tan 陈慧雯",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Joy Lee 李柔彬",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Loh Jia Yi",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Gan Kian Man",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Wendy (Tai Yaan Baby Land)",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "8",
+      "name": "Table 8",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 8,
+      "parties": [
+        {
+          "name": "Lee Ee Ping 李玉萍",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Wong Jing Mun 黄靖雯",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Choo Siet Ding 朱雪婷",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Piong Choon Tein 房春婷",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Wong Xiao Pin 筱嫔",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Cindy Tan夫妇",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Lee Sheng Yong李生勇",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Chong Yen San 庄雁善",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Simie (Tai Yaan Baby Land)",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "9",
+      "name": "Table 9",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 9,
+      "parties": [
+        {
+          "name": "大姑Family",
+          "name_zh": "",
+          "expected_count": 7,
+          "is_vip": false
+        },
+        {
+          "name": "Ah Yoke",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Mei Choo",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 1
+    },
+    {
+      "table_number": "10",
+      "name": "Table 10",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 10,
+      "parties": [
+        {
+          "name": "Yap Kok Seong (表哥)",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "郭雅丽 （四舅母）",
+          "name_zh": "郭雅丽 （四舅母）",
+          "expected_count": 6,
+          "is_vip": false
+        },
+        {
+          "name": "苏素雪 （二姨）",
+          "name_zh": "苏素雪 （二姨）",
+          "expected_count": 2,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "11",
+      "name": "Table 11",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 11,
+      "parties": [
+        {
+          "name": "苏伟杰Wei Kit （表哥）",
+          "name_zh": "",
+          "expected_count": 6,
+          "is_vip": false
+        },
+        {
+          "name": "蘇碧玲 (表姐）",
+          "name_zh": "蘇碧玲 (表姐）",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "苏进森 （五舅）",
+          "name_zh": "苏进森 （五舅）",
+          "expected_count": 2,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "12",
+      "name": "Table 12",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 12,
+      "parties": [
+        {
+          "name": "苏伟武Wei Bu （表哥）",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "苏伟安Wei An （表哥）",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Soh Wai Kong 蘇偉光",
+          "name_zh": "",
+          "expected_count": 3,
+          "is_vip": false
+        },
+        {
+          "name": "Soh Mei Yin 蘇美螢 （表姐）",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Soh Wai Tuck 苏伟德 （表哥）",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "13",
+      "name": "Table 13",
+      "table_type": "normal",
+      "capacity": 11,
+      "sort_order": 13,
+      "parties": [
+        {
+          "name": "Anni Leong 梁艾莉",
+          "name_zh": "",
+          "expected_count": 3,
+          "is_vip": false
+        },
+        {
+          "name": "Marie Lim 林静婷",
+          "name_zh": "",
+          "expected_count": 3,
+          "is_vip": false
+        },
+        {
+          "name": "Kishar Wong",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "冰妹",
+          "name_zh": "冰妹",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Lynn Low 刘美伶",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Fifi 古翠欣",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "阿赖/ 黎慧仪",
+          "name_zh": "阿赖/ 黎慧仪",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "14",
+      "name": "Table 14 (was 13A)",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 14,
+      "parties": [
+        {
+          "name": "Wong Xiao Hui 黄晓慧夫妇",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Wong Xiao Ying",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Winky 马咏琪",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Ma Hin Mun 马庆敏",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Lee Chun Hung 李俊宏",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Alex Lee Jau Shing 李昭信",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Qiu Jie Ying",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Ning Fung",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Candy Loke Hui Teng",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "15",
+      "name": "Table 15",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 15,
+      "parties": [
+        {
+          "name": "Mey Loong Family",
+          "name_zh": "",
+          "expected_count": 5,
+          "is_vip": false
+        },
+        {
+          "name": "Mey Seng Family",
+          "name_zh": "",
+          "expected_count": 5,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "16",
+      "name": "Table 16",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 16,
+      "parties": [
+        {
+          "name": "Jacky Soh",
+          "name_zh": "",
+          "expected_count": 3,
+          "is_vip": false
+        },
+        {
+          "name": "宋友誠合家 （五姨丈）",
+          "name_zh": "宋友誠合家 （五姨丈）",
+          "expected_count": 4,
+          "is_vip": false
+        },
+        {
+          "name": "Shelly & 张展耀 （表姐）",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Lucy (Rose) （表姐）",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "17",
+      "name": "Table 17",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 17,
+      "parties": [
+        {
+          "name": "Yee Ping Family",
+          "name_zh": "",
+          "expected_count": 6,
+          "is_vip": false
+        },
+        {
+          "name": "Foong 姑Family",
+          "name_zh": "",
+          "expected_count": 4,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "18",
+      "name": "Table 18",
+      "table_type": "family",
+      "capacity": 10,
+      "sort_order": 18,
+      "parties": [
+        {
+          "name": "Yee Wen Family",
+          "name_zh": "",
+          "expected_count": 9,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 1
+    },
+    {
+      "table_number": "19",
+      "name": "Table 19",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 19,
+      "parties": [
+        {
+          "name": "Ah Fu 李宜富",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "农汶毅夫妇",
+          "name_zh": "农汶毅夫妇",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "陈联顺",
+          "name_zh": "陈联顺",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Robson Sooi 徐德权夫妇",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Wong Kal Man 黄家铭",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Steven",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "李奇",
+          "name_zh": "李奇",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Jing Yit 方靖毓",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "20",
+      "name": "Table 20",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 20,
+      "parties": [
+        {
+          "name": "Law Weng Ki 刘永齐 &Vonn",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "QING YANG",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Yap Jing Bing夫妇",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Jojo Tan 川洲",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Phat",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Phon",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Aaric Lai 业苈",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Lim Kim Tat 林欽逹",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "21",
+      "name": "Table 21",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 21,
+      "parties": [
+        {
+          "name": "黄荟秦 & 刘家僥合家",
+          "name_zh": "",
+          "expected_count": 3,
+          "is_vip": false
+        },
+        {
+          "name": "Lim Chan Tong 林镇东",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Joe Lee 李耀祖",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Wenart/ Tony夫妇",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Li Chin",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Chea Cheng (Chocolate)",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Lim Chun Tat 林俊达",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    },
+    {
+      "table_number": "22",
+      "name": "Table 22",
+      "table_type": "normal",
+      "capacity": 10,
+      "sort_order": 22,
+      "parties": [
+        {
+          "name": "Danny Lim 林道俊",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Sharly Chin陈慧玲",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Keong",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Eric Lim Kuok Yuan",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Mervin Wong",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Wen Zi 陈文欣/ 颜志伟",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        },
+        {
+          "name": "Chui Chui 陈翠翠",
+          "name_zh": "",
+          "expected_count": 1,
+          "is_vip": false
+        },
+        {
+          "name": "Fung Sheng Yong 冯胜勇",
+          "name_zh": "",
+          "expected_count": 2,
+          "is_vip": false
+        }
+      ],
+      "open_seats": 0
+    }
+  ]
+}

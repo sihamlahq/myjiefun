@@ -245,10 +245,10 @@ export async function importGuests(rows: GuestImportRow[]) {
       continue;
     }
 
-    const expectedCount = Number(raw.expected_count || 1);
+      const expectedCount = Number(raw.expected_count || 1);
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         name_en: repairMojibakeText(name),
         name_zh: repairMojibakeText(
           (raw.name_zh || raw.chinese_name || raw.name_chinese || "").trim(),
@@ -258,6 +258,22 @@ export async function importGuests(rows: GuestImportRow[]) {
         relationship: raw.relationship ?? "",
         category: raw.category ?? "",
       };
+
+      if (String(raw.is_vip || "").toLowerCase() === "true") {
+        payload.is_vip = true;
+      }
+
+      const tableNumber = (raw.table || raw.table_number || raw.table_no || "").trim();
+      let tableId: string | null = null;
+      if (tableNumber) {
+        const { data: tableRow } = await supabase
+          .from("reception_tables")
+          .select("id")
+          .eq("table_number", tableNumber)
+          .maybeSingle();
+        tableId = tableRow?.id ?? null;
+        if (tableId) payload.table_id = tableId;
+      }
 
       const { data: existingRows } = await supabase
         .from("guests")
@@ -282,7 +298,7 @@ export async function importGuests(rows: GuestImportRow[]) {
           phone: "",
           email: "",
           attendance_status: "not_arrived",
-          is_vip: false,
+          is_vip: Boolean(payload.is_vip),
           is_walk_in: false,
           dietary: "",
           notes: "",
@@ -523,7 +539,7 @@ export async function assignGuestToTable(opts: {
   const { supabase, user } = await requireUser();
 
   if (opts.tableId) {
-    const [{ data: settings }, { data: table }, { count }] = await Promise.all([
+    const [{ data: settings }, { data: table }, { data: seatedGuests }] = await Promise.all([
       supabase
         .from("app_settings")
         .select("value")
@@ -536,7 +552,7 @@ export async function assignGuestToTable(opts: {
         .single(),
       supabase
         .from("guests")
-        .select("id", { count: "exact", head: true })
+        .select("id, expected_count")
         .eq("table_id", opts.tableId)
         .neq("id", opts.guestId),
     ]);
@@ -547,7 +563,16 @@ export async function assignGuestToTable(opts: {
       (settings?.value as { allowOvercapacity?: boolean } | null)?.allowOvercapacity ??
       false;
 
-    if (!allowOver && (count ?? 0) >= table.capacity) {
+    const { data: moving } = await supabase
+      .from("guests")
+      .select("expected_count")
+      .eq("id", opts.guestId)
+      .maybeSingle();
+    const nextHeadcount =
+      (seatedGuests ?? []).reduce((sum, g) => sum + (Number(g.expected_count) || 1), 0) +
+      (Number(moving?.expected_count) || 1);
+
+    if (!allowOver && nextHeadcount > table.capacity) {
       throw new Error("Table is at capacity. Enable overcapacity in Settings or add a seat.");
     }
   }
@@ -922,4 +947,32 @@ export async function updateRedPacketPasscode(nextPasscode: string, currentPassc
   });
   revalidatePath("/red-packet");
   return value;
+}
+
+/** Apply Wedding dinner table V3: upsert tables + party guests (repeat count = pax). */
+export async function applyWeddingDinnerSeatingV3() {
+  const { supabase, user } = await requireUser();
+  const { applyWeddingDinnerSeatingV3Plan } = await import("@/lib/wedding-seating-v3");
+  const result = await applyWeddingDinnerSeatingV3Plan(supabase);
+
+  await writeAudit(supabase, {
+    action: "guest_import",
+    entity_type: "guest",
+    staff_id: user.id,
+    meta: {
+      source: "wedding-dinner-table-v3",
+      ...result,
+    },
+  });
+
+  revalidatePath("/guests");
+  revalidatePath("/seating");
+  revalidatePath("/tables");
+  revalidatePath("/floor-plan");
+  revalidatePath("/dashboard");
+  revalidatePath("/check-in");
+  revalidatePath("/reception");
+  revalidatePath("/reports");
+
+  return result;
 }
