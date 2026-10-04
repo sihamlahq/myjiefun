@@ -7,8 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 /**
- * Mobile remote control for Kiss Cam — right-panel controls only.
- * Does not replace /reception/kiss-cam (LED stage stays as-is).
+ * Mobile remote — controls the desktop LED Kiss Cam website only.
+ * Signaling/control panel; never hosts the stage or local fullscreen.
  */
 export default async function KissCamRemotePage() {
   let user = null;
