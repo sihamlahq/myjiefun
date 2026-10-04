@@ -234,8 +234,9 @@ export function KissCamRemote({ coupleNames }: { coupleNames: string }) {
           </p>
           <h1 className="kiss-cam-love-title mt-1 text-[2.2rem] leading-none">LED Remote</h1>
           <p className="mt-2 text-sm text-[#f7f1e8]/70">
-            This phone only controls the desktop Kiss Cam LED. Enter the short code from the LED
-            panel (or open <span className="font-semibold">Open mobile remote</span> from the LED).
+            This phone only controls the desktop Kiss Cam LED. Scan{" "}
+            <span className="font-semibold">Scan for LED remote</span> on the laptop panel, or enter
+            the short code shown next to the camera QR.
           </p>
         </header>
         <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ffc9d4]/85">
