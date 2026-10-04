@@ -1,0 +1,121 @@
+﻿name,name_zh,expected_count,table,category,relationship,rsvp_status,is_vip
+"Ling Ah Meng","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Soh Soo Yen","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Ling Chia Jun","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Ling Chia Wee","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Ling May Loong","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Ling Mey Seng","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Ah Thye","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Daniel Chin","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Esther Lee","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Lee Yih Chyun","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Chew Yong Kiew","",1,VIP,wedding-dinner-v3,,confirmed,true
+"Lee Yeep Choon","",1,VIP,wedding-dinner-v3,,confirmed,true
+"李业坚","李业坚",6,1,wedding-dinner-v3,,confirmed,false
+"Lee Tai","",2,1,wedding-dinner-v3,,confirmed,false
+"Pot Lee","",2,1,wedding-dinner-v3,,confirmed,false
+"李彩玲","李彩玲",8,2,wedding-dinner-v3,,confirmed,false
+"Wen Ley & Yih Tyng","",2,2,wedding-dinner-v3,,confirmed,false
+"李永平","李永平",7,3,wedding-dinner-v3,,confirmed,false
+"李云仙","李云仙",3,3,wedding-dinner-v3,,confirmed,false
+"李永和夫妇","李永和夫妇",2,4,wedding-dinner-v3,,confirmed,false
+"李彩风夫妇","李彩风夫妇",2,4,wedding-dinner-v3,,confirmed,false
+"李永龙夫妇","李永龙夫妇",2,4,wedding-dinner-v3,,confirmed,false
+"李永成夫妇","李永成夫妇",2,4,wedding-dinner-v3,,confirmed,false
+"李永江夫妇","李永江夫妇",2,4,wedding-dinner-v3,,confirmed,false
+"Victor Chew & Yih Shyan's Family","",9,5,wedding-dinner-v3,,confirmed,false
+"Yap Yong Han","",1,6,wedding-dinner-v3,,confirmed,false
+"Agnes Lee","",1,6,wedding-dinner-v3,,confirmed,false
+"康宏宇","康宏宇",1,6,wedding-dinner-v3,,confirmed,false
+"Eric Thong","",1,6,wedding-dinner-v3,,confirmed,false
+"Lim Eng Sing","",1,6,wedding-dinner-v3,,confirmed,false
+"许颂夫妇","许颂夫妇",2,6,wedding-dinner-v3,,confirmed,false
+"Naa At Baan","",1,6,wedding-dinner-v3,,confirmed,false
+"Chin KH秦閣宏","",1,6,wedding-dinner-v3,,confirmed,false
+"CHENG LONG","",1,6,wedding-dinner-v3,,confirmed,false
+"Emily Tee 郑慧琪合家","",3,7,wedding-dinner-v3,,confirmed,false
+"Liew De Lung夫妇","",2,7,wedding-dinner-v3,,confirmed,false
+"Vicky Tan 陈慧雯","",1,7,wedding-dinner-v3,,confirmed,false
+"Joy Lee 李柔彬","",1,7,wedding-dinner-v3,,confirmed,false
+"Loh Jia Yi","",1,7,wedding-dinner-v3,,confirmed,false
+"Gan Kian Man","",1,7,wedding-dinner-v3,,confirmed,false
+"Wendy (Tai Yaan Baby Land)","",1,7,wedding-dinner-v3,,confirmed,false
+"Lee Ee Ping 李玉萍","",1,8,wedding-dinner-v3,,confirmed,false
+"Wong Jing Mun 黄靖雯","",1,8,wedding-dinner-v3,,confirmed,false
+"Choo Siet Ding 朱雪婷","",1,8,wedding-dinner-v3,,confirmed,false
+"Piong Choon Tein 房春婷","",1,8,wedding-dinner-v3,,confirmed,false
+"Wong Xiao Pin 筱嫔","",1,8,wedding-dinner-v3,,confirmed,false
+"Cindy Tan夫妇","",2,8,wedding-dinner-v3,,confirmed,false
+"Lee Sheng Yong李生勇","",1,8,wedding-dinner-v3,,confirmed,false
+"Chong Yen San 庄雁善","",1,8,wedding-dinner-v3,,confirmed,false
+"Simie (Tai Yaan Baby Land)","",1,8,wedding-dinner-v3,,confirmed,false
+"大姑Family","",7,9,wedding-dinner-v3,,confirmed,false
+"Ah Yoke","",1,9,wedding-dinner-v3,,confirmed,false
+"Mei Choo","",1,9,wedding-dinner-v3,,confirmed,false
+"Yap Kok Seong (表哥)","",2,10,wedding-dinner-v3,,confirmed,false
+"郭雅丽 （四舅母）","郭雅丽 （四舅母）",6,10,wedding-dinner-v3,,confirmed,false
+"苏素雪 （二姨）","苏素雪 （二姨）",2,10,wedding-dinner-v3,,confirmed,false
+"苏伟杰Wei Kit （表哥）","",6,11,wedding-dinner-v3,,confirmed,false
+"蘇碧玲 (表姐）","蘇碧玲 (表姐）",2,11,wedding-dinner-v3,,confirmed,false
+"苏进森 （五舅）","苏进森 （五舅）",2,11,wedding-dinner-v3,,confirmed,false
+"苏伟武Wei Bu （表哥）","",2,12,wedding-dinner-v3,,confirmed,false
+"苏伟安Wei An （表哥）","",1,12,wedding-dinner-v3,,confirmed,false
+"Soh Wai Kong 蘇偉光","",3,12,wedding-dinner-v3,,confirmed,false
+"Soh Mei Yin 蘇美螢 （表姐）","",2,12,wedding-dinner-v3,,confirmed,false
+"Soh Wai Tuck 苏伟德 （表哥）","",2,12,wedding-dinner-v3,,confirmed,false
+"Anni Leong 梁艾莉","",3,13,wedding-dinner-v3,,confirmed,false
+"Marie Lim 林静婷","",3,13,wedding-dinner-v3,,confirmed,false
+"Kishar Wong","",1,13,wedding-dinner-v3,,confirmed,false
+"冰妹","冰妹",1,13,wedding-dinner-v3,,confirmed,false
+"Lynn Low 刘美伶","",1,13,wedding-dinner-v3,,confirmed,false
+"Fifi 古翠欣","",1,13,wedding-dinner-v3,,confirmed,false
+"阿赖/ 黎慧仪","阿赖/ 黎慧仪",1,13,wedding-dinner-v3,,confirmed,false
+"Wong Xiao Hui 黄晓慧夫妇","",2,14,wedding-dinner-v3,,confirmed,false
+"Wong Xiao Ying","",1,14,wedding-dinner-v3,,confirmed,false
+"Winky 马咏琪","",1,14,wedding-dinner-v3,,confirmed,false
+"Ma Hin Mun 马庆敏","",1,14,wedding-dinner-v3,,confirmed,false
+"Lee Chun Hung 李俊宏","",1,14,wedding-dinner-v3,,confirmed,false
+"Alex Lee Jau Shing 李昭信","",1,14,wedding-dinner-v3,,confirmed,false
+"Qiu Jie Ying","",1,14,wedding-dinner-v3,,confirmed,false
+"Ning Fung","",1,14,wedding-dinner-v3,,confirmed,false
+"Candy Loke Hui Teng","",1,14,wedding-dinner-v3,,confirmed,false
+"Mey Loong Family","",5,15,wedding-dinner-v3,,confirmed,false
+"Mey Seng Family","",5,15,wedding-dinner-v3,,confirmed,false
+"Jacky Soh","",3,16,wedding-dinner-v3,,confirmed,false
+"宋友誠合家 （五姨丈）","宋友誠合家 （五姨丈）",4,16,wedding-dinner-v3,,confirmed,false
+"Shelly & 张展耀 （表姐）","",2,16,wedding-dinner-v3,,confirmed,false
+"Lucy (Rose) （表姐）","",1,16,wedding-dinner-v3,,confirmed,false
+"Yee Ping Family","",6,17,wedding-dinner-v3,,confirmed,false
+"Foong 姑Family","",4,17,wedding-dinner-v3,,confirmed,false
+"Yee Wen Family","",9,18,wedding-dinner-v3,,confirmed,false
+"Ah Fu 李宜富","",1,19,wedding-dinner-v3,,confirmed,false
+"农汶毅夫妇","农汶毅夫妇",2,19,wedding-dinner-v3,,confirmed,false
+"陈联顺","陈联顺",1,19,wedding-dinner-v3,,confirmed,false
+"Robson Sooi 徐德权夫妇","",2,19,wedding-dinner-v3,,confirmed,false
+"Wong Kal Man 黄家铭","",1,19,wedding-dinner-v3,,confirmed,false
+"Steven","",1,19,wedding-dinner-v3,,confirmed,false
+"李奇","李奇",1,19,wedding-dinner-v3,,confirmed,false
+"Jing Yit 方靖毓","",1,19,wedding-dinner-v3,,confirmed,false
+"Law Weng Ki 刘永齐 &Vonn","",2,20,wedding-dinner-v3,,confirmed,false
+"QING YANG","",1,20,wedding-dinner-v3,,confirmed,false
+"Yap Jing Bing夫妇","",2,20,wedding-dinner-v3,,confirmed,false
+"Jojo Tan 川洲","",1,20,wedding-dinner-v3,,confirmed,false
+"Phat","",1,20,wedding-dinner-v3,,confirmed,false
+"Phon","",1,20,wedding-dinner-v3,,confirmed,false
+"Aaric Lai 业苈","",1,20,wedding-dinner-v3,,confirmed,false
+"Lim Kim Tat 林欽逹","",1,20,wedding-dinner-v3,,confirmed,false
+"黄荟秦 & 刘家僥合家","",3,21,wedding-dinner-v3,,confirmed,false
+"Lim Chan Tong 林镇东","",1,21,wedding-dinner-v3,,confirmed,false
+"Joe Lee 李耀祖","",1,21,wedding-dinner-v3,,confirmed,false
+"Wenart/ Tony夫妇","",2,21,wedding-dinner-v3,,confirmed,false
+"Li Chin","",1,21,wedding-dinner-v3,,confirmed,false
+"Chea Cheng (Chocolate)","",1,21,wedding-dinner-v3,,confirmed,false
+"Lim Chun Tat 林俊达","",1,21,wedding-dinner-v3,,confirmed,false
+"Danny Lim 林道俊","",1,22,wedding-dinner-v3,,confirmed,false
+"Sharly Chin陈慧玲","",1,22,wedding-dinner-v3,,confirmed,false
+"Keong","",1,22,wedding-dinner-v3,,confirmed,false
+"Eric Lim Kuok Yuan","",1,22,wedding-dinner-v3,,confirmed,false
+"Mervin Wong","",1,22,wedding-dinner-v3,,confirmed,false
+"Wen Zi 陈文欣/ 颜志伟","",2,22,wedding-dinner-v3,,confirmed,false
+"Chui Chui 陈翠翠","",1,22,wedding-dinner-v3,,confirmed,false
+"Fung Sheng Yong 冯胜勇","",2,22,wedding-dinner-v3,,confirmed,false

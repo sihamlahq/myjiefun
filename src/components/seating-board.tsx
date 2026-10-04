@@ -264,7 +264,7 @@ function TableSelect({
         </option>
         {currentTableId ? <option value="__unassigned__">Unassigned</option> : null}
         {tables.map((table) => {
-          const seated = guestsByTable.get(table.id)?.length ?? 0;
+          const seated = sumParty(guestsByTable.get(table.id) ?? []);
           const side = tableSide(table);
           const fullness = seated >= table.capacity ? "full" : `${seated}/${table.capacity}`;
           const current = table.id === currentTableId ? " · current" : "";
