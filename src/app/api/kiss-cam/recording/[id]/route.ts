@@ -29,13 +29,18 @@ async function requireStaffService() {
 
 /**
  * Staff: signed URL to view / download a Kiss Cam recording.
+ * Pass `?download=1` to force Content-Disposition: attachment (needed for cross-origin download).
  */
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { id } = await context.params;
   const recordingId = (id || "").trim();
   if (!recordingId) {
     return NextResponse.json({ error: "Missing recording id" }, { status: 400 });
   }
+
+  const wantDownload =
+    new URL(request.url).searchParams.get("download") === "1" ||
+    new URL(request.url).searchParams.get("download") === "true";
 
   const gated = await requireStaffService();
   if ("error" in gated) return gated.error;
@@ -60,9 +65,16 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
+  const fileName =
+    (row.storage_path as string).split("/").pop() || `kiss-cam-${recordingId}.webm`;
+
   const { data: signed, error: signError } = await supabase.storage
     .from(KISS_CAM_RECORDING_BUCKET)
-    .createSignedUrl(row.storage_path as string, SIGNED_URL_TTL_SEC);
+    .createSignedUrl(
+      row.storage_path as string,
+      SIGNED_URL_TTL_SEC,
+      wantDownload ? { download: fileName } : undefined,
+    );
 
   if (signError || !signed?.signedUrl) {
     return NextResponse.json(
@@ -70,9 +82,6 @@ export async function GET(_request: Request, context: RouteContext) {
       { status: 500 },
     );
   }
-
-  const fileName =
-    (row.storage_path as string).split("/").pop() || `kiss-cam-${recordingId}.webm`;
 
   return NextResponse.json({
     id: row.id,
@@ -82,6 +91,7 @@ export async function GET(_request: Request, context: RouteContext) {
     bytes: row.bytes,
     fileName,
     createdAt: row.created_at,
+    download: wantDownload,
   });
 }
 

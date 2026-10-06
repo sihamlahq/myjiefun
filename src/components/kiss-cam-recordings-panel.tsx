@@ -64,8 +64,9 @@ export function KissCamRecordingsPanel() {
     void load();
   }, [load]);
 
-  async function fetchSigned(id: string) {
-    const res = await fetch(`/api/kiss-cam/recording/${id}`, { cache: "no-store" });
+  async function fetchSigned(id: string, opts?: { download?: boolean }) {
+    const qs = opts?.download ? "?download=1" : "";
+    const res = await fetch(`/api/kiss-cam/recording/${id}${qs}`, { cache: "no-store" });
     const json = (await res.json()) as {
       url?: string;
       fileName?: string;
@@ -97,15 +98,38 @@ export function KissCamRecordingsPanel() {
     setBusyId(id);
     setError(null);
     try {
-      const signed = await fetchSigned(id);
-      const anchor = document.createElement("a");
-      anchor.href = signed.url;
-      anchor.download = signed.fileName;
-      anchor.rel = "noopener";
-      anchor.target = "_blank";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
+      // Cross-origin Supabase URLs ignore <a download>, so fetch as a blob
+      // (same-origin object URL) and/or use a signed URL with attachment disposition.
+      const signed = await fetchSigned(id, { download: true });
+      let objectUrl: string | null = null;
+      try {
+        const fileRes = await fetch(signed.url);
+        if (!fileRes.ok) {
+          throw new Error(`Download failed (${fileRes.status})`);
+        }
+        const blob = await fileRes.blob();
+        objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = signed.fileName;
+        anchor.rel = "noopener";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } catch {
+        // Fallback: open attachment-disposition signed URL (no SPA navigation).
+        const anchor = document.createElement("a");
+        anchor.href = signed.url;
+        anchor.rel = "noopener";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      } finally {
+        if (objectUrl) {
+          // Revoke after the browser has a chance to start the download.
+          window.setTimeout(() => URL.revokeObjectURL(objectUrl!), 60_000);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to download recording");
     } finally {
@@ -228,7 +252,11 @@ export function KissCamRecordingsPanel() {
                       disabled={!ready || busy}
                       onClick={() => void onDownload(item.id)}
                     >
-                      <Download className="h-3.5 w-3.5" />
+                      {busy ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
                       Download
                     </Button>
                     <Button
