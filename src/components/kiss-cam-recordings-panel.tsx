@@ -5,6 +5,11 @@ import { Download, Eye, Loader2, RefreshCw, Trash2, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { KissCamRecordingListItem } from "@/lib/kiss-cam/recording";
+import {
+  isIphonePlayableMime,
+  recordingFileExtension,
+  recordingFormatLabel,
+} from "@/lib/kiss-cam/recording";
 
 function formatBytes(bytes: number | null) {
   if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return "—";
@@ -116,9 +121,7 @@ export function KissCamRecordingsPanel() {
   async function onView(id: string) {
     const item = recordings.find((row) => row.id === id);
     const fallbackName = item
-      ? `kiss-cam-${item.shortCode || id.slice(0, 8)}.${
-          item.mimeType?.includes("mp4") ? "mp4" : "webm"
-        }`
+      ? `kiss-cam-${item.shortCode || id.slice(0, 8)}.${recordingFileExtension(item.mimeType)}`
       : `kiss-cam-${id}.webm`;
 
     revokeObjectUrl();
@@ -222,6 +225,16 @@ export function KissCamRecordingsPanel() {
   }, [viewer?.id, viewer?.url]);
 
   async function onDownload(id: string) {
+    const item = recordings.find((row) => row.id === id);
+    if (item && !isIphonePlayableMime(item.mimeType)) {
+      const ok = confirm(
+        "This clip is WebM (common when recorded from Android/Chrome).\n\n" +
+          "iPhone Photos and Safari cannot play WebM. It will play on Mac/Windows/Android, or after converting to MP4 (e.g. with VLC).\n\n" +
+          "Download anyway?",
+      );
+      if (!ok) return;
+    }
+
     setBusyId(id);
     setError(null);
     try {
@@ -297,7 +310,8 @@ export function KissCamRecordingsPanel() {
           <div>
             <CardTitle>Recorded clips</CardTitle>
             <CardDescription>
-              Auto-saved when a phone goes live. View, download, or delete from here.
+              Auto-saved when a phone goes live. MP4 clips play on iPhone; WebM does not
+              (convert or open on Mac/Android).
             </CardDescription>
           </div>
           <Button
@@ -357,7 +371,20 @@ export function KissCamRecordingsPanel() {
                     </p>
                     <p className="mt-1 text-xs text-black/55">
                       {statusLabel(item.status)} · {formatBytes(item.bytes)}
-                      {item.mimeType ? ` · ${item.mimeType}` : ""}
+                      {item.mimeType ? ` · ${recordingFormatLabel(item.mimeType)}` : ""}
+                      {item.status === "ready" ? (
+                        <span
+                          className={
+                            isIphonePlayableMime(item.mimeType)
+                              ? "ml-2 text-emerald-700"
+                              : "ml-2 text-amber-700"
+                          }
+                        >
+                          {isIphonePlayableMime(item.mimeType)
+                            ? "· iPhone OK"
+                            : "· not for iPhone Photos"}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

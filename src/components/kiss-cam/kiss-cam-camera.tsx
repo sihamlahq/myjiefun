@@ -49,11 +49,15 @@ const RECORD_MAX_MS = 3 * 60 * 1000; // soft cap so typical 720p stays under 50M
 
 function pickRecorderMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
+  // Prefer MP4/H.264 so downloads open in iPhone Photos / Safari.
+  // (Chrome/Android often only support WebM — those clips are labeled in the library.)
   const candidates = [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
+    "video/mp4;codecs=avc1.42E01E",
+    "video/mp4;codecs=avc1.4D401F",
     "video/mp4",
+    "video/webm;codecs=vp8",
+    "video/webm;codecs=vp9",
+    "video/webm",
   ];
   for (const type of candidates) {
     if (MediaRecorder.isTypeSupported(type)) return type;

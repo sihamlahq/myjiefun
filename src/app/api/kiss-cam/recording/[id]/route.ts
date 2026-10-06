@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAuthedDataClient } from "@/lib/supabase/data-client";
 import { createServiceClient } from "@/lib/supabase/service";
-import { KISS_CAM_RECORDING_BUCKET } from "@/lib/kiss-cam/recording";
+import {
+  KISS_CAM_RECORDING_BUCKET,
+  recordingFileExtension,
+} from "@/lib/kiss-cam/recording";
 
 export const dynamic = "force-dynamic";
 
@@ -65,8 +68,12 @@ export async function GET(request: Request, context: RouteContext) {
     );
   }
 
+  const storageName = (row.storage_path as string).split("/").pop() || "";
+  const ext = recordingFileExtension(row.mime_type as string | null);
   const fileName =
-    (row.storage_path as string).split("/").pop() || `kiss-cam-${recordingId}.webm`;
+    storageName && /\.(mp4|webm|mov)$/i.test(storageName)
+      ? storageName
+      : `kiss-cam-${recordingId}.${ext}`;
 
   const { data: signed, error: signError } = await supabase.storage
     .from(KISS_CAM_RECORDING_BUCKET)

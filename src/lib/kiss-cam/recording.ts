@@ -19,3 +19,21 @@ export type KissCamRecordingListItem = {
   status: "pending" | "ready" | "failed";
   createdAt: string;
 };
+
+/** iPhone Photos / Safari play MP4 (H.264) and QuickTime — not WebM/VP8/VP9. */
+export function isIphonePlayableMime(mimeType: string | null | undefined): boolean {
+  const mime = (mimeType || "").toLowerCase();
+  return mime.includes("mp4") || mime.includes("quicktime");
+}
+
+export function recordingFileExtension(mimeType: string | null | undefined): "mp4" | "webm" {
+  return isIphonePlayableMime(mimeType) ? "mp4" : "webm";
+}
+
+export function recordingFormatLabel(mimeType: string | null | undefined): string {
+  const mime = (mimeType || "").toLowerCase();
+  if (mime.includes("mp4")) return "MP4";
+  if (mime.includes("quicktime")) return "MOV";
+  if (mime.includes("webm")) return "WebM";
+  return mimeType || "Unknown";
+}
