@@ -10,6 +10,7 @@ import {
   recordingFileExtension,
   recordingFormatLabel,
 } from "@/lib/kiss-cam/recording";
+import { convertRecordingToIphoneMp4 } from "@/lib/kiss-cam/convert-to-mp4";
 
 function formatBytes(bytes: number | null) {
   if (bytes == null || !Number.isFinite(bytes) || bytes <= 0) return "—";
@@ -226,14 +227,7 @@ export function KissCamRecordingsPanel() {
 
   async function onDownload(id: string) {
     const item = recordings.find((row) => row.id === id);
-    if (item && !isIphonePlayableMime(item.mimeType)) {
-      const ok = confirm(
-        "This clip is WebM (common when recorded from Android/Chrome).\n\n" +
-          "iPhone Photos and Safari cannot play WebM. It will play on Mac/Windows/Android, or after converting to MP4 (e.g. with VLC).\n\n" +
-          "Download anyway?",
-      );
-      if (!ok) return;
-    }
+    const needsConvert = Boolean(item && !isIphonePlayableMime(item.mimeType));
 
     setBusyId(id);
     setError(null);
@@ -247,11 +241,32 @@ export function KissCamRecordingsPanel() {
         if (!fileRes.ok) {
           throw new Error(`Download failed (${fileRes.status})`);
         }
-        const blob = await fileRes.blob();
+        let blob = await fileRes.blob();
+        let fileName = signed.fileName;
+
+        // Convert WebM → MP4/H.264 so the file opens in iPhone Photos.
+        if (needsConvert || !isIphonePlayableMime(blob.type || item?.mimeType)) {
+          const mp4 = await convertRecordingToIphoneMp4(blob);
+          if (mp4) {
+            blob = mp4;
+            fileName = fileName.replace(/\.webm$/i, ".mp4");
+            if (!/\.mp4$/i.test(fileName)) {
+              fileName = `${fileName.replace(/\.[^.]+$/, "") || "kiss-cam"}.mp4`;
+            }
+          } else if (needsConvert) {
+            const ok = confirm(
+              "Could not convert this WebM clip to MP4 in this browser.\n\n" +
+                "iPhone Photos cannot play WebM. Try Download on Chrome/desktop, or convert with VLC.\n\n" +
+                "Save the original WebM anyway?",
+            );
+            if (!ok) return;
+          }
+        }
+
         objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = objectUrl;
-        anchor.download = signed.fileName;
+        anchor.download = fileName;
         anchor.rel = "noopener";
         document.body.appendChild(anchor);
         anchor.click();
@@ -310,8 +325,8 @@ export function KissCamRecordingsPanel() {
           <div>
             <CardTitle>Recorded clips</CardTitle>
             <CardDescription>
-              Auto-saved when a phone goes live. MP4 clips play on iPhone; WebM does not
-              (convert or open on Mac/Android).
+              Auto-saved when a phone goes live. New clips save as MP4 for iPhone Photos when
+              possible; Download converts older WebM clips to MP4 in supported browsers.
             </CardDescription>
           </div>
           <Button
@@ -382,7 +397,7 @@ export function KissCamRecordingsPanel() {
                         >
                           {isIphonePlayableMime(item.mimeType)
                             ? "· iPhone OK"
-                            : "· not for iPhone Photos"}
+                            : "· converts to MP4 on Download"}
                         </span>
                       ) : null}
                     </p>

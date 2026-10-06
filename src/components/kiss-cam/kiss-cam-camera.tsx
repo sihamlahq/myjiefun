@@ -13,6 +13,11 @@ import { KissCamLoveBurst } from "@/components/kiss-cam/kiss-cam-love-burst";
 import { KissCamSignalBars } from "@/components/kiss-cam/kiss-cam-quality";
 import type { ConnectionQuality } from "@/components/kiss-cam/kiss-cam-types";
 import { KISS_CAM_RECORDING_MAX_BYTES } from "@/lib/kiss-cam/recording";
+import {
+  canRecordIphoneMp4,
+  startKissCamMp4Recorder,
+  type KissCamMp4Recorder,
+} from "@/lib/kiss-cam/mp4-recorder";
 
 type UiStatus =
   | "waiting"
@@ -50,7 +55,7 @@ const RECORD_MAX_MS = 3 * 60 * 1000; // soft cap so typical 720p stays under 50M
 function pickRecorderMime(): string {
   if (typeof MediaRecorder === "undefined") return "";
   // Prefer MP4/H.264 so downloads open in iPhone Photos / Safari.
-  // (Chrome/Android often only support WebM — those clips are labeled in the library.)
+  // Chrome/Android often lack MediaRecorder MP4 — WebCodecs MP4 path is tried first.
   const candidates = [
     "video/mp4;codecs=avc1.42E01E",
     "video/mp4;codecs=avc1.4D401F",
@@ -331,6 +336,7 @@ export function KissCamCameraClient() {
     async () => undefined,
   );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mp4RecorderRef = useRef<KissCamMp4Recorder | null>(null);
   const recordChunksRef = useRef<Blob[]>([]);
   const recordBytesRef = useRef(0);
   const recordStartedAtRef = useRef(0);
@@ -340,6 +346,7 @@ export function KissCamCameraClient() {
   const wantLiveRecordRef = useRef(false);
   const recordingRef = useRef(false);
   const startRecordingRef = useRef<() => Promise<void>>(async () => undefined);
+  const haltLiveRecordingRef = useRef<(opts?: { upload?: boolean }) => void>(() => undefined);
 
   const stopPlaceholderTrack = useCallback(() => {
     const track = placeholderTrackRef.current;
@@ -481,11 +488,7 @@ export function KissCamCameraClient() {
     startingRef.current = false;
     loadingBusyRef.current = false;
     wantLiveRecordRef.current = false;
-    try {
-      mediaRecorderRef.current?.stop();
-    } catch {
-      // ignore
-    }
+    haltLiveRecordingRef.current({ upload: true });
     stopPlaceholderTrack();
     try {
       await connRef.current?.stopPublishing();
@@ -583,11 +586,7 @@ export function KissCamCameraClient() {
         stopPlaceholderTrack();
         // Keep local camera preview + wake lock so LED can switch back instantly.
         wantLiveRecordRef.current = false;
-        try {
-          mediaRecorderRef.current?.stop();
-        } catch {
-          // ignore
-        }
+        haltLiveRecordingRef.current({ upload: true });
         setLoadingScreen(false);
         setNeedsConnectTap(false);
         setStatus("standby");
@@ -752,13 +751,7 @@ export function KissCamCameraClient() {
     const wasLiveRecording = wantLiveRecordRef.current;
     // Don't auto-roll a new clip while the lens swap tears down the stream.
     wantLiveRecordRef.current = false;
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch {
-        // ignore
-      }
-    }
+    haltLiveRecordingRef.current({ upload: true });
     switchingRef.current = true;
     setSwitching(true);
     setMessage(null);
@@ -928,6 +921,11 @@ export function KissCamCameraClient() {
         // ignore
       }
       mediaRecorderRef.current = null;
+      const mp4 = mp4RecorderRef.current;
+      mp4RecorderRef.current = null;
+      if (mp4) {
+        void mp4.cancel().catch(() => undefined);
+      }
     };
   }, []);
 
@@ -962,7 +960,7 @@ export function KissCamCameraClient() {
       setRecordBusy(true);
       setMessage("Uploading recording…");
       try {
-        const mimeType = (blob.type || "video/webm").split(";")[0];
+        const mimeType = (blob.type || "video/mp4").split(";")[0];
         const prepareRes = await fetch("/api/kiss-cam/recording/prepare", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1020,21 +1018,108 @@ export function KissCamCameraClient() {
     [sessionId],
   );
 
+  const finishRecordingSegment = useCallback(
+    (blob: Blob) => {
+      void uploadRecording(blob).finally(() => {
+        // Still live → roll the next clip (50MB / 3:00 segments).
+        if (wantLiveRecordRef.current && connRef.current?.isPublishing) {
+          void startRecordingRef.current();
+        }
+      });
+    },
+    [uploadRecording],
+  );
+
+  const stopActiveRecorder = useCallback(async () => {
+    const mp4 = mp4RecorderRef.current;
+    if (mp4) {
+      mp4RecorderRef.current = null;
+      try {
+        const blob = await mp4.stop();
+        return blob;
+      } catch {
+        await mp4.cancel().catch(() => undefined);
+        return null;
+      }
+    }
+    const media = mediaRecorderRef.current;
+    if (media && media.state !== "inactive") {
+      try {
+        media.stop();
+      } catch {
+        // ignore — onstop will still fire in most browsers
+      }
+    }
+    return null;
+  }, []);
+
   const startRecording = useCallback(async () => {
     if (recordingRef.current || recordBusy || switchingRef.current) return;
     if (!sessionId) return;
     if (!wantLiveRecordRef.current) return;
 
     const stream = streamRef.current;
-    const liveTrack = stream?.getVideoTracks()[0];
+    const liveTrack = stream?.getVideoTracks()[0] as MediaStreamVideoTrack | undefined;
     if (!stream || !liveTrack || liveTrack.readyState === "ended") return;
-
-    const mimeType = pickRecorderMime();
-    if (!mimeType || typeof MediaRecorder === "undefined") return;
 
     recordChunksRef.current = [];
     recordBytesRef.current = 0;
     setRecordElapsedMs(0);
+
+    const armTimers = (onMax: () => void) => {
+      recordStartedAtRef.current = Date.now();
+      recordingRef.current = true;
+      setRecording(true);
+      recordTickerRef.current = setInterval(() => {
+        setRecordElapsedMs(Date.now() - recordStartedAtRef.current);
+        // Estimate size for WebCodecs path (bytes only known after finalize).
+        if (mp4RecorderRef.current) {
+          const elapsedSec = (Date.now() - recordStartedAtRef.current) / 1000;
+          const estimated = elapsedSec * (2_500_000 / 8);
+          if (estimated >= KISS_CAM_RECORDING_MAX_BYTES * 0.9) {
+            onMax();
+          }
+        }
+      }, 250);
+      recordMaxTimerRef.current = setTimeout(onMax, RECORD_MAX_MS);
+    };
+
+    const stopAndRollMp4 = () => {
+      if (!mp4RecorderRef.current) return;
+      clearRecordTimers();
+      recordingRef.current = false;
+      setRecording(false);
+      void stopActiveRecorder().then((blob) => {
+        if (blob && blob.size > 0) finishRecordingSegment(blob);
+        else if (wantLiveRecordRef.current && connRef.current?.isPublishing) {
+          void startRecordingRef.current();
+        }
+      });
+    };
+
+    // 1) Prefer WebCodecs → MP4/H.264 (works on many Chrome/Android phones; iPhone-playable).
+    try {
+      const settings = liveTrack.getSettings();
+      const canMp4 = await canRecordIphoneMp4(
+        settings.width || 1280,
+        settings.height || 720,
+        typeof settings.frameRate === "number" ? settings.frameRate : 30,
+      );
+      if (canMp4) {
+        const recorder = await startKissCamMp4Recorder(liveTrack);
+        mp4RecorderRef.current = recorder;
+        mediaRecorderRef.current = null;
+        armTimers(stopAndRollMp4);
+        return;
+      }
+    } catch {
+      // Fall through to MediaRecorder.
+      mp4RecorderRef.current = null;
+    }
+
+    // 2) MediaRecorder — MP4 if the browser supports it, else WebM.
+    const mimeType = pickRecorderMime();
+    if (!mimeType || typeof MediaRecorder === "undefined") return;
 
     let recorder: MediaRecorder;
     try {
@@ -1051,6 +1136,7 @@ export function KissCamCameraClient() {
     }
 
     mediaRecorderRef.current = recorder;
+    mp4RecorderRef.current = null;
     recorder.ondataavailable = (event) => {
       if (!event.data || event.data.size <= 0) return;
       recordChunksRef.current.push(event.data);
@@ -1077,12 +1163,7 @@ export function KissCamCameraClient() {
       recordChunksRef.current = [];
       const type = chunks[0]?.type || mimeType || "video/webm";
       const blob = new Blob(chunks, { type });
-      void uploadRecording(blob).finally(() => {
-        // Still live → roll the next clip (50MB / 3:00 segments).
-        if (wantLiveRecordRef.current && connRef.current?.isPublishing) {
-          void startRecordingRef.current();
-        }
-      });
+      finishRecordingSegment(blob);
     };
 
     try {
@@ -1092,21 +1173,49 @@ export function KissCamCameraClient() {
       return;
     }
 
-    recordStartedAtRef.current = Date.now();
-    recordingRef.current = true;
-    setRecording(true);
-    recordTickerRef.current = setInterval(() => {
-      setRecordElapsedMs(Date.now() - recordStartedAtRef.current);
-    }, 250);
-    recordMaxTimerRef.current = setTimeout(() => {
+    armTimers(() => {
       try {
         recorder.stop();
       } catch {
         // ignore
       }
-    }, RECORD_MAX_MS);
-  }, [clearRecordTimers, recordBusy, sessionId, uploadRecording]);
+    });
+  }, [
+    clearRecordTimers,
+    finishRecordingSegment,
+    recordBusy,
+    sessionId,
+    stopActiveRecorder,
+  ]);
   startRecordingRef.current = startRecording;
+  haltLiveRecordingRef.current = (opts) => {
+    const shouldUpload = opts?.upload !== false;
+    const mp4 = mp4RecorderRef.current;
+    if (mp4) {
+      mp4RecorderRef.current = null;
+      clearRecordTimers();
+      recordingRef.current = false;
+      setRecording(false);
+      if (shouldUpload) {
+        void mp4
+          .stop()
+          .then((blob) => {
+            if (blob.size > 0) void uploadRecording(blob);
+          })
+          .catch(() => undefined);
+      } else {
+        void mp4.cancel().catch(() => undefined);
+      }
+      return;
+    }
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   const resolveCode = async () => {
     const code = codeInput.trim().toUpperCase();
