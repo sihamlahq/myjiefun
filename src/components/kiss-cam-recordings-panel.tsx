@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Eye, Loader2, RefreshCw, Trash2, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,16 +30,35 @@ function statusLabel(status: KissCamRecordingListItem["status"]) {
   return "Failed";
 }
 
+type ViewerState = {
+  id: string;
+  url: string | null;
+  fileName: string;
+  mimeType: string | null;
+  phase: "loading-url" | "buffering" | "ready" | "error";
+  error?: string;
+};
+
 export function KissCamRecordingsPanel() {
   const [recordings, setRecordings] = useState<KissCamRecordingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [viewer, setViewer] = useState<{
-    id: string;
-    url: string;
-    fileName: string;
-  } | null>(null);
+  const [viewer, setViewer] = useState<ViewerState | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  const revokeObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }, []);
+
+  const closeViewer = useCallback(() => {
+    revokeObjectUrl();
+    setViewer(null);
+  }, [revokeObjectUrl]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,12 +83,24 @@ export function KissCamRecordingsPanel() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!viewer) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeViewer();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [viewer, closeViewer]);
+
+  useEffect(() => () => revokeObjectUrl(), [revokeObjectUrl]);
+
   async function fetchSigned(id: string, opts?: { download?: boolean }) {
     const qs = opts?.download ? "?download=1" : "";
     const res = await fetch(`/api/kiss-cam/recording/${id}${qs}`, { cache: "no-store" });
     const json = (await res.json()) as {
       url?: string;
       fileName?: string;
+      mimeType?: string | null;
       error?: string;
     };
     if (!res.ok || !json.url) {
@@ -78,21 +109,117 @@ export function KissCamRecordingsPanel() {
     return {
       url: json.url,
       fileName: json.fileName || `kiss-cam-${id}.webm`,
+      mimeType: json.mimeType ?? null,
     };
   }
 
   async function onView(id: string) {
+    const item = recordings.find((row) => row.id === id);
+    const fallbackName = item
+      ? `kiss-cam-${item.shortCode || id.slice(0, 8)}.${
+          item.mimeType?.includes("mp4") ? "mp4" : "webm"
+        }`
+      : `kiss-cam-${id}.webm`;
+
+    revokeObjectUrl();
+    // Open the modal immediately so the click feels responsive.
+    setViewer({
+      id,
+      url: null,
+      fileName: fallbackName,
+      mimeType: item?.mimeType ?? null,
+      phase: "loading-url",
+    });
     setBusyId(id);
     setError(null);
+
     try {
       const signed = await fetchSigned(id);
-      setViewer({ id, ...signed });
+      setViewer({
+        id,
+        url: signed.url,
+        fileName: signed.fileName,
+        mimeType: signed.mimeType ?? item?.mimeType ?? null,
+        phase: "buffering",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to open recording");
+      const message = err instanceof Error ? err.message : "Unable to open recording";
+      setViewer({
+        id,
+        url: null,
+        fileName: fallbackName,
+        mimeType: item?.mimeType ?? null,
+        phase: "error",
+        error: message,
+      });
+      setError(message);
     } finally {
       setBusyId(null);
     }
   }
+
+  // Explicit play once the signed URL is attached. Autoplay often fails after
+  // the async signed-URL fetch (user-gesture already expired).
+  useEffect(() => {
+    if (!viewer?.url) return;
+    const el = videoRef.current;
+    if (!el) return;
+    const viewerId = viewer.id;
+    const viewerUrl = viewer.url;
+
+    let cancelled = false;
+    const markReady = () => {
+      if (!cancelled) {
+        setViewer((prev) =>
+          prev && prev.id === viewerId && prev.url === viewerUrl && prev.phase !== "error"
+            ? { ...prev, phase: "ready" }
+            : prev,
+        );
+      }
+    };
+
+    const tryPlay = () => {
+      void el
+        .play()
+        .then(markReady)
+        .catch(() => {
+          // Autoplay blocked — controls are visible; user can press play.
+          markReady();
+        });
+    };
+
+    const onReadyEnough = () => tryPlay();
+    const onError = () => {
+      if (cancelled) return;
+      setViewer((prev) =>
+        prev && prev.id === viewerId
+          ? {
+              ...prev,
+              phase: "error",
+              error: "Unable to play this clip. Try Download instead.",
+            }
+          : prev,
+      );
+    };
+
+    el.addEventListener("loadeddata", onReadyEnough);
+    el.addEventListener("canplay", onReadyEnough);
+    el.addEventListener("error", onError);
+    const safety = window.setTimeout(markReady, 12_000);
+    if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      tryPlay();
+    }
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(safety);
+      el.removeEventListener("loadeddata", onReadyEnough);
+      el.removeEventListener("canplay", onReadyEnough);
+      el.removeEventListener("error", onError);
+    };
+    // Only re-bind when the clip URL changes — not when phase flips to ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [viewer?.id, viewer?.url]);
 
   async function onDownload(id: string) {
     setBusyId(id);
@@ -152,13 +279,16 @@ export function KissCamRecordingsPanel() {
       const json = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(json.error || "Unable to delete recording");
       setRecordings((prev) => prev.filter((item) => item.id !== id));
-      setViewer((prev) => (prev?.id === id ? null : prev));
+      if (viewer?.id === id) closeViewer();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete recording");
     } finally {
       setBusyId(null);
     }
   }
+
+  const viewerBusy =
+    viewer?.phase === "loading-url" || viewer?.phase === "buffering";
 
   return (
     <>
@@ -279,11 +409,11 @@ export function KissCamRecordingsPanel() {
 
       {viewer ? (
         <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Kiss Cam video preview"
-          onClick={() => setViewer(null)}
+          onClick={closeViewer}
         >
           <div
             className="w-full max-w-3xl overflow-hidden rounded-2xl border border-white/15 bg-[#1a1014] shadow-2xl"
@@ -296,24 +426,61 @@ export function KissCamRecordingsPanel() {
                   type="button"
                   size="sm"
                   variant="secondary"
+                  disabled={busyId === viewer.id}
                   onClick={() => void onDownload(viewer.id)}
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  {busyId === viewer.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
                   Download
                 </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => setViewer(null)}>
+                <Button type="button" size="sm" variant="outline" onClick={closeViewer}>
                   Close
                 </Button>
               </div>
             </div>
-            <video
-              key={viewer.url}
-              src={viewer.url}
-              controls
-              playsInline
-              autoPlay
-              className="aspect-video max-h-[min(70vh,720px)] w-full bg-black object-contain"
-            />
+
+            <div className="relative bg-black">
+              {viewerBusy ? (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/55 text-sm text-white">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <p>
+                    {viewer.phase === "loading-url"
+                      ? "Opening clip…"
+                      : "Buffering video…"}
+                  </p>
+                </div>
+              ) : null}
+
+              {viewer.phase === "error" ? (
+                <div className="flex aspect-video max-h-[min(70vh,720px)] w-full flex-col items-center justify-center gap-3 px-6 text-center text-[#fff5f7]">
+                  <p className="text-sm">{viewer.error || "Unable to play this clip."}</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void onDownload(viewer.id)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download instead
+                  </Button>
+                </div>
+              ) : viewer.url ? (
+                <video
+                  key={viewer.url}
+                  ref={videoRef}
+                  src={viewer.url}
+                  controls
+                  playsInline
+                  preload="auto"
+                  className="aspect-video max-h-[min(70vh,720px)] w-full bg-black object-contain"
+                />
+              ) : (
+                <div className="aspect-video max-h-[min(70vh,720px)] w-full bg-black" />
+              )}
+            </div>
           </div>
         </div>
       ) : null}
